@@ -1,0 +1,327 @@
+/* ===========================================================================
+   Estilos de la ficha individual de una materia prima (/materia-prima/<id>).
+   Extraido del bloque <style> inline de la plantilla en 2026-05 — antes
+   pesaba ~264 LOC dentro del HTML.
+   =========================================================================== */
+  .mpd-section { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.2rem; }
+  .mpd-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .mpd-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
+
+  /* ==========================================================
+     CABECERA — 3 zonas: HERO (identidad+acciones) · KPIs · CONFIG
+     ========================================================== */
+
+  /* --- ZONA 1: HERO --- */
+  .mpd-hero { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 0.9rem; }
+  .mpd-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+  .mpd-hero-id { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1 1 auto; }
+  .mpd-hero-title {
+    font-size: 1.65rem; font-weight: 300; color: #2a2a2a; line-height: 1.2;
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0;
+  }
+  .mpd-hero-title-em {
+    font-weight: 500; color: #2a2a2a;
+    border-bottom: 2px solid #2a2a2a; padding-bottom: 2px;
+  }
+  /* Click-to-edit del nombre de la calidad (span con id="mpd-tipo").
+     Hover: cursor + sutil indicación visual. Cuando entra en modo
+     edicion, sustituimos el span por un input con estos mismos estilos
+     para que el cambio sea fluido. */
+  .mpd-tipo-editable {
+    cursor: text;
+    border-radius: 4px;
+    padding: 0 2px;
+    transition: background 0.12s, box-shadow 0.12s;
+  }
+  .mpd-tipo-editable:hover {
+    background: #faf3e3;
+    box-shadow: 0 0 0 4px #faf3e3;
+  }
+  /* Pequeno ✎ que aparece al hacer hover (hint visual) */
+  .mpd-tipo-editable::after {
+    content: '  ✎';
+    font-size: 0.55em;
+    color: #c8a771;
+    opacity: 0;
+    transition: opacity 0.12s;
+    vertical-align: middle;
+  }
+  .mpd-tipo-editable:hover::after { opacity: 1; }
+  /* Input que reemplaza temporalmente el span en modo edicion */
+  .mpd-tipo-editable-input {
+    font: inherit;
+    font-weight: 500;
+    color: #2a2a2a;
+    background: #fff;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 6px;
+    outline: none;
+    min-width: 8em;
+  }
+  .mpd-tipo-editable-input.saving { border-color: #d68a2a; background: #fff8e1; }
+  .mpd-tipo-editable-input.saved-ok { border-color: #2f6b29; background: #e8f3e1; }
+  .mpd-hero-subtitle { font-size: 0.85rem; color: #7a7a7a; margin: 0; }
+  .mpd-hero-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+  /* Chip estado pegado al titulo (no en una esquina) */
+  .mpd-chip-estado {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.3rem 0.8rem; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    vertical-align: middle;
+  }
+  .mpd-chip-estado.estado-pedir     { background: #fde2e2; color: #9b1c1c; border-color: #f4baba; }
+  .mpd-chip-estado.estado-en-camino { background: #dbeafe; color: #1e40af; border-color: #c2d5f4; }
+  .mpd-chip-estado.estado-bajo      { background: #fff1d6; color: #8a6d3b; border-color: #f0dcb0; }
+  .mpd-chip-estado.estado-ok        { background: #e8f3e1; color: #2f6b29; border-color: #c8e2bd; }
+  .mpd-chip-estado.estado-sin       { background: #ececec; color: #707070; border-color: #d8d8d8; }
+  .mpd-chip-estado.estado-pedir::before     { content: '🔴'; }
+  .mpd-chip-estado.estado-en-camino::before { content: '🚚'; }
+  .mpd-chip-estado.estado-bajo::before      { content: '⚠'; }
+  .mpd-chip-estado.estado-ok::before        { content: '✓'; }
+  .mpd-chip-estado.estado-sin::before       { content: '○'; }
+
+  /* Botones del hero */
+  .btn-mpd { padding: 0.55rem 1.1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; border: none; transition: background 0.12s, border-color 0.12s, color 0.12s; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; }
+  .btn-mpd-primary { background: var(--accent); color: #fff; }
+  .btn-mpd-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-mpd-ghost { background: transparent; border: 1px solid var(--border); color: #4d4d4d; }
+  .btn-mpd-ghost:hover { color: var(--accent-hover); border-color: var(--accent); }
+  /* Variante pill chiquito para "+ Añadir" */
+  .btn-mpd-pill {
+    background: transparent; border: 1px dashed var(--border);
+    color: #7a7a7a; padding: 0.35rem 0.85rem; border-radius: 999px;
+    font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .btn-mpd-pill:hover { color: var(--accent-hover); border-color: var(--accent); background: #fbf8f3; }
+
+  /* --- ZONA 2: KPIs --- */
+  .mpd-kpis-grid {
+    display: grid; gap: 0.7rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin-bottom: 0.9rem;
+  }
+  .mpd-kpi-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.95rem 1.1rem; display: flex; flex-direction: column; gap: 0.4rem;
+  }
+  .mpd-kpi-card label { font-size: 0.7rem; font-weight: 600; color: #7a7a7a; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mpd-kpi-card .val { font-size: 1.45rem; font-weight: 600; color: #2a2a2a; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .mpd-kpi-card.mpd-kpi-card-editable { background: #fbf8f3; border-color: #ede7dc; }
+  .mpd-kpi-card.mpd-kpi-card-encamino { border-color: #c2d5f4; background: #f5f9fe; }
+  .mpd-kpi-card.mpd-kpi-card-encamino .val { color: #1e40af; }
+  .mpd-kpi-card.hidden { display: none; }
+  .mpd-kpi-input-row { display: flex; align-items: baseline; gap: 0.4rem; }
+  .mpd-kpi-input {
+    font-size: 1.45rem; font-weight: 600; color: #2a2a2a;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+    width: 100%; max-width: 130px;
+    border: 1px solid transparent; border-radius: 6px;
+    padding: 0.05rem 0.4rem;
+    background: transparent; font-family: inherit;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .mpd-kpi-input:hover { background: #fff; border-color: #ede7dc; }
+  .mpd-kpi-input:focus { background: #fff; border-color: var(--accent, #C8A771); outline: none; }
+  .mpd-kpi-input.saving  { background: #fff8e1; border-color: #d68a2a; }
+  .mpd-kpi-input.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+  .mpd-kpi-unit { color: #7a7a7a; font-size: 0.82rem; }
+
+  /* --- ZONA 3: CONFIGURACIÓN --- */
+  .mpd-config {
+    background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    padding: 1rem 1.4rem;
+    display: grid; gap: 1.2rem;
+    grid-template-columns: 1.4fr 1fr;
+    margin-bottom: 1.2rem;
+  }
+  @media (max-width: 900px) { .mpd-config { grid-template-columns: 1fr; } }
+  .mpd-config-block { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+  .mpd-config-clasif { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  #mpd-grupo-material.oculto,
+  #mpd-grupo-titulo.oculto { display: none; }
+  .mpd-config-grupo { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+  .mpd-config-label {
+    font-size: 0.7rem; font-weight: 600; color: #7a7a7a;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .mpd-config-provs { display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem; min-height: 2.1rem; }
+  .mpd-select {
+    font-size: 0.92rem; font-family: inherit; color: #2a2a2a;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.4rem 0.7rem; background: #FAF8F6;
+    cursor: pointer; transition: border-color 0.12s, background 0.12s;
+  }
+  .mpd-select:hover { border-color: var(--accent); background: #fff; }
+  .mpd-select:focus { border-color: var(--accent); background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(200, 167, 113, 0.18); }
+  .mpd-select.saving { background: #fff8e1; border-color: #d68a2a; }
+  .mpd-select.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+
+  /* Pills de proveedor + boton quitar (en zona Config) */
+  .mpd-prov-link { color: #2a2a2a; text-decoration: none; font-weight: 600; border-bottom: 1px dotted var(--accent); transition: color 0.12s, border-color 0.12s; }
+  .mpd-prov-link:hover { color: var(--accent-hover); border-bottom-color: var(--accent-hover); }
+  .mpd-prov-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: #faf8f5; border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.3rem 0.55rem 0.3rem 0.8rem;
+    font-size: 0.84rem;
+  }
+  .mpd-prov-chip .mpd-prov-link { border-bottom: none; }
+  .mpd-prov-quitar {
+    background: transparent; border: none; cursor: pointer;
+    color: #b8b0a4; font-size: 0.95rem; line-height: 1;
+    padding: 0.15rem 0.3rem; border-radius: 999px;
+    font-family: inherit; transition: color 0.12s, background 0.12s;
+  }
+  .mpd-prov-quitar:hover { color: #9b1c1c; background: #fde2e2; }
+
+  /* Tabla de lotes */
+  table.mpd-tabla { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: auto; }
+  table.mpd-tabla th { text-align: left; padding: 0.45rem 0.4rem; font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #7a7a7a; border-bottom: 1px solid var(--border); }
+  table.mpd-tabla th.num, table.mpd-tabla td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.mpd-tabla td { padding: 0.55rem 0.4rem; border-bottom: 1px solid #f2ede6; color: #2a2a2a; }
+  table.mpd-tabla tr.lote-agotado td { color: #b0b0b0; }
+  table.mpd-tabla tr.lote-en-camino td { background: #f5fafd; }
+
+  /* === Bloque visual "Cantidad actual" === */
+  /* Las 3 columnas (En proveedor + En almacén Rols + Cantidad actual)
+     forman un grupo: las dos primeras se SUMAN para dar la tercera.
+     Las marcamos con un fondo cream para que se lea como un bloque,
+     con la columna del total ligeramente mas tinta para destacar. */
+  table.mpd-tabla th.mpd-bloque-cant {
+    background: #faf3e3;
+    color: #6b5224;
+    border-bottom-color: #e8d8b0;
+  }
+  table.mpd-tabla td.mpd-bloque-cant { background: #fbf6e8; }
+  table.mpd-tabla tr.lote-en-camino td.mpd-bloque-cant { background: #f1ede0; }
+  table.mpd-tabla tr.lote-agotado td.mpd-bloque-cant { background: #faf6ec; }
+  /* La celda del total: tinta un punto mas fuerte para destacar */
+  table.mpd-tabla th.mpd-bloque-cant-igual,
+  table.mpd-tabla td.mpd-bloque-cant-igual {
+    background: #f4ead0;
+  }
+  table.mpd-tabla tr.lote-en-camino td.mpd-bloque-cant-igual { background: #ebdfb8; }
+  table.mpd-tabla tr.lote-agotado td.mpd-bloque-cant-igual { background: #f0e9d8; }
+
+  /* (las reglas de .mpd-chip-estado viven arriba, junto al hero) */
+
+  /* Chips de estado (intrinseco / ubicacion) — tabla de partidos */
+  .chip { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .chip-activo  { background: #e8f3e1; color: #2f6b29; }
+  .chip-agotado { background: #ececec; color: #707070; }
+  .chip-en-almacen { background: #faf3e7; color: #8a6d3b; }
+  .chip-en-camino  { background: #dbeafe; color: #1e40af; }
+
+  /* Input observaciones inline */
+  input.mpd-obs {
+    width: 100%; min-width: 120px;
+    border: 1px solid transparent; background: transparent;
+    padding: 0.3rem 0.45rem; font-size: 0.82rem; font-family: inherit;
+    border-radius: 6px; transition: border-color 0.12s, background 0.12s;
+  }
+  input.mpd-obs:hover { border-color: #ede7dc; background: #fbf8f3; }
+  input.mpd-obs:focus { border-color: var(--accent); background: #fff; outline: none; }
+  input.mpd-obs.saving { background: #fff8e1; }
+  input.mpd-obs.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+
+  /* Botones de acción inline */
+  .mpd-btn-row { background: transparent; border: 1px solid var(--border); color: #7a7a7a; padding: 0.28rem 0.65rem; border-radius: 999px; font-size: 0.74rem; cursor: pointer; transition: color 0.12s, border-color 0.12s; font-family: inherit; }
+  .mpd-btn-row:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+  .mpd-empty { color: #9a9a9a; padding: 1.5rem; text-align: center; font-style: italic; }
+
+  /* Mini-sparkline precios (cabecera) */
+  .mpd-spark { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #7a7a7a; }
+  .mpd-spark-line { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .mpd-spark-dot { fill: var(--accent-hover); }
+
+  /* === Modal "Generar pedido" — reaprovechado de materias_primas.html
+        para que el boton de la ficha abra aqui sin cambiar de pagina ===
+        Misma estetica que en el tab Compras del listado. */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(35, 30, 25, 0.45); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-backdrop.open { display: flex; }
+
+  /* Toggle de direccion del modal Mover. IMPORTANTE: definir aqui
+     todos los estilos base (fondo, borde, padding, etc.) para que no
+     queden como inline styles en el HTML — los inline ganarian a la
+     clase .active y dejarian el boton blanco con texto blanco al
+     activarse. */
+  .mpd-mover-dir-btn {
+    flex: 1;
+    padding: 0.6rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #2a2a2a;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.84rem;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .mpd-mover-dir-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-hover); }
+  .mpd-mover-dir-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .mpd-mover-dir-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .mpd-mover-dir-btn.active[data-dir="a-proveedor"] { background: #6b46c1; border-color: #6b46c1; color: #fff; }
+  .mpd-mover-dir-btn.active[data-dir="a-rols"] { background: #2c5b8a; border-color: #2c5b8a; color: #fff; }
+  .ped-modal-card { background: #fff; border-radius: 14px; padding: 1.6rem 1.8rem; min-width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.22); }
+  .ped-modal-card h3 { font-size: 1.12rem; font-weight: 600; color: #2a2a2a; margin-bottom: 0.25rem; }
+  .ped-modal-card .ped-sub { font-size: 0.84rem; color: #7a7a7a; margin-bottom: 1.2rem; }
+  .ped-prov-grupo { border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.9rem; }
+  .ped-prov-titulo { font-weight: 700; color: #2a2a2a; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+  .ped-prov-titulo small { font-weight: 400; color: #7a7a7a; font-size: 0.72rem; }
+  table.ped-tabla { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  table.ped-tabla th { text-align: left; padding: 0.3rem 0.4rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; color: #7a7a7a; }
+  table.ped-tabla th.num, table.ped-tabla td.num { text-align: right; }
+  table.ped-tabla td { padding: 0.4rem 0.4rem; border-top: 1px solid #f2ede6; vertical-align: middle; }
+  table.ped-tabla input.ped-input { border: 1px solid #ede7dc; border-radius: 6px; padding: 0.3rem 0.45rem; font-size: 0.82rem; width: 80px; font-variant-numeric: tabular-nums; background: #fbf8f3; text-align: right; font-family: inherit; }
+  table.ped-tabla input.ped-input:focus { border-color: var(--accent); background: #fff; outline: none; }
+  .ped-prov-total { font-size: 0.85rem; color: #4d4d4d; }
+  .ped-prov-total strong { color: #2a2a2a; font-size: 0.95rem; }
+  .ped-prov-bottom { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding-top: 0.6rem; flex-wrap: wrap; }
+  .btn-prov-solo { font-size: 0.78rem; padding: 0.38rem 0.85rem; }
+  .ped-prov-feedback { font-size: 0.78rem; margin-top: 0.5rem; display: none; }
+  .ped-prov-feedback.ok  { color: #2f6b29; display: block; }
+  .ped-prov-feedback.err { color: #9b1c1c; display: block; }
+  .ped-prov-grupo.enviado { opacity: 0.6; }
+  .ped-prov-grupo.enviado input { background: #f4ede5; pointer-events: none; }
+  .ped-prov-grupo.enviado .btn-prov-solo { display: none; }
+  .ped-nota { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.85rem; font-family: inherit; resize: vertical; min-height: 60px; background: #FAF8F6; }
+  .ped-nota:focus { border-color: var(--accent); background: #fff; outline: none; }
+  .ped-modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1rem; }
+  .ped-success { background: #e8f3e1; color: #2f6b29; border: 1px solid #c8e2bd; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.85rem; margin-bottom: 0.8rem; display: none; }
+  .ped-success.show { display: block; }
+  .ped-success a { color: #2f6b29; font-weight: 600; text-decoration: underline; margin-right: 0.7rem; }
+  .ped-error { background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba; border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; margin-bottom: 0.8rem; display: none; }
+  .ped-error.show { display: block; }
+  .btn-pedido { background: var(--accent); color: #fff; border: none; padding: 0.5rem 1.1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s; }
+  .btn-pedido:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-pedido:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-pedido-ghost { background: transparent; color: #7a7a7a; border: 1px solid var(--border); padding: 0.45rem 0.9rem; border-radius: 999px; font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+  .btn-pedido-ghost:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+  /* Zona peligrosa: borrar materia prima entera. Separada visualmente con
+     borde rojizo para que no se confunda con las secciones de datos. */
+  .mpd-zona-peligro { border: 1px solid #f3c8c8; background: #fdf6f6; }
+  .mpd-zona-peligro-body {
+    display: flex; gap: 1.2rem; align-items: center; justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .mpd-zona-peligro-texto { flex: 1; min-width: 280px; }
+  .mpd-zona-peligro-texto strong { display: block; font-size: 0.9rem; color: #4d4d4d; margin-bottom: 0.25rem; }
+  .mpd-zona-peligro-texto p { margin: 0; font-size: 0.78rem; color: #7a7a7a; line-height: 1.4; }
+  .mpd-zona-peligro-btn {
+    background: #fff; color: #9b1c1c; border: 1px solid #e0a0a0;
+    padding: 0.55rem 1.1rem; border-radius: 999px;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    white-space: nowrap;
+  }
+  .mpd-zona-peligro-btn:hover {
+    background: #9b1c1c; color: #fff; border-color: #9b1c1c;
+  }

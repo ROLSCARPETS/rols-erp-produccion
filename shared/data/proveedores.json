@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "version_schema": 1,
+    "actualizado_en": "2026-05-23T18:46:45"
+  },
+  "proveedores": [
+    {
+      "id": "aquafil",
+      "nombre": "AQUAFIL",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T18:46:45",
+      "alias": "AQUAFIL"
+    },
+    {
+      "id": "cobo",
+      "nombre": "COBO",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T15:03:40",
+      "alias": "COBO",
+      "contacto_persona": "michael"
+    },
+    {
+      "id": "filmuro",
+      "nombre": "FILMURO",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T12:48:53",
+      "alias": "FILMURO"
+    },
+    {
+      "id": "globaltex",
+      "nombre": "GLOBALTEX",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T12:48:53",
+      "alias": "GLOBALTEX"
+    },
+    {
+      "id": "htc",
+      "nombre": "HTC",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T13:15:16",
+      "alias": "HTC"
+    },
+    {
+      "id": "htc-federico",
+      "nombre": "HTC / FEDERICO",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T12:48:53",
+      "alias": "HTC / FEDERICO"
+    },
+    {
+      "id": "proveedor-2",
+      "nombre": "PROVEEDOR 2",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T12:48:53",
+      "alias": "PROVEEDOR 2"
+    },
+    {
+      "id": "turktex",
+      "nombre": "TURKTEX",
+      "activo": true,
+      "creado_en": "2026-05-23T12:48:53",
+      "actualizado_en": "2026-05-23T12:48:53",
+      "alias": "TURKTEX"
+    },
+    {
+      "id": "tt",
+      "nombre": "TT",
+      "alias": "TT",
+      "activo": true,
+      "creado_en": "2026-05-23T15:02:51",
+      "actualizado_en": "2026-05-23T15:03:00"
+    }
+  ]
+}

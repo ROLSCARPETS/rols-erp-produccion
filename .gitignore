@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Logs
+*.log
+
+# Claude Code local settings
+.claude/
+
+# Variables de entorno (secretos)
+.env
+.env.*
+!.env.example
+
+# Datos de runtime editados desde la UI. El repo lleva shared/data/*.json como
+# SEED; en produccion la verdad vive en ROLS_DATA_DIR (fuera del docroot).
+# Backups locales generados durante migraciones.
+shared/data/.bak/
+
+# Lock temporal del bootstrap de reportlab
+.reportlab_install.lock

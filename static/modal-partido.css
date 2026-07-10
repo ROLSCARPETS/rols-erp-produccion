@@ -1,0 +1,112 @@
+/* Modal "Editar partido" — estilo Rols */
+.mp-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(35, 30, 25, 0.45);
+  display: none; align-items: center; justify-content: center;
+  z-index: 200;
+}
+.mp-backdrop.open { display: flex; }
+.mp-modal {
+  background: #fff; border-radius: 14px;
+  padding: 1.6rem 1.8rem;
+  min-width: 480px; max-width: 92vw;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  font-family: inherit;
+}
+.mp-modal h3 { font-size: 1.05rem; font-weight: 600; color: #2a2a2a; margin: 0 0 0.3rem; }
+.mp-modal .mp-sub { font-size: 0.85rem; color: #5a5a5a; line-height: 1.4; margin: 0 0 1rem; }
+.mp-modal .mp-row { margin-bottom: 0.85rem; }
+.mp-modal .mp-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.mp-modal label {
+  display: block;
+  font-size: 0.74rem; font-weight: 600; color: #4d4d4d;
+  margin-bottom: 0.25rem;
+}
+.mp-modal input[type="text"],
+.mp-modal input[type="number"],
+.mp-modal input[type="date"] {
+  width: 100%;
+  border: 1px solid var(--border, #E5DCD2); border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem; font-family: inherit;
+  background: #FAF8F6; outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.mp-modal input:focus {
+  border-color: var(--accent, #C8A771); background: #fff;
+}
+.mp-modal .mp-error {
+  background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba;
+  padding: 0.5rem 0.7rem; border-radius: 6px;
+  font-size: 0.82rem; margin: 0 0 0.8rem; display: none;
+}
+.mp-modal .mp-error.show { display: block; }
+.mp-modal .mp-actions {
+  display: flex; gap: 0.6rem; align-items: center; margin-top: 0.6rem;
+}
+.mp-modal .mp-btn {
+  padding: 0.55rem 1.1rem; border-radius: 999px;
+  font-size: 0.88rem; font-weight: 500;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  border: 1px solid transparent;
+}
+.mp-modal .mp-btn-primary {
+  background: var(--accent, #C8A771); color: #fff; border-color: var(--accent, #C8A771);
+}
+.mp-modal .mp-btn-primary:hover:not(:disabled) { background: var(--accent-hover, #B89368); }
+.mp-modal .mp-btn-ghost {
+  background: transparent; color: #5a5a5a; border-color: var(--border, #E5DCD2);
+}
+.mp-modal .mp-btn-ghost:hover { color: #2a2a2a; border-color: var(--accent, #C8A771); }
+.mp-modal .mp-btn-danger {
+  background: transparent; color: #9b1c1c; border-color: #f4baba;
+}
+.mp-modal .mp-btn-danger:hover:not(:disabled) { background: #fde2e2; color: #7a1414; }
+.mp-modal .mp-btn:disabled { opacity: 0.55; cursor: wait; }
+
+/* === Bloque "Cantidad actual" + ajuste (+/-) ============================
+   Antes habia un input "Cantidad (kg)" sobreescribible. Ahora el saldo
+   actual se ensena como lectura y los cambios se hacen como ajuste
+   con signo, para que quede trazabilidad en el historico de movimientos.
+   ===================================================================== */
+.mp-modal .mp-cant-actual {
+  font-size: 1.05rem; font-weight: 700; color: #2a2a2a;
+  font-variant-numeric: tabular-nums;
+  background: #FAF8F6; border: 1px solid var(--border, #E5DCD2);
+  border-radius: 8px; padding: 0.5rem 0.7rem;
+  letter-spacing: 0.01em;
+}
+.mp-modal .mp-ajuste-row {
+  display: flex; align-items: stretch; gap: 0.5rem;
+}
+.mp-modal .mp-ajuste-toggle {
+  display: inline-flex; background: #f4ede5; border-radius: 999px; padding: 3px;
+  flex-shrink: 0;
+}
+.mp-modal .mp-ajuste-btn {
+  border: none; background: transparent;
+  padding: 0.35rem 0.75rem; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600; color: #7a7a7a;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+.mp-modal .mp-ajuste-btn:hover:not(.active) { color: #4d4d4d; }
+.mp-modal .mp-ajuste-btn.active {
+  background: #fff; color: #2a2a2a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.mp-modal .mp-ajuste-btn#mp-aj-neg.active { color: #9b1c1c; }
+.mp-modal .mp-ajuste-btn#mp-aj-pos.active { color: #2f6b29; }
+.mp-modal .mp-ajuste-unit {
+  display: inline-flex; align-items: center;
+  color: #7a7a7a; font-size: 0.88rem; padding: 0 0.4rem 0 0.1rem;
+}
+.mp-modal .mp-cant-resultado {
+  font-size: 0.82rem; color: #5a5a5a; margin-top: 0.45rem;
+}
+.mp-modal .mp-cant-resultado strong {
+  color: #2a2a2a; font-variant-numeric: tabular-nums;
+}
+.mp-modal .mp-cant-resultado strong.mp-resultado-warn { color: #8a6d3b; }
+.mp-modal .mp-cant-resultado strong.mp-resultado-neg  { color: #9b1c1c; }

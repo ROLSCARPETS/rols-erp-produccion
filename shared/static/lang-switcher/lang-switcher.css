@@ -1,0 +1,86 @@
+/* ============================================================
+ * Rols One — Selector de idioma compacto (shared)
+ *
+ * Boton de la topbar con la bandera del idioma activo. Click
+ * despliega un dropdown con las 8 opciones. Auto-contenido,
+ * no depende de variables de la app que lo monta.
+ * ============================================================ */
+
+.rols-lang {
+    --rl-border: var(--border, #e6dfd6);
+    --rl-accent: var(--accent, #c8a771);
+    --rl-bg: #fff;
+    --rl-text: #4D4D4D;
+    --rl-hover: #FAF8F6;
+    position: relative;
+    display: inline-block;
+}
+
+.rols-lang-btn {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    background: var(--rl-bg);
+    border: 1px solid var(--rl-border);
+    border-radius: 999px;
+    padding: 0.4rem 0.7rem 0.4rem 0.55rem;
+    font-family: inherit; font-size: 0.78rem; font-weight: 500;
+    color: var(--rl-text); cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+}
+.rols-lang-btn:hover {
+    border-color: var(--rl-accent);
+    background: var(--rl-hover);
+}
+.rols-lang-btn .rols-lang-flag {
+    width: 18px; height: 14px; display: inline-block;
+    border-radius: 2px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
+}
+.rols-lang-btn .rols-lang-code { letter-spacing: 0.04em; }
+.rols-lang-btn .rols-lang-caret {
+    width: 10px; height: 10px; margin-left: 0.15rem;
+    color: #9a9a9a;
+}
+
+.rols-lang-menu {
+    position: absolute; top: calc(100% + 0.4rem); right: 0;
+    background: var(--rl-bg);
+    border: 1px solid var(--rl-border);
+    border-radius: 10px;
+    padding: 0.3rem;
+    box-shadow: 0 14px 32px -10px rgba(77,77,77,0.25), 0 4px 10px rgba(77,77,77,0.08);
+    z-index: 80;
+    min-width: 160px;
+    display: none;
+}
+.rols-lang-menu.open { display: block; animation: rlIn 0.12s ease-out; }
+@keyframes rlIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.rols-lang-item {
+    display: flex; align-items: center; gap: 0.55rem;
+    width: 100%; text-align: left;
+    background: transparent; border: none;
+    padding: 0.45rem 0.6rem; border-radius: 7px;
+    font-family: inherit; font-size: 0.82rem; color: var(--rl-text);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.rols-lang-item:hover { background: var(--rl-hover); }
+.rols-lang-item.active {
+    background: var(--rl-hover);
+    color: var(--rl-accent); font-weight: 600;
+}
+.rols-lang-item .rols-lang-flag {
+    width: 20px; height: 15px; display: inline-block;
+    border-radius: 2px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}
+.rols-lang-item .rols-lang-label { flex-grow: 1; }
+.rols-lang-item .rols-lang-check {
+    width: 14px; height: 14px; color: var(--rl-accent);
+    visibility: hidden;
+}
+.rols-lang-item.active .rols-lang-check { visibility: visible; }

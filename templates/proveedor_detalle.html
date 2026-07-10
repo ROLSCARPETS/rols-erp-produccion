@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ficha proveedor — Rols ERP Producción</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='ui-modales.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='materias-primas.css') }}">
+<script src="/shared/sso-guard.js"></script>
+<script src="{{ url_for('static', filename='ui-modales.js') }}"></script>
+<link rel="stylesheet" href="/shared/lang-switcher/lang-switcher.css">
+<style>
+  /* ===== Hero / KPIs (mismo lenguaje que la ficha de materia prima) ===== */
+  .pv-hero { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 0.9rem; }
+  .pv-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+  .pv-hero-id { flex: 1 1 auto; min-width: 0; }
+  .pv-hero-title { font-size: 1.65rem; font-weight: 300; color: #2a2a2a; line-height: 1.2; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
+  .pv-hero-title-em { font-weight: 500; color: #2a2a2a; border-bottom: 2px solid #2a2a2a; padding-bottom: 2px; }
+  .pv-hero-subtitle { font-size: 0.85rem; color: #7a7a7a; margin: 0.25rem 0 0; }
+  .pv-hero-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .btn-pv { padding: 0.55rem 1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+  .btn-pv-ghost { background: transparent; border: 1px solid var(--border); color: #4d4d4d; text-decoration: none; display: inline-block; }
+  .btn-pv-ghost:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .btn-pv-primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+  .btn-pv-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-pv-danger { background: transparent; border: 1px solid #e8c2c2; color: #c25656; }
+  .btn-pv-danger:hover { background: #fde2e2; color: #9b1c1c; }
+
+  .pv-chip-estado { display: inline-block; padding: 0.18rem 0.65rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .pv-chip-activo   { background: #e8f3e1; color: #2f6b29; }
+  .pv-chip-inactivo { background: #ececec; color: #707070; }
+
+  .pv-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 0.9rem; }
+  @media (max-width: 1100px) { .pv-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .pv-kpi-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1rem; }
+  .pv-kpi-label { font-size: 0.72rem; color: #7a7a7a; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.25rem; }
+  .pv-kpi-value { font-size: 1.45rem; font-weight: 600; color: #2a2a2a; font-variant-numeric: tabular-nums; }
+
+  /* ===== Secciones ===== */
+  .pv-section { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; }
+  .pv-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin: 0 0 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+  .pv-section-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
+
+  /* Campos editables (mismo patron que prov-ficha del listado) */
+  .pv-ficha-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem 1.5rem; }
+  @media (max-width: 1100px) { .pv-ficha-grid { grid-template-columns: repeat(2, 1fr); } }
+  .pv-bloque h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7a7a7a; margin: 0 0 0.55rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  .pv-campo { margin-bottom: 0.55rem; }
+  .pv-campo label { display: block; font-size: 0.7rem; font-weight: 600; color: #7a7a7a; margin-bottom: 0.15rem; }
+  .pv-campo input, .pv-campo textarea {
+    width: 100%; border: 1px solid transparent; border-radius: 6px;
+    padding: 0.32rem 0.5rem; font-size: 0.86rem; font-family: inherit;
+    background: transparent;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .pv-campo input:hover, .pv-campo textarea:hover { background: #fbf8f3; border-color: #ede7dc; }
+  .pv-campo input:focus, .pv-campo textarea:focus { background: #fff; border-color: var(--accent); outline: none; }
+  .pv-campo input.saving, .pv-campo textarea.saving { background: #fff8e1; }
+  .pv-campo input.saved-ok, .pv-campo textarea.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+  .pv-campo textarea { resize: vertical; min-height: 60px; }
+
+  /* Tablas (pedidos abiertos / recientes / calidades) */
+  table.pv-tabla { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.pv-tabla th { text-align: left; padding: 0.5rem 0.6rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #7a7a7a; border-bottom: 1px solid var(--border); }
+  table.pv-tabla th.num, table.pv-tabla td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.pv-tabla td { padding: 0.6rem 0.6rem; border-bottom: 1px solid #f2ede6; color: #2a2a2a; }
+  table.pv-tabla tr:last-child td { border-bottom: none; }
+  table.pv-tabla a.pv-link { color: #2a2a2a; text-decoration: none; border-bottom: 1px dotted transparent; transition: color 0.12s, border-color 0.12s; }
+  table.pv-tabla a.pv-link:hover { color: var(--accent-hover); border-bottom-color: var(--accent); }
+  .pv-empty { padding: 1.5rem; text-align: center; color: #9a9a9a; font-style: italic; }
+
+  /* Chips de estado para pedidos */
+  .ped-chip { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ped-chip-abierto  { background: #dbeafe; color: #1e40af; }
+  .ped-chip-recibido { background: #e8f3e1; color: #2f6b29; }
+  .ped-chip-anulado  { background: #ececec; color: #707070; }
+
+  /* Calidades suministradas: tabla con filas expandibles (precios + historico) */
+  tr.pv-cal-row-expandable { cursor: pointer; }
+  tr.pv-cal-row-expandable:hover { background: #faf8f5; }
+  .pv-cal-caret {
+    display: inline-block; margin-right: 0.3rem; color: #b09d77;
+    font-size: 0.7rem; transition: transform 0.18s;
+  }
+  tr.pv-cal-row-expanded .pv-cal-caret { transform: rotate(90deg); }
+  .pv-cal-histcount {
+    display: inline-block; margin-left: 0.5rem;
+    background: #f4ede5; color: #7a6a4d;
+    border-radius: 999px; padding: 0.05rem 0.5rem;
+    font-size: 0.7rem; font-weight: 600;
+    vertical-align: middle;
+  }
+  tr.pv-cal-detail-row > td {
+    background: #fbf8f3 !important;
+    padding: 0 !important;
+    border-top: none;
+  }
+  .pv-cal-detail-inner {
+    padding: 0.7rem 1rem 1rem;
+    border-left: 3px solid var(--accent);
+    margin: 0 0 0.3rem 0.5rem;
+  }
+  .pv-cal-detail-titulo {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #7a7a7a; margin-bottom: 0.5rem;
+  }
+  .pv-cal-detail-tabla {
+    width: 100%; border-collapse: collapse; font-size: 0.84rem;
+    background: #fff; border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .pv-cal-detail-tabla th {
+    background: #f4ede5; padding: 0.4rem 0.6rem;
+    font-weight: 600; color: #7a7a7a; text-align: left;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .pv-cal-detail-tabla td { padding: 0.45rem 0.6rem; border-top: 1px solid #f0e9dc; }
+  .pv-cal-detail-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Input editable de precio tarifa */
+  .pv-tarifa-input {
+    width: 80px; padding: 0.25rem 0.4rem;
+    border: 1px solid #ede5d0; border-radius: 6px;
+    font-size: 0.85rem; font-family: inherit; background: #fff;
+    text-align: right; font-variant-numeric: tabular-nums;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .pv-tarifa-input:hover { border-color: #c8a771; }
+  .pv-tarifa-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(213,179,140,0.18); }
+  .pv-tarifa-input.saving { background: #fff8e1; }
+  .pv-tarifa-input.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+  .pv-tarifa-input.saved-err { background: #fde2e2; border-color: #9b1c1c; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="flex min-h-screen">
+  <!-- Sidebar (igual que en el resto de calc) -->
+  <aside class="sidebar w-64 flex-shrink-0 flex flex-col px-4 py-6">
+    <div class="px-2 mb-8">
+      <img src="{{ url_for('static', filename='logo-rols.png') }}" alt="Rols" class="rols-logo" />
+    </div>
+    <nav class="space-y-1">
+      <a href="/materias-primas"><span class="check"></span><span data-i18n="materias.breadcrumb">Materias primas</span></a>
+      <a href="/materias-primas#proveedores" class="active"><span class="check"></span><span>Proveedores</span></a>
+    </nav>
+    <div class="space-y-1 pt-4 border-t border-stone-700/50">
+      <a href="{{ nav.cuentas }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
+    </div>
+  </aside>
+
+  <main class="flex-grow px-10 py-8 overflow-x-hidden">
+
+    <div class="mb-6 flex justify-between items-start">
+      <div>
+        <p class="breadcrumb mb-1">
+          <span>Compras</span> ·
+          <a href="/materias-primas#proveedores">Proveedores</a> ·
+          <span id="pv-bread-alias">…</span>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div data-lang-switcher></div>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="pv-hero">
+      <div class="pv-hero-top">
+        <div class="pv-hero-id">
+          <h1 class="pv-hero-title">
+            <span id="pv-alias">…</span>
+            <span class="pv-hero-title-em" id="pv-nombre">…</span>
+            <span class="pv-chip-estado" id="pv-estado">—</span>
+          </h1>
+          <p class="pv-hero-subtitle" id="pv-hero-sub">—</p>
+        </div>
+        <div class="pv-hero-actions">
+          <a href="/materias-primas#proveedores" class="btn-pv btn-pv-ghost">← Volver a Proveedores</a>
+          <button type="button" class="btn-pv btn-pv-ghost" id="pv-btn-toggle">Desactivar</button>
+          <button type="button" class="btn-pv btn-pv-danger" id="pv-btn-borrar"
+                  title="Solo se puede borrar si no tiene calidades vinculadas">Borrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="pv-kpis">
+      <div class="pv-kpi-card">
+        <div class="pv-kpi-label">Calidades suministradas</div>
+        <div class="pv-kpi-value" id="pv-kpi-calidades">0</div>
+      </div>
+      <div class="pv-kpi-card">
+        <div class="pv-kpi-label">Stock total</div>
+        <div class="pv-kpi-value" id="pv-kpi-stock">0 kg</div>
+      </div>
+      <div class="pv-kpi-card">
+        <div class="pv-kpi-label">Pedidos en camino</div>
+        <div class="pv-kpi-value" id="pv-kpi-pedidos">0</div>
+      </div>
+      <div class="pv-kpi-card">
+        <div class="pv-kpi-label">Plazo de entrega</div>
+        <div class="pv-kpi-value" id="pv-kpi-plazo">—</div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS EN CAMINO -->
+    <section class="pv-section">
+      <div class="pv-section-title">
+        <span>Pedidos en camino</span>
+        <span class="pv-section-count" id="pv-ab-count">0</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="pv-tabla" style="min-width:900px">
+          <thead>
+            <tr>
+              <th>Ref pedido</th>
+              <th>Calidad</th>
+              <th class="num">kg</th>
+              <th class="num">€/kg</th>
+              <th class="num">Importe</th>
+              <th>Partido</th>
+              <th>Fecha pedido</th>
+              <th>ETA llegada</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="pv-ab-tbody">
+            <tr><td colspan="9" class="pv-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PEDIDOS EN ALMACÉN (pedidos cuya mercancía ya ha llegado al
+         almacén Rols — estado = 'recibido'). Los anulados se filtran
+         fuera de esta vista; siguen quedando en el histórico de
+         movimientos para auditoría. -->
+    <section class="pv-section">
+      <div class="pv-section-title">
+        <span>Pedidos en almacén</span>
+        <span class="pv-section-count" id="pv-rec-count">0</span>
+        <span style="font-size:0.74rem; color:#9a9a9a; font-weight:400; margin-left:0.5rem;">
+          últimos 10 recibidos
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="pv-tabla" style="min-width:900px">
+          <thead>
+            <tr>
+              <th>Ref pedido</th>
+              <th>Calidad</th>
+              <th class="num">kg</th>
+              <th class="num">€/kg</th>
+              <th>Partido</th>
+              <th>Fecha pedido</th>
+              <th>Fecha llegada</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="pv-rec-tbody">
+            <tr><td colspan="8" class="pv-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CALIDADES SUMINISTRADAS + PRECIOS -->
+    <section class="pv-section">
+      <div class="pv-section-title">
+        <span>Calidades suministradas y precios</span>
+        <span class="pv-section-count" id="pv-cal-count">0</span>
+        <span style="font-size:0.74rem; color:#9a9a9a; font-weight:400; margin-left:0.5rem;">
+          último €/kg por calidad · click en fila para ver histórico
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="pv-tabla" id="pv-cal-tabla" style="min-width:880px">
+          <thead>
+            <tr>
+              <th>Calidad</th>
+              <th class="num">Stock actual</th>
+              <th class="num">Precio tarifa</th>
+              <th class="num">Último €/kg</th>
+              <th class="num">Δ vs anterior</th>
+              <th>Fecha último precio</th>
+              <th style="text-align:right">Ver ficha</th>
+            </tr>
+          </thead>
+          <tbody id="pv-cal-tbody">
+            <tr><td colspan="7" class="pv-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DATOS FICHA (editables) -->
+    <section class="pv-section">
+      <div class="pv-section-title">
+        <span>Ficha del proveedor</span>
+      </div>
+      <div class="pv-ficha-grid" id="pv-ficha-grid">
+        <!-- Bloques rellenados por JS para reusar el patron del listado -->
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const PROV_ID = {{ prov_id | tojson }};
+let _PROV = null;  // proveedor actual cacheado
+
+function currentUsuario() {
+  try { return (window.__rolsUser && window.__rolsUser.username) || ''; }
+  catch (_) { return ''; }
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtNum(n, dec = 0) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('es-ES', {
+    minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: 'always',
+  });
+}
+function fmtKg(n)  { return n == null || isNaN(n) ? '—' : fmtNum(n, 0) + ' kg'; }
+function fmtEur(n) { return n == null || isNaN(n) ? '—' : fmtNum(n, 2) + ' €/kg'; }
+function fmtImporte(n) { return n == null || isNaN(n) ? '—' : fmtNum(n, 2) + ' €'; }
+function fmtFecha(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('es-ES');
+}
+
+async function cargar() {
+  try {
+    const r = await fetch(`/api/proveedor/${encodeURIComponent(PROV_ID)}/detalle`);
+    if (r.status === 404) {
+      document.querySelector('main').innerHTML =
+        '<div class="pv-empty" style="margin-top:3rem">Proveedor no encontrado.</div>';
+      return;
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    _PROV = d.proveedor;
+    pintarHero(d);
+    pintarKpis(d);
+    pintarPedidosAbiertos(d.pedidos_abiertos || []);
+    pintarPedidosRecientes(d.pedidos_recientes || []);
+    pintarCalidades(d.variantes || []);
+    pintarFicha(d.proveedor);
+  } catch (err) {
+    await mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+  }
+}
+
+function pintarHero(d) {
+  const p = d.proveedor;
+  const alias = (p.alias || p.nombre || '').trim();
+  const nombre = (p.nombre || '').trim();
+  // H1: ALIAS  nombre comercial (si distinto)  CHIP
+  document.getElementById('pv-alias').textContent = alias || '—';
+  document.getElementById('pv-nombre').textContent =
+    (nombre && nombre.toUpperCase() !== alias.toUpperCase()) ? nombre : '';
+  document.getElementById('pv-bread-alias').textContent = alias || PROV_ID;
+  document.title = `${alias || PROV_ID} — Proveedor — Rols One`;
+  // Subtitle: contacto + telefono o email si los hay
+  const partes = [];
+  if (p.contacto_persona) partes.push(p.contacto_persona);
+  if (p.contacto_email)   partes.push(p.contacto_email);
+  if (p.contacto_telefono) partes.push(p.contacto_telefono);
+  document.getElementById('pv-hero-sub').textContent =
+    partes.length ? partes.join(' · ') : 'Sin datos de contacto todavía';
+  // Estado chip
+  const chip = document.getElementById('pv-estado');
+  if (p.activo) {
+    chip.className = 'pv-chip-estado pv-chip-activo';
+    chip.textContent = 'Activo';
+    document.getElementById('pv-btn-toggle').textContent = 'Desactivar';
+  } else {
+    chip.className = 'pv-chip-estado pv-chip-inactivo';
+    chip.textContent = 'Inactivo';
+    document.getElementById('pv-btn-toggle').textContent = 'Reactivar';
+  }
+  // Boton borrar: deshabilitado si hay calidades vinculadas
+  const btnBorrar = document.getElementById('pv-btn-borrar');
+  const nCal = (d.kpis && d.kpis.n_calidades) || 0;
+  btnBorrar.disabled = nCal > 0;
+  btnBorrar.title = nCal > 0
+    ? `Tiene ${nCal} calidad(es) vinculadas — desactívalo en lugar de borrarlo`
+    : 'Borrar definitivamente este proveedor';
+}
+
+function pintarKpis(d) {
+  const k = d.kpis || {};
+  document.getElementById('pv-kpi-calidades').textContent = k.n_calidades || 0;
+  document.getElementById('pv-kpi-stock').textContent = fmtKg(k.stock_total_kg || 0);
+  document.getElementById('pv-kpi-pedidos').textContent =
+    (k.n_pedidos_abiertos || 0) + ' ' + ((k.n_pedidos_abiertos || 0) === 1 ? 'pedido' : 'pedidos');
+  const plazo = d.proveedor && d.proveedor.plazo_entrega_dias;
+  document.getElementById('pv-kpi-plazo').textContent = plazo
+    ? `${plazo} día${plazo === 1 ? '' : 's'}`
+    : '—';
+}
+
+function pintarPedidosAbiertos(peds) {
+  document.getElementById('pv-ab-count').textContent = peds.length;
+  const tb = document.getElementById('pv-ab-tbody');
+  if (!peds.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="pv-empty">No hay pedidos en camino con este proveedor.</td></tr>';
+    return;
+  }
+  tb.innerHTML = peds.map(p => `
+    <tr>
+      <td><strong>${escapeHtml(p.ref || '—')}</strong></td>
+      <td>
+        <a href="/materia-prima/${encodeURIComponent(p.calidad_id || '')}"
+           class="pv-link" title="Abrir ficha de la materia prima">
+          ${escapeHtml(p.calidad_nombre || '—')}
+        </a>
+      </td>
+      <td class="num"><strong>${fmtKg(p.kg)}</strong></td>
+      <td class="num">${p.eur_kg != null ? fmtEur(p.eur_kg) : '—'}</td>
+      <td class="num">${fmtImporte(p.importe)}</td>
+      <td>${escapeHtml(p.partido_previsto || '—')}</td>
+      <td>${fmtFecha(p.fecha)}</td>
+      <td>${p.fecha_estimada
+            ? `<span style="color:#1e40af">${fmtFecha(p.fecha_estimada)}</span>`
+            : '—'}</td>
+      <td><span class="ped-chip ped-chip-abierto">🚚 EN CAMINO</span></td>
+    </tr>
+  `).join('');
+}
+
+function pintarPedidosRecientes(peds) {
+  // Solo mostramos pedidos cuya mercancia ya esta fisicamente en el
+  // almacen Rols. Los anulados se filtran fuera; siguen registrados
+  // en el historico de movimientos para auditoria.
+  const recibidos = (peds || []).filter(p => p.estado === 'recibido');
+  document.getElementById('pv-rec-count').textContent = recibidos.length;
+  const tb = document.getElementById('pv-rec-tbody');
+  if (!recibidos.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="pv-empty">Sin pedidos recibidos todavía.</td></tr>';
+    return;
+  }
+  tb.innerHTML = recibidos.map(p => `
+    <tr>
+      <td><strong>${escapeHtml(p.ref || '—')}</strong></td>
+      <td>
+        <a href="/materia-prima/${encodeURIComponent(p.calidad_id || '')}"
+           class="pv-link" title="Abrir ficha de la materia prima">
+          ${escapeHtml(p.calidad_nombre || '—')}
+        </a>
+      </td>
+      <td class="num">${fmtKg(p.kg)}</td>
+      <td class="num">${p.eur_kg != null ? fmtEur(p.eur_kg) : '—'}</td>
+      <td>${escapeHtml(p.partido_previsto || '—')}</td>
+      <td>${fmtFecha(p.fecha)}</td>
+      <td>${fmtFecha(p.fecha_recibido)}</td>
+      <td><span class="ped-chip ped-chip-recibido">✓ En almacén</span></td>
+    </tr>`).join('');
+}
+
+// Cache de variantes para que el handler de expansion pueda acceder al historico
+let _pvVariantesCache = [];
+
+function pintarCalidades(variantes) {
+  _pvVariantesCache = variantes || [];
+  document.getElementById('pv-cal-count').textContent = variantes.length;
+  const tb = document.getElementById('pv-cal-tbody');
+  if (!variantes.length) {
+    tb.innerHTML = `<tr><td colspan="7" class="pv-empty">
+      Sin calidades vinculadas todavía. Para añadir, ve a la ficha de la materia prima y usa "+ Añadir proveedor".
+    </td></tr>`;
+    return;
+  }
+  tb.innerHTML = variantes.map(v => {
+    const precio = v.precio_actual;
+    const fecha = v.fecha_precio_actual || '';
+    const dEur = v.delta_precio_eur;
+    const dPct = v.delta_precio_pct;
+    let deltaCell = '<span style="color:#9a9a9a">—</span>';
+    if (dEur != null && dPct != null) {
+      const sube = dEur > 0;
+      const baja = dEur < 0;
+      const col = sube ? '#9b1c1c' : (baja ? '#2f6b29' : '#7a7a7a');
+      const sig = sube ? '+' : (baja ? '−' : '');
+      deltaCell = `<span style="color:${col}; font-weight:600">${sig}${fmtEur(Math.abs(dEur))} (${sig}${Math.abs(dPct).toFixed(1)}%)</span>`;
+    }
+    // Tarifa editable: input numerico + fecha debajo. Si la fuente NO es
+    // manual (viene de precio_2026/precio_2025 legacy), mostramos hint.
+    const tarifaVal = v.tarifa_eur_kg;
+    const tarifaInput = tarifaVal != null
+      ? Number(tarifaVal).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+      : '';
+    const tarifaFecha = v.tarifa_fecha || '';
+    const tarifaFuente = v.tarifa_fuente || 'manual';
+    const tarifaHint = tarifaFecha
+      ? `<small style="display:block; color:#9a9a9a; font-size:0.7rem; margin-top:0.1rem">${escapeHtml(tarifaFecha)}</small>`
+      : (tarifaFuente !== 'manual' && tarifaVal != null
+          ? `<small style="display:block; color:#9a9a9a; font-style:italic; font-size:0.7rem; margin-top:0.1rem">desde ${escapeHtml(tarifaFuente)}</small>`
+          : '<small style="display:block; color:#c0c0c0; font-size:0.7rem; margin-top:0.1rem">sin fecha</small>');
+
+    const nRefs = (v.historico_precios || []).length;
+    return `
+    <tr class="pv-cal-row pv-cal-row-expandable" data-vid="${escapeHtml(v.id)}">
+      <td>
+        <span class="pv-cal-caret">▸</span>
+        <strong>${escapeHtml(v.nombre || v.id)}</strong>
+        ${nRefs > 1 ? `<span class="pv-cal-histcount" title="${nRefs} entradas de precio">${nRefs}</span>` : ''}
+      </td>
+      <td class="num">${fmtKg(v.total_kg)}</td>
+      <td class="num" onclick="event.stopPropagation()">
+        <input type="number" step="0.01" min="0"
+               class="pv-tarifa-input"
+               data-vid="${escapeHtml(v.id)}"
+               value="${tarifaVal != null ? tarifaVal : ''}"
+               placeholder="—"
+               title="Precio tarifa €/kg (editable). Se sugiere al hacer un pedido nuevo." />
+        ${tarifaHint}
+      </td>
+      <td class="num"><strong>${precio != null ? fmtEur(precio) : '—'}</strong></td>
+      <td class="num">${deltaCell}</td>
+      <td>${escapeHtml(fecha || '—')}</td>
+      <td style="text-align:right">
+        <a href="/materia-prima/${encodeURIComponent(v.calidad_id)}"
+           class="pv-link" title="Abrir ficha de la materia prima"
+           onclick="event.stopPropagation()">
+          Abrir →
+        </a>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Guardar la tarifa al perder el foco. Reusa el endpoint de campo de
+// lana_inventario (PUT /api/lanas-inventario/<vid>/campo).
+document.getElementById('pv-cal-tbody')?.addEventListener('change', async (e) => {
+  const inp = e.target.closest('input.pv-tarifa-input');
+  if (!inp) return;
+  const vid = inp.dataset.vid;
+  const valor = inp.value.trim();
+  inp.disabled = true;
+  inp.classList.remove('saved-ok', 'saved-err');
+  inp.classList.add('saving');
+  try {
+    const r = await fetch(`/api/lanas-inventario/${encodeURIComponent(vid)}/campo`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({campo: 'tarifa_actual_eur_kg', valor: valor || null}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    inp.classList.remove('saving');
+    inp.classList.add('saved-ok');
+    setTimeout(() => inp.classList.remove('saved-ok'), 800);
+    // Actualizar cache local + fecha visible debajo del input
+    const cache = _pvVariantesCache.find(v => v.id === vid);
+    if (cache) {
+      cache.tarifa_eur_kg = valor ? Number(valor) : null;
+      cache.tarifa_fecha = valor ? new Date().toISOString().slice(0, 10) : null;
+      cache.tarifa_fuente = 'manual';
+      // Repintar la hint debajo
+      const small = inp.parentElement.querySelector('small');
+      if (small) {
+        small.textContent = cache.tarifa_fecha || 'sin fecha';
+        small.style.color = '#9a9a9a';
+        small.style.fontStyle = 'normal';
+      }
+    }
+  } catch (err) {
+    inp.classList.remove('saving');
+    inp.classList.add('saved-err');
+    alert('No se pudo guardar la tarifa: ' + err.message);
+  } finally {
+    inp.disabled = false;
+  }
+});
+
+// Click en una fila de calidad: expande/colapsa el historico de precios
+document.getElementById('pv-cal-tbody')?.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr.pv-cal-row-expandable');
+  if (!tr) return;
+  // Si el click viene de un link (Abrir ficha), no interceptar
+  if (e.target.closest('a')) return;
+  const vid = tr.dataset.vid;
+  const v = _pvVariantesCache.find(x => x.id === vid);
+  if (!v) return;
+  // Colapsar si ya esta expandido
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('pv-cal-detail-row') && next.dataset.vid === vid) {
+    next.remove();
+    tr.classList.remove('pv-cal-row-expanded');
+    return;
+  }
+  tr.classList.add('pv-cal-row-expanded');
+  const detail = document.createElement('tr');
+  detail.className = 'pv-cal-detail-row';
+  detail.dataset.vid = vid;
+  const hist = v.historico_precios || [];
+  let body;
+  if (!hist.length) {
+    body = '<div style="color:#9a9a9a; font-style:italic; padding:0.4rem">Sin histórico de precios todavía. Aparecerá cuando se reciban partidos con coste definido.</div>';
+  } else {
+    body = `
+      <table class="pv-cal-detail-tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Partido</th>
+            <th class="num">Cantidad</th>
+            <th class="num">€/kg</th>
+            <th class="num">Δ vs anterior</th>
+          </tr>
+        </thead>
+        <tbody>${hist.map(h => {
+          const dE = h.delta_eur;
+          const dP = h.delta_pct;
+          let dCell = '<span style="color:#9a9a9a">—</span>';
+          if (dE != null && dP != null) {
+            const col = dE > 0 ? '#9b1c1c' : (dE < 0 ? '#2f6b29' : '#7a7a7a');
+            const sig = dE > 0 ? '+' : (dE < 0 ? '−' : '');
+            dCell = `<span style="color:${col}">${sig}${fmtEur(Math.abs(dE))} (${sig}${Math.abs(dP).toFixed(1)}%)</span>`;
+          }
+          return `
+            <tr>
+              <td style="white-space:nowrap; font-size:0.8rem; color:#4d4d4d">${escapeHtml(h.fecha || '—')}</td>
+              <td><strong>${escapeHtml(h.partido || '—')}</strong></td>
+              <td class="num">${fmtKg(h.kg_inicial)}</td>
+              <td class="num"><strong>${fmtEur(h.coste_kg)}</strong></td>
+              <td class="num">${dCell}</td>
+            </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  }
+  detail.innerHTML = `<td colspan="7">
+    <div class="pv-cal-detail-inner">
+      <div class="pv-cal-detail-titulo">Histórico de precios — ${escapeHtml(v.nombre || v.id)}</div>
+      ${body}
+    </div>
+  </td>`;
+  tr.parentNode.insertBefore(detail, tr.nextSibling);
+});
+
+// Ficha editable — los campos guardan onBlur con PUT /api/proveedor/<id>
+function pintarFicha(p) {
+  const campo = (label, key, type='text', extra='') => {
+    const val = (p[key] != null ? String(p[key]) : '');
+    return `<div class="pv-campo">
+       <label>${escapeHtml(label)}</label>
+       <input type="${type}" data-prov-campo="${escapeHtml(key)}"
+              value="${escapeHtml(val)}" ${extra} />
+     </div>`;
+  };
+  const grid = document.getElementById('pv-ficha-grid');
+  grid.innerHTML = `
+    <div class="pv-bloque">
+      <h4>Identificador</h4>
+      ${campo('Alias interno', 'alias', 'text', 'placeholder="Nombre corto que aparece en tablas"')}
+      ${campo('Nombre comercial', 'nombre')}
+      ${campo('Razón social', 'razon_social')}
+      ${campo('CIF / NIF', 'cif')}
+    </div>
+    <div class="pv-bloque">
+      <h4>Dirección</h4>
+      ${campo('Dirección', 'direccion')}
+      ${campo('CP', 'cp')}
+      ${campo('Ciudad', 'ciudad')}
+      ${campo('Provincia', 'provincia')}
+      ${campo('País', 'pais')}
+    </div>
+    <div class="pv-bloque">
+      <h4>Contacto</h4>
+      ${campo('Persona', 'contacto_persona')}
+      ${campo('Email', 'contacto_email', 'email')}
+      ${campo('Teléfono', 'contacto_telefono')}
+    </div>
+    <div class="pv-bloque">
+      <h4>Comercial</h4>
+      ${campo('Plazo de entrega (días)', 'plazo_entrega_dias', 'number')}
+      ${campo('Pedido mínimo (kg)', 'pedido_minimo_kg', 'number')}
+      ${campo('Pedido mínimo (€)', 'pedido_minimo_eur', 'number')}
+    </div>
+    <div class="pv-bloque">
+      <h4>Pago y portes</h4>
+      ${campo('Condiciones de pago', 'condiciones_pago')}
+      ${campo('Portes', 'portes')}
+    </div>
+    <div class="pv-bloque">
+      <h4>Notas internas</h4>
+      <div class="pv-campo">
+        <label>Comentarios (solo internos)</label>
+        <textarea data-prov-campo="notas" placeholder="Notas para el equipo">${escapeHtml(p.notas || '')}</textarea>
+      </div>
+    </div>`;
+}
+
+// Guardado inline en blur de cualquier campo de la ficha
+document.addEventListener('blur', async (e) => {
+  const el = e.target;
+  if (!el || !el.dataset || !el.dataset.provCampo) return;
+  const campo = el.dataset.provCampo;
+  let valor = (el.value != null ? el.value : '').trim();
+  // Numericos: convertir a number (o null si vacio)
+  if (el.type === 'number') {
+    valor = valor === '' ? null : Number(valor);
+    if (valor != null && isNaN(valor)) return;
+  }
+  el.classList.remove('saved-ok');
+  el.classList.add('saving');
+  try {
+    const r = await fetch(`/api/proveedor/${encodeURIComponent(PROV_ID)}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({[campo]: valor}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    el.classList.remove('saving');
+    el.classList.add('saved-ok');
+    setTimeout(() => el.classList.remove('saved-ok'), 700);
+    // Si cambio el alias o el nombre, actualizar el H1
+    if (campo === 'alias' || campo === 'nombre') {
+      if (d.proveedor) {
+        _PROV = d.proveedor;
+        pintarHero({proveedor: d.proveedor, kpis: {n_calidades: 0}});
+        // Recargar para coger los kpis frescos (el alias afecta al matcheo)
+        cargar();
+      }
+    }
+  } catch (err) {
+    el.classList.remove('saving');
+    await mostrarAlerta({titulo: 'Error guardando ' + campo,
+                         mensaje: err.message, tipo: 'danger'});
+  }
+}, true);
+
+// Toggle activo/inactivo
+document.getElementById('pv-btn-toggle').addEventListener('click', async () => {
+  if (!_PROV) return;
+  try {
+    const r = await fetch(`/api/proveedor/${encodeURIComponent(PROV_ID)}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({activo: !_PROV.activo}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    cargar();
+  } catch (err) {
+    await mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+  }
+});
+
+// Borrar (solo si no tiene calidades vinculadas)
+document.getElementById('pv-btn-borrar').addEventListener('click', async () => {
+  if (!_PROV) return;
+  const { ok } = await mostrarConfirmacion({
+    titulo: 'Borrar proveedor',
+    mensaje: `Se borrará la ficha del proveedor "${_PROV.alias || _PROV.nombre}". ` +
+             `Esta acción es definitiva.`,
+    textoConfirmar: 'Borrar definitivamente',
+    tipo: 'danger',
+  });
+  if (!ok) return;
+  try {
+    const r = await fetch(`/api/proveedor/${encodeURIComponent(PROV_ID)}`, {method: 'DELETE'});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    window.location.href = '/materias-primas#proveedores';
+  } catch (err) {
+    await mostrarAlerta({titulo: 'No se pudo borrar', mensaje: err.message, tipo: 'danger'});
+  }
+});
+
+cargar();
+</script>
+
+<script src="{{ url_for('static', filename='i18n.js') }}"></script>
+<script src="/shared/lang-switcher/lang-switcher.js" defer></script>
+</body>
+</html>

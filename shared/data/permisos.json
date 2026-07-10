@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "version_schema": 1,
+    "actualizado_en": "2026-05-23T15:10:48"
+  },
+  "permisos_rol": {
+    "comercial": {
+      "compras": true
+    }
+  }
+}

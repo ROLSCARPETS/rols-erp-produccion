@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "version": 1,
+    "descripcion": "Catalogo de clasificaciones de materia y materiales (felpa) que se usan en las fichas de calidad. Editable desde la propia ficha (boton '+ Nuevo' en cada select)."
+  },
+  "clasificaciones": [
+    {
+      "id": "materia-felpa",
+      "label": "Materia felpa"
+    },
+    {
+      "id": "basamentos",
+      "label": "Basamentos"
+    },
+    {
+      "id": "otros",
+      "label": "Otros"
+    }
+  ],
+  "materiales_felpa": [
+    {
+      "id": "lana-hilada",
+      "label": "Lana hilada"
+    },
+    {
+      "id": "lana-bruto",
+      "label": "Lana en bruto"
+    },
+    {
+      "id": "pp",
+      "label": "Polipropileno (PP)"
+    },
+    {
+      "id": "pes",
+      "label": "Poliéster (PES)"
+    },
+    {
+      "id": "nylon-reciclado",
+      "label": "Nylon reciclado"
+    }
+  ],
+  "titulos": [
+    {
+      "id": "65-2c",
+      "label": "65/2C"
+    },
+    {
+      "id": "80-2c",
+      "label": "80/2C"
+    },
+    {
+      "id": "100-2c",
+      "label": "100/2C"
+    },
+    {
+      "id": "100-3c",
+      "label": "100/3C"
+    },
+    {
+      "id": "140-1c",
+      "label": "140/1C"
+    },
+    {
+      "id": "140-2c",
+      "label": "140/2C"
+    },
+    {
+      "id": "140-3c",
+      "label": "140/3C"
+    },
+    {
+      "id": "150-2c",
+      "label": "150/2C"
+    },
+    {
+      "id": "150-3c",
+      "label": "150/3C"
+    },
+    {
+      "id": "1200-den",
+      "label": "1200 den"
+    }
+  ]
+}

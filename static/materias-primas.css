@@ -1,0 +1,761 @@
+/* ===========================================================================
+   Estilos de la pagina /materias-primas (tabs: Materias primas, Todos los
+   partidos, Movimientos, Compras, Proveedores).
+   Extraido del bloque <style> inline de la plantilla en 2026-05 — antes
+   pesaba ~570 LOC dentro del HTML, lo que dificultaba navegar la plantilla.
+   =========================================================================== */
+  .mp-section { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.2rem; }
+  .mp-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .mp-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
+
+  .mp-form-grid { display: grid; gap: 0.7rem; grid-template-columns: 1fr 1fr auto; align-items: end; }
+  .mp-form-grid input { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.88rem; background: #FAF8F6; outline: none; transition: border-color 0.12s, background 0.12s; }
+  .mp-form-grid input:focus { border-color: var(--accent); background: #fff; }
+  .mp-form-grid label { font-size: 0.72rem; font-weight: 600; color: #4d4d4d; display: block; margin-bottom: 0.25rem; }
+  .mp-btn-add { background: var(--accent); color: #fff; border: none; padding: 0.55rem 1.1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: background 0.12s; height: fit-content; }
+  .mp-btn-add:hover:not(:disabled) { background: var(--accent-hover); }
+  .mp-btn-add:disabled { opacity: 0.5; cursor: wait; }
+  /* "+ Añadir nueva materia prima" colapsable. Compacto cuando esta
+     cerrado para que los filtros y la tabla tengan protagonismo. */
+  details.mp-add-details { border: 1px dashed var(--border); border-radius: 10px; padding: 0.55rem 0.9rem; margin-bottom: 0.9rem; background: #faf8f5; }
+  details.mp-add-details > summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #4d4d4d; user-select: none; list-style: none; }
+  details.mp-add-details > summary::-webkit-details-marker { display: none; }
+  details.mp-add-details[open] > summary { color: var(--accent); margin-bottom: 0.3rem; }
+
+  table.mp-tabla { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.5rem; }
+  table.mp-tabla th { text-align: left; padding: 0.5rem 0.6rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #7a7a7a; border-bottom: 1px solid var(--border); }
+  table.mp-tabla td { padding: 0.7rem 0.6rem; border-bottom: 1px solid #f2ede6; color: #2a2a2a; }
+  table.mp-tabla tr:last-child td { border-bottom: none; }
+  table.mp-tabla tr.editando td { background: #faf6ee; }
+  table.mp-tabla tr.lana-row { cursor: pointer; }
+  table.mp-tabla tr.lana-row:hover td { background: #fbf6ed; }
+  table.mp-tabla tr.lana-row.editando { cursor: default; }
+  table.mp-tabla tr.lana-row.editando:hover td { background: #faf6ee; }
+  .mp-completo { color: #7a7a7a; font-size: 0.78rem; font-style: italic; }
+  .mp-row-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+  .mp-btn-row { background: transparent; border: 1px solid var(--border); color: #7a7a7a; padding: 0.32rem 0.7rem; border-radius: 999px; font-size: 0.74rem; cursor: pointer; transition: color 0.12s, border-color 0.12s; font-family: inherit; }
+  .mp-btn-row:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .mp-btn-row.danger { color: #c25656; border-color: #e8c2c2; }
+  .mp-btn-row.danger:hover { background: #fde2e2; color: #9b1c1c; }
+  .mp-empty { color: #9a9a9a; padding: 1.5rem; text-align: center; font-style: italic; }
+  .mp-feedback { margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.82rem; display: none; }
+  .mp-feedback.ok { background: #e8f3e1; color: #2f6b29; border: 1px solid #c8e2bd; display: block; }
+  .mp-feedback.err { background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba; display: block; }
+
+  /* === Barra de filtros + selector de columnas (compactos, en una fila) ===
+     El override de width:auto es necesario porque .input-line viene
+     con width:100% global, que hace que los selects se apilen en
+     bloques verticales. Aqui los queremos finos, en linea, y con
+     padding mas reducido para que entren los 4 filtros + el boton de
+     columnas en la misma fila. */
+  .mp-filtros-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+  .mp-filtros-bar select.mp-filtro {
+    width: auto !important;
+    min-width: 0;
+    max-width: 200px;
+    padding: 0.35rem 1.9rem 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: #fff;
+    background-position: right 0.5rem center;
+    background-size: 14px 14px;
+    height: 32px;
+    color: #2a2a2a;
+  }
+  .mp-filtros-bar select.mp-filtro:hover { border-color: #d8cdb8; }
+  .mp-filtros-bar select.mp-filtro:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(213,179,140,0.18); }
+  /* Inputs text dentro del filtros bar (Todos los partidos: buscador
+     nº partido). Mismo aspecto que los selects. */
+  .mp-filtros-bar input[type="text"].mp-filtro {
+    width: auto !important;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: #fff;
+    height: 32px;
+    color: #2a2a2a;
+    font-family: inherit;
+  }
+  .mp-filtros-bar input[type="text"].mp-filtro:hover { border-color: #d8cdb8; }
+  .mp-filtros-bar input[type="text"].mp-filtro:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(213,179,140,0.18); }
+
+  /* Inputs date dentro del filtros bar (Movimientos: rango de fechas).
+     Mismo aspecto que los selects para alinear visualmente. */
+  .mp-filtros-bar input[type="date"].mp-filtro {
+    width: auto !important;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-color: #fff;
+    height: 32px;
+    color: #2a2a2a;
+    font-family: inherit;
+  }
+  .mp-filtros-bar input[type="date"].mp-filtro:hover { border-color: #d8cdb8; }
+  .mp-filtros-bar input[type="date"].mp-filtro:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(213,179,140,0.18); }
+  .mp-filtros-bar .mp-f-counter { font-size: 0.75rem; color: #7a7a7a; }
+  .mp-filtros-bar .mp-f-spacer { flex-grow: 1; }
+
+  /* Dropdown de columnas (vistas) */
+  .mp-cols-wrap { position: relative; }
+  .mp-cols-btn {
+    background: #fff; border: 1px solid var(--border); color: #4d4d4d;
+    padding: 0 0.75rem; border-radius: 8px;
+    font-size: 0.78rem; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    height: 32px; line-height: 1;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .mp-cols-btn:hover, .mp-cols-btn.open { border-color: var(--accent); color: var(--accent-hover); }
+  .mp-cols-btn .ico { font-size: 0.9rem; line-height: 1; }
+  .mp-cols-popup {
+    position: absolute; right: 0; top: calc(100% + 4px);
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    padding: 0.45rem; min-width: 200px; z-index: 30;
+    display: none;
+  }
+  .mp-cols-popup.open { display: block; }
+  .mp-cols-popup-title {
+    font-size: 0.66rem; font-weight: 700; color: #7a7a7a;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 0.2rem 0.45rem 0.4rem;
+  }
+  .mp-cols-popup .mp-cols-list { display: flex; flex-direction: column; gap: 1px; }
+  .mp-cols-popup .mp-cols-item {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.5rem; border-radius: 6px;
+    font-size: 0.82rem; color: #2a2a2a;
+    user-select: none;
+    background: #fff;
+    border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .mp-cols-popup .mp-cols-item:hover { background: #faf6ee; }
+  .mp-cols-popup .mp-cols-item.dragging { opacity: 0.45; }
+  .mp-cols-popup .mp-cols-item.drop-before { border-top: 2px solid var(--accent); }
+  .mp-cols-popup .mp-cols-item.drop-after  { border-bottom: 2px solid var(--accent); }
+  .mp-cols-popup .mp-cols-handle {
+    cursor: grab; color: #b0b0b0; font-size: 0.9rem;
+    line-height: 1; padding: 0 0.1rem;
+    flex-shrink: 0;
+  }
+  .mp-cols-popup .mp-cols-handle:active { cursor: grabbing; }
+  .mp-cols-popup .mp-cols-item input[type="checkbox"] {
+    accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .mp-cols-popup .mp-cols-label {
+    flex: 1; cursor: pointer;
+  }
+
+  /* Mostrar/ocultar columnas */
+  .mp-tabla th.col-hidden,
+  .mp-tabla td.col-hidden { display: none; }
+
+  /* Resumen stock + coste medio en cada fila */
+  .mp-stock { font-weight: 600; color: #2a2a2a; }
+  .mp-stock-zero { color: #b0b0b0; font-weight: 400; }
+  .mp-coste { color: #4d4d4d; font-size: 0.8rem; }
+  .mp-coste-na { color: #b0b0b0; font-style: italic; font-size: 0.78rem; }
+  .mp-toggle-lotes { font-size: 0.72rem; color: var(--accent-hover); cursor: pointer; user-select: none; padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid var(--border); background: transparent; font-family: inherit; }
+  .mp-toggle-lotes:hover { color: var(--accent); border-color: var(--accent); }
+  .mp-toggle-lotes .chev { display: inline-block; transition: transform 0.15s; margin-left: 0.25rem; }
+  .mp-toggle-lotes.expanded .chev { transform: rotate(180deg); }
+
+  /* Sub-tabla de lotes dentro de la fila expandida */
+  .lotes-wrap { background: #FAF8F6; padding: 0.7rem 1rem 0.9rem; }
+  .lotes-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.6rem; }
+  .lotes-header-title { font-size: 0.78rem; font-weight: 600; color: #4d4d4d; text-transform: uppercase; letter-spacing: 0.04em; flex-grow: 1; }
+  .lotes-show-agotados { font-size: 0.72rem; color: #7a7a7a; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+  table.lotes-tabla { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border-radius: 8px; overflow: hidden; }
+  table.lotes-tabla th { text-align: left; padding: 0.4rem 0.5rem; font-size: 0.66rem; font-weight: 600; text-transform: uppercase; color: #7a7a7a; background: #f4ede5; }
+  table.lotes-tabla td { padding: 0.5rem; border-top: 1px solid #f2ede6; color: #2a2a2a; }
+  table.lotes-tabla tr.lote-agotado td { color: #b0b0b0; }
+  .lote-form-row td { background: #fffaf0; }
+  .lote-form-row input { border: 1px solid var(--border); border-radius: 6px; padding: 0.32rem 0.45rem; font-size: 0.78rem; background: #fff; width: 100%; font-family: inherit; }
+  .lote-form-row .num { width: 100px; }
+  .btn-lote-add { background: var(--accent); color: #fff; border: none; padding: 0.35rem 0.7rem; border-radius: 999px; font-size: 0.74rem; cursor: pointer; font-family: inherit; }
+  .btn-lote-add:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-lote-add:disabled { opacity: 0.5; cursor: wait; }
+  .btn-lote-ghost { background: transparent; border: 1px solid var(--border); color: #7a7a7a; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+  .btn-lote-ghost:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .btn-lote-danger { background: transparent; border: 1px solid #e8c2c2; color: #c25656; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+  .btn-lote-danger:hover { background: #fde2e2; color: #9b1c1c; }
+  .btn-lote-consumir { background: transparent; border: 1px solid #c8d8e8; color: #2c5b8a; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.72rem; cursor: pointer; font-family: inherit; }
+  .btn-lote-consumir:hover { background: #e1ecf5; color: #1d4470; border-color: #2c5b8a; }
+  .lotes-empty { color: #9a9a9a; padding: 0.8rem; text-align: center; font-style: italic; font-size: 0.78rem; }
+
+  /* Modal de consumo */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(35, 30, 25, 0.45); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 1.6rem 1.8rem; min-width: 420px; max-width: 92vw; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+  .modal h3 { font-size: 1.05rem; font-weight: 600; color: #2a2a2a; margin-bottom: 0.3rem; }
+  .modal .modal-sub { font-size: 0.82rem; color: #7a7a7a; margin-bottom: 1.1rem; }
+  .modal .modal-row { margin-bottom: 0.9rem; }
+  .modal label { display: block; font-size: 0.74rem; font-weight: 600; color: #4d4d4d; margin-bottom: 0.25rem; }
+  .modal input[type="number"], .modal input[type="text"] { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.9rem; background: #FAF8F6; outline: none; font-family: inherit; }
+  .modal input:focus { border-color: var(--accent); background: #fff; }
+  .modal-info { background: #f5f0e8; padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.82rem; color: #4d4d4d; margin-bottom: 1rem; }
+  .modal-info strong { color: #2a2a2a; }
+  .modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 0.4rem; }
+  .modal-error { background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba; padding: 0.5rem 0.7rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.8rem; display: none; }
+  .modal-error.show { display: block; }
+  /* Botón destructivo del modal genérico (anular) */
+  .btn-lote-add.btn-danger { background: #9b1c1c; }
+  .btn-lote-add.btn-danger:hover:not(:disabled) { background: #7a1414; }
+
+  /* ===== Tab Compras (inventario operativo estilo Alberto) ===== */
+  /* Barra superior de stats */
+  .cmp-stats { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .cmp-stat  { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.9rem; display: flex; align-items: center; gap: 0.55rem; font-size: 0.84rem; }
+  .cmp-stat .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .cmp-stat strong { font-size: 1.05rem; font-weight: 600; color: #2a2a2a; }
+  .cmp-stat small { color: #7a7a7a; font-size: 0.75rem; }
+  .dot-pedir     { background: #e0473a; }
+  .dot-en-camino { background: #2c5b8a; }
+  .dot-bajo      { background: #d68a2a; }
+  .dot-ok        { background: #2f6b29; }
+  .dot-total     { background: #a0aec0; }
+
+  /* Filtros (categoria + proveedor) */
+  .cmp-filtros { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.9rem; }
+  .cmp-pills { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+  .cmp-pill { padding: 0.28rem 0.7rem; border-radius: 999px; border: 1px solid var(--border); background: #FAF8F6; cursor: pointer; font-size: 0.78rem; font-family: inherit; color: #4d4d4d; }
+  .cmp-pill:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .cmp-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cmp-pill[data-prov="COBO"].active   { background: #2b6cb0; border-color: #2b6cb0; }
+  .cmp-pill[data-prov="HTC"].active    { background: #6b46c1; border-color: #6b46c1; }
+  .cmp-pill[data-prov="FILMURO"].active{ background: #2f6b29; border-color: #2f6b29; }
+
+  /* Tabla operativa: compacta, scrolleable, semaforo lateral en filas.
+     overflow-y para que el sticky header funcione al scrollear. */
+  .cmp-tabla-wrap { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 0; overflow: auto; max-height: 70vh; }
+  table.cmp-tabla { width: 100%; border-collapse: collapse; font-size: 0.83rem; min-width: 1200px; }
+  table.cmp-tabla th { text-align: left; padding: 0.7rem 0.6rem; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7a7a7a; border-bottom: 1px solid var(--border); background: #faf6ee; white-space: nowrap; position: sticky; top: 0; z-index: 5; }
+  /* Headers numericos centrados (alinea con celdas centradas) */
+  table.cmp-tabla th.num { text-align: center; }
+  table.cmp-tabla th.sortable { cursor: pointer; user-select: none; }
+  table.cmp-tabla th.sortable:hover { color: var(--accent-hover); background: #f5ecdb; }
+  table.cmp-tabla th .arrow { display: inline-block; margin-left: 0.2rem; color: #c8a771; font-size: 0.7rem; opacity: 0; }
+  table.cmp-tabla th.sort-asc .arrow,
+  table.cmp-tabla th.sort-desc .arrow { opacity: 1; }
+  table.cmp-tabla th.sort-asc .arrow::before  { content: '▲'; }
+  table.cmp-tabla th.sort-desc .arrow::before { content: '▼'; }
+  table.cmp-tabla td { padding: 0.7rem 0.6rem; border-bottom: 1px solid #f4ede5; white-space: nowrap; color: #2a2a2a; }
+  table.cmp-tabla tr:last-child td { border-bottom: none; }
+  /* Zebra striping muy sutil para leer mejor con 34 filas.
+     Solo a filas con data-id (no a separadores de grupo). */
+  table.cmp-tabla tbody tr[data-id]:nth-of-type(even) td { background: #fbf9f5; }
+  table.cmp-tabla tbody tr[data-id]:hover td { background: #f5ecdb; }
+  /* Mantener el color de la celda semaforo aunque haya zebra/hover */
+  table.cmp-tabla tbody tr.fila-pedir     td.semaforo { background: #e0473a !important; }
+  table.cmp-tabla tbody tr.fila-en-camino td.semaforo { background: #2c5b8a !important; }
+  table.cmp-tabla tbody tr.fila-bajo      td.semaforo { background: #d68a2a !important; }
+  table.cmp-tabla tbody tr.fila-ok        td.semaforo { background: #d4e6cf !important; }
+  /* Columnas numericas centradas (no alineadas a la derecha) */
+  table.cmp-tabla td.num { text-align: center; font-variant-numeric: tabular-nums; }
+  table.cmp-tabla td.num strong { font-size: 0.94rem; }
+  table.cmp-tabla td.calidad { font-weight: 600; min-width: 200px; white-space: normal; }
+  /* Links de calidad y proveedor desde la tabla de Compras a sus fichas.
+     Tambien aplica a la tabla mp-tabla (tab "Todos los partidos") para
+     que el nombre de la calidad y el nº lote sean clicables y lleven
+     a la ficha. */
+  table.cmp-tabla a.cmp-link-calidad,
+  table.mp-tabla  a.cmp-link-calidad {
+    color: #2a2a2a; text-decoration: none;
+    border-bottom: 1px dotted transparent;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  table.cmp-tabla a.cmp-link-calidad:hover,
+  table.mp-tabla  a.cmp-link-calidad:hover {
+    color: var(--accent-hover);
+    border-bottom-color: var(--accent);
+  }
+  table.cmp-tabla a.cmp-link-prov { text-decoration: none; display: inline-block; }
+  table.cmp-tabla a.cmp-link-prov:hover .prov-pill { box-shadow: 0 0 0 2px var(--accent); }
+  table.cmp-tabla td.partidos { font-size: 0.74rem; color: #4d4d4d; max-width: 320px; white-space: normal; line-height: 1.35; }
+  table.cmp-tabla td.partidos .part { display: inline-block; background: #f4ede5; padding: 0.08rem 0.45rem; border-radius: 4px; margin: 0.05rem 0.15rem 0.05rem 0; font-variant-numeric: tabular-nums; }
+  table.cmp-tabla td.obs { font-size: 0.78rem; color: #4d4d4d; max-width: 200px; white-space: normal; }
+  /* Inputs editables: centrados + fondo sutil siempre visible para
+     que el usuario sepa que son editables sin tener que hacer hover. */
+  table.cmp-tabla td.editable { text-align: center; }
+  table.cmp-tabla td.editable input {
+    width: 85px; padding: 0.3rem 0.5rem; border-radius: 5px;
+    border: 1px solid #ede7dc; background: #fbf8f3;
+    font-size: 0.82rem; font-family: inherit;
+    text-align: center; font-variant-numeric: tabular-nums;
+    transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+  }
+  table.cmp-tabla td.editable input:hover { border-color: var(--accent); background: #fff; }
+  table.cmp-tabla td.editable input:focus { border-color: var(--accent); background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(200, 167, 113, 0.18); }
+  table.cmp-tabla td.obs-edit { text-align: left; }
+  table.cmp-tabla td.obs-edit input { width: 100%; min-width: 150px; text-align: left; }
+
+  /* Semaforo: barrita izquierda en cada fila + chip mas prominente */
+  table.cmp-tabla td.semaforo { width: 6px; padding: 0; }
+  table.cmp-tabla tr.fila-pedir     td.semaforo { background: #e0473a; }
+  table.cmp-tabla tr.fila-en-camino td.semaforo { background: #2c5b8a; }
+  table.cmp-tabla tr.fila-bajo      td.semaforo { background: #d68a2a; }
+  table.cmp-tabla tr.fila-ok        td.semaforo { background: #d4e6cf; }
+  .estado-chip { display: inline-block; padding: 0.18rem 0.65rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+  .estado-pedir     { background: #fde2e2; color: #9b1c1c; }
+  .estado-en-camino { background: #dbeafe; color: #1e40af; }
+  .estado-bajo      { background: #fff1d6; color: #8a6d3b; }
+  .estado-ok        { background: #e8f3e1; color: #2f6b29; }
+
+  /* Pill proveedor en la fila */
+  .prov-pill { display: inline-block; padding: 0.12rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; }
+  .prov-COBO     { background: #dbeafe; color: #1e40af; }
+  .prov-HTC      { background: #ede9fe; color: #5b21b6; }
+  .prov-FILMURO  { background: #d4e6cf; color: #276749; }
+  .prov-AQUAFIL,
+  .prov-GLOBALTEX,
+  .prov-TURKTEX  { background: #f4ede5; color: #4d4d4d; }
+
+  /* Stat clickable como filtro de estado (reemplaza el checkbox) */
+  .cmp-stat { cursor: pointer; transition: transform 0.08s, box-shadow 0.12s; }
+  .cmp-stat:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .cmp-stat.active { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+
+  /* Subtotal por seccion (cuando ordenas por categoria) */
+  tr.cmp-grupo td { background: #f4ede5; color: #4d4d4d; font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.4rem 0.7rem; }
+  tr.cmp-grupo td small { font-weight: 400; color: #7a7a7a; margin-left: 0.5rem; }
+
+  /* Fila total al pie */
+  tr.cmp-total td { background: #efe6d6; font-weight: 700; color: #2a2a2a; border-top: 2px solid #c8a771; position: sticky; bottom: 0; }
+
+  /* Visual feedback al guardar */
+  table.cmp-tabla td.editable input.saving { background: #fff8e1; border-color: #d68a2a; }
+  table.cmp-tabla td.editable input.saved-ok { background: #e8f3e1 !important; border-color: #2f6b29; transition: background 0.4s, border-color 0.4s; }
+  table.cmp-tabla td.editable input.saved-err { background: #fde2e2 !important; border-color: #9b1c1c; }
+
+  /* Iconos junto al estado */
+  .estado-chip::before { content: ''; }
+  .estado-pedir::before     { content: '🔴 '; }
+  .estado-en-camino::before { content: '🚚 '; }
+  .estado-bajo::before      { content: '⚠ '; }
+  .estado-ok::before        { content: '✓ '; }
+
+  /* Columna de checkbox al inicio de cada fila (seleccion para pedido) */
+  table.cmp-tabla th.cmp-check, table.cmp-tabla td.cmp-check { width: 28px; text-align: center; padding-left: 0.4rem; padding-right: 0.2rem; }
+  table.cmp-tabla th.cmp-check input, table.cmp-tabla td.cmp-check input {
+    cursor: pointer; accent-color: #c8a771; width: 14px; height: 14px;
+  }
+  table.cmp-tabla tbody tr.seleccionada td { background: #fbf3e2 !important; }
+
+  /* Barra de acciones de pedido (sticky encima de la tabla) */
+  .cmp-actions-bar {
+    display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.55rem 0.9rem; margin-bottom: 0.7rem;
+  }
+  .cmp-actions-info { font-size: 0.82rem; color: #4d4d4d; flex-grow: 1; }
+  .cmp-actions-info strong { color: #2a2a2a; }
+  .btn-pedido {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.5rem 1.1rem; border-radius: 999px; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: background 0.12s, transform 0.06s;
+  }
+  .btn-pedido:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-pedido:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-pedido-ghost {
+    background: transparent; color: #7a7a7a; border: 1px solid var(--border);
+    padding: 0.45rem 0.9rem; border-radius: 999px; font-size: 0.78rem;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn-pedido-ghost:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+  /* === Proveedores: ficha expandible bajo cada fila === */
+  tr.prov-detalle-row { background: #fbf8f3; }
+  tr.prov-detalle-row td { padding: 0 !important; border-bottom: 1px solid var(--border); }
+  .prov-detalle-wrap { padding: 1.2rem 1.5rem 1.4rem; }
+  .prov-ficha-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem 1.5rem;
+  }
+  @media (max-width: 1100px) { .prov-ficha-grid { grid-template-columns: repeat(2, 1fr); } }
+  .prov-ficha-bloque h4 {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #7a7a7a;
+    margin: 0 0 0.55rem; padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .prov-campo { margin-bottom: 0.55rem; }
+  .prov-campo label {
+    display: block;
+    font-size: 0.7rem; font-weight: 600; color: #7a7a7a;
+    margin-bottom: 0.15rem;
+  }
+  .prov-campo input, .prov-campo textarea {
+    width: 100%;
+    border: 1px solid transparent; border-radius: 6px;
+    padding: 0.32rem 0.5rem;
+    font-size: 0.86rem; font-family: inherit;
+    background: transparent;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .prov-campo input:hover, .prov-campo textarea:hover { background: #fbf8f3; border-color: #ede7dc; }
+  .prov-campo input:focus, .prov-campo textarea:focus { background: #fff; border-color: var(--accent); outline: none; }
+  .prov-campo input.saving, .prov-campo textarea.saving { background: #fff8e1; }
+  .prov-campo input.saved-ok, .prov-campo textarea.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+  .prov-campo textarea { resize: vertical; min-height: 60px; }
+  .prov-ficha-calidades {
+    grid-column: 1 / -1;
+    margin-top: 0.4rem;
+  }
+  .prov-ficha-calidades h4 { margin-bottom: 0.6rem; }
+  .prov-calidad-pill {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: #f4ede5; padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    margin: 0.15rem 0.25rem 0.15rem 0;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .prov-calidad-pill:hover { background: #fff; box-shadow: 0 0 0 1px var(--accent); }
+  .prov-calidad-pill .pill-kg { font-variant-numeric: tabular-nums; color: #4d4d4d; font-weight: 600; }
+  .prov-chip-estado {
+    display: inline-block; padding: 0.15rem 0.5rem;
+    border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .prov-chip-activo   { background: #e8f3e1; color: #2f6b29; }
+  .prov-chip-inactivo { background: #ececec; color: #707070; }
+  .prov-toggle-estado {
+    background: transparent; border: 1px solid var(--border);
+    color: #7a7a7a; padding: 0.32rem 0.7rem; border-radius: 999px;
+    font-size: 0.74rem; cursor: pointer; font-family: inherit;
+  }
+  .prov-toggle-estado:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+  /* Modal Generar pedido */
+  .ped-modal-card {
+    background: #fff; border-radius: 14px; padding: 1.6rem 1.8rem;
+    min-width: 560px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.22);
+  }
+  .ped-modal-card h3 { font-size: 1.12rem; font-weight: 600; color: #2a2a2a; margin-bottom: 0.25rem; }
+  .ped-modal-card .ped-sub { font-size: 0.84rem; color: #7a7a7a; margin-bottom: 1.2rem; }
+  .ped-prov-grupo { border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.9rem; }
+  .ped-prov-titulo { font-weight: 700; color: #2a2a2a; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+  .ped-prov-titulo small { font-weight: 400; color: #7a7a7a; font-size: 0.72rem; }
+  table.ped-tabla { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  table.ped-tabla th { text-align: left; padding: 0.3rem 0.4rem; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; color: #7a7a7a; }
+  table.ped-tabla th.num, table.ped-tabla td.num { text-align: right; }
+  table.ped-tabla td { padding: 0.4rem 0.4rem; border-top: 1px solid #f2ede6; vertical-align: middle; }
+  table.ped-tabla input.ped-input { border: 1px solid #ede7dc; border-radius: 6px; padding: 0.3rem 0.45rem; font-size: 0.82rem; width: 80px; font-variant-numeric: tabular-nums; background: #fbf8f3; text-align: right; font-family: inherit; }
+  table.ped-tabla input.ped-input:focus { border-color: var(--accent); background: #fff; outline: none; }
+  .ped-prov-total { font-size: 0.85rem; color: #4d4d4d; }
+  .ped-prov-total strong { color: #2a2a2a; font-size: 0.95rem; }
+  .ped-prov-bottom { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding-top: 0.6rem; flex-wrap: wrap; }
+  .btn-prov-solo { font-size: 0.78rem; padding: 0.38rem 0.85rem; }
+  .ped-prov-feedback { font-size: 0.78rem; margin-top: 0.5rem; display: none; }
+  .ped-prov-feedback.ok  { color: #2f6b29; display: block; }
+  .ped-prov-feedback.err { color: #9b1c1c; display: block; }
+  .ped-prov-grupo.enviado { opacity: 0.6; }
+  .ped-prov-grupo.enviado input { background: #f4ede5; pointer-events: none; }
+  /* Tras enviar, el boton "Generar solo X" se queda visible pero como
+     "✓ Generado" (clase .btn-generado anadida desde JS): fondo verde
+     suave, no clicable, sin animacion. Asi el usuario ve el feedback
+     en el sitio donde clico.
+     IMPORTANT: opacity:1 !important porque (1) el boton lleva :disabled
+     que da opacity:0.45, y (2) el padre .ped-prov-grupo.enviado da
+     opacity:0.6. Si dejamos que se multipliquen, queda casi invisible. */
+  .btn-pedido.btn-generado {
+    background: #e8f3e1 !important;
+    color: #2f6b29 !important;
+    cursor: default !important;
+    box-shadow: none !important;
+    border: 1px solid #c8e2bd !important;
+    font-weight: 600;
+    opacity: 1 !important;
+  }
+  /* El grupo "enviado" ya no se opaca entero — solo opacamos los inputs
+     individuales (los kg/€/partido) para que se vea que esta cerrado,
+     pero el resto (titulo, subtotal, boton "Generado") queda legible. */
+  .ped-prov-grupo.enviado { opacity: 1; }
+  .ped-prov-grupo.enviado tbody tr { opacity: 0.65; }
+  .ped-nota { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.85rem; font-family: inherit; resize: vertical; min-height: 60px; background: #FAF8F6; }
+  .ped-nota:focus { border-color: var(--accent); background: #fff; outline: none; }
+  .ped-modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1rem; }
+  .ped-success { background: #e8f3e1; color: #2f6b29; border: 1px solid #c8e2bd; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.85rem; margin-bottom: 0.8rem; display: none; }
+  .ped-success.show { display: block; }
+  .ped-success a { color: #2f6b29; font-weight: 600; text-decoration: underline; margin-right: 0.7rem; }
+  .ped-error { background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba; border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; margin-bottom: 0.8rem; display: none; }
+  .ped-error.show { display: block; }
+
+  /* (El toggle Tabla/Kanban se reemplazo por un tab top-level "Kanban"
+     hermano de "Compras" — ver .tabs-bar arriba.) */
+
+  /* Vista Kanban */
+  .kb-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.8rem; }
+  @media (max-width: 1600px) { .kb-board { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 1200px) { .kb-board { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px)  { .kb-board { grid-template-columns: repeat(2, 1fr); } }
+  .kb-col { background: #fafaf7; border: 1px solid var(--border); border-radius: 12px; min-height: 200px; display: flex; flex-direction: column; }
+  .kb-col[data-estado="pedir"]        { border-top: 3px solid #e0473a; }
+  .kb-col[data-estado="en-camino"]    { border-top: 3px solid #2c5b8a; }
+  .kb-col[data-estado="en-proveedor"] { border-top: 3px solid #6b46c1; }
+  .kb-col[data-estado="bajo"]         { border-top: 3px solid #d68a2a; }
+  .kb-col[data-estado="ok"]           { border-top: 3px solid #2f6b29; }
+  .kb-col[data-estado="sin"]          { border-top: 3px solid #a0aec0; }
+  /* min-height para que todas las cabeceras de columna del kanban
+     tengan la misma altura aunque el titulo de algunas se vaya a
+     2 lineas ("En almacén proveedor", "Sin mínimo de seguridad").
+     Asi las primeras cards de cada columna empiezan a la misma altura. */
+  .kb-col-hdr { padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.84rem; color: #4d4d4d; display: flex; align-items: center; gap: 0.4rem; min-height: 3.1rem; }
+  .kb-icon { font-size: 0.95rem; }
+  .kb-count { margin-left: auto; background: #fff; border: 1px solid var(--border); padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; color: #7a7a7a; }
+  .kb-col-body { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 70vh; overflow-y: auto; }
+  .kb-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.78rem; transition: box-shadow 0.12s, transform 0.08s; }
+  .kb-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  .kb-card-calidad { cursor: pointer; }
+  /* Cuando la card es de calidad agrupada, las pills de proveedor van
+     en flex y permiten ocupar varias lineas */
+  .kb-card-calidad .kb-card-prov { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  .kb-card-hdr { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.4rem; margin-bottom: 0.2rem; }
+  .kb-card-name { font-weight: 600; font-size: 0.84rem; color: #2a2a2a; line-height: 1.25; flex: 1; }
+  .kb-card-cat { background: #f4ede5; color: #4d4d4d; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; white-space: nowrap; }
+  .kb-card-prov { font-size: 0.72rem; margin-bottom: 0.35rem; }
+  .kb-card-prov .prov-pill { padding: 0.05rem 0.4rem; font-size: 0.66rem; }
+  .kb-card-stock { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem; }
+  .kb-card-kg { font-size: 1rem; font-weight: 700; color: #2a2a2a; font-variant-numeric: tabular-nums; }
+  .kb-card-min { color: #7a7a7a; font-size: 0.72rem; }
+  .kb-progress { height: 4px; background: #f2ede6; border-radius: 4px; overflow: hidden; margin-bottom: 0.4rem; }
+  .kb-progress-bar { height: 100%; transition: width 0.3s; background: #2f6b29; }
+  .kb-progress-bar.bar-pedir     { background: #e0473a; }
+  .kb-progress-bar.bar-en-camino { background: #2c5b8a; }
+  .kb-progress-bar.bar-bajo      { background: #d68a2a; }
+  .kb-progress-bar.bar-ok        { background: #2f6b29; }
+  .kb-card-recibido {
+    background: transparent; border: 1px solid #c8d8e8; color: #1e40af;
+    padding: 0.28rem 0.7rem; border-radius: 999px; font-size: 0.72rem;
+    cursor: pointer; font-family: inherit; margin-top: 0.4rem; width: 100%;
+    transition: background 0.12s;
+  }
+  .kb-card-recibido:hover:not(:disabled) { background: #dbeafe; }
+  .kb-card-recibido:disabled { opacity: 0.5; cursor: wait; }
+  .kb-card-pedir {
+    background: var(--accent); border: none; color: #fff;
+    padding: 0.32rem 0.7rem; border-radius: 999px; font-size: 0.74rem;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    margin-top: 0.4rem; width: 100%; transition: background 0.12s;
+  }
+  .kb-card-pedir:hover:not(:disabled) { background: var(--accent-hover); }
+  .kb-card-pedir:disabled { opacity: 0.5; cursor: wait; }
+  .kb-card-anular {
+    background: transparent; border: none; color: #9b1c1c;
+    padding: 0.2rem 0.5rem; font-size: 0.68rem; cursor: pointer;
+    font-family: inherit; margin-top: 0.2rem; width: 100%;
+    text-decoration: underline; opacity: 0.7; transition: opacity 0.12s;
+  }
+  .kb-card-anular:hover:not(:disabled) { opacity: 1; }
+  .kb-card-anular:disabled { opacity: 0.3; cursor: wait; }
+  .kb-card-pedido-ref { font-size: 0.68rem; color: #1e40af; background: #dbeafe; padding: 0.1rem 0.45rem; border-radius: 4px; display: inline-block; }
+  /* Mini-bloque "Ya en almacen" dentro de la card de pedido en camino */
+  .kb-card-stock-actual { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); }
+  .kb-card-stock-actual-lbl { font-size: 0.66rem; color: #7a7a7a; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.25rem; display: flex; gap: 0.4rem; align-items: baseline; }
+  .kb-card-stock-actual-lbl small { font-weight: 400; color: #2a2a2a; font-variant-numeric: tabular-nums; text-transform: none; letter-spacing: 0; }
+  .kb-card-stock-actual-list { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  .kb-card-stock-actual-list .kb-part {
+    cursor: pointer; background: #f4ede5; padding: 0.1rem 0.45rem; border-radius: 4px;
+    font-size: 0.68rem; color: #4d4d4d; font-variant-numeric: tabular-nums;
+    border: 1px solid transparent; transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .kb-card-stock-actual-list .kb-part:hover {
+    background: #fff; border-color: var(--accent); color: var(--accent-hover);
+  }
+  .kb-card-stock-actual-empty { font-size: 0.7rem; color: #9a9a9a; font-style: italic; }
+  .kb-card-pedido { border-left: 3px solid #2c5b8a; }
+  .kb-card-pedido.kb-card-legacy { border-left-color: #a0aec0; background: #fafaf7; }
+
+  /* Card "En proveedor": un card por PARTIDO que tiene kg en el almacen
+     del proveedor (no por calidad). El borde lateral en violeta lo
+     distingue de pedidos en camino (azul). */
+  .kb-card-en-proveedor { border-left: 3px solid #6b46c1; }
+  .kb-card-en-proveedor .kb-prov-lote { font-size: 0.72rem; color: #4d4d4d; margin-bottom: 0.3rem; font-variant-numeric: tabular-nums; }
+  .kb-card-en-proveedor .kb-prov-lote strong { color: #2a2a2a; }
+  .kb-card-en-proveedor .kb-prov-kg-rols {
+    margin-top: 0.4rem; padding-top: 0.4rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.72rem; color: #7a7a7a;
+  }
+  .kb-card-en-proveedor .kb-prov-kg-rols strong { color: #2a2a2a; font-variant-numeric: tabular-nums; }
+  .kb-card-traer {
+    background: #6b46c1; border: none; color: #fff;
+    padding: 0.34rem 0.7rem; border-radius: 999px; font-size: 0.74rem;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    margin-top: 0.45rem; width: 100%; transition: background 0.12s;
+  }
+  .kb-card-traer:hover:not(:disabled) { background: #553c9a; }
+  .kb-card-traer:disabled { opacity: 0.5; cursor: wait; }
+
+  /* Stat "En proveedor" en la barra superior de Compras */
+  .dot-en-proveedor { background: #6b46c1; }
+  .estado-en-proveedor { background: #ede9fe; color: #5b21b6; }
+  .estado-en-proveedor::before { content: '📦 '; }
+  table.cmp-tabla tbody tr.fila-en-proveedor td.semaforo { background: #6b46c1 !important; }
+  table.cmp-tabla tr.fila-en-proveedor td.semaforo { background: #6b46c1; }
+  .kb-card-pedido-legacy { font-size: 0.76rem; color: #4d4d4d; background: #f4ede5; padding: 0.4rem 0.6rem; border-radius: 6px; margin: 0.35rem 0; font-style: italic; }
+  .kb-card-eta { display: flex; align-items: center; gap: 0.4rem; margin: 0.35rem 0; font-size: 0.74rem; }
+  .kb-card-eta label { color: #7a7a7a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.68rem; }
+  .kb-card-eta input { flex: 1; border: 1px solid #ede7dc; background: #fbf8f3; border-radius: 6px; padding: 0.28rem 0.4rem; font-size: 0.78rem; font-family: inherit; }
+  .kb-card-eta input:focus { border-color: var(--accent); background: #fff; outline: none; }
+  .kb-card-eta input.saving { background: #fff8e1; }
+  .kb-card-eta input.saved-ok { background: #e8f3e1; border-color: #2f6b29; }
+  .kb-card-parts { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-bottom: 0.3rem; }
+  .kb-card-parts .kb-part {
+    background: #f4ede5; padding: 0.1rem 0.45rem; border-radius: 4px;
+    font-size: 0.7rem; color: #4d4d4d; font-variant-numeric: tabular-nums;
+    cursor: pointer; border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .kb-card-parts .kb-part:hover {
+    background: #fff; border-color: var(--accent); color: var(--accent-hover);
+  }
+  .kb-card-foot { display: flex; justify-content: space-between; gap: 0.4rem; font-size: 0.72rem; color: #7a7a7a; padding-top: 0.35rem; border-top: 1px solid #f2ede6; }
+  .kb-card-precio { color: #2a2a2a; font-weight: 600; }
+  .kb-card-obs { font-style: italic; flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kb-empty { color: #b0b0b0; font-style: italic; font-size: 0.78rem; text-align: center; padding: 1rem 0; }
+
+/* Pills para los chips de tipo de movimiento (tab Movimientos) */
+.pill-tipo { display:inline-block; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; letter-spacing:0.03em; }
+.pill-entrada { background:#e8f3e1; color:#2f6b29; }
+.pill-ajuste  { background:#fff1d6; color:#8a6d3b; }
+.pill-salida  { background:#e1ecf5; color:#1d4470; }
+.pill-borrado { background:#fde2e2; color:#9b1c1c; }
+
+/* ============ Tab "Lana en crudo" ============ */
+/* Barra de progreso "Consumido" en la tabla de contenedores */
+.lc-progress { width: 110px; height: 8px; background: #f0e9dc; border-radius: 999px; overflow: hidden; }
+.lc-progress-bar { height: 100%; background: linear-gradient(90deg, #c8a771 0%, #b8965f 100%); transition: width 0.25s; }
+
+/* Modal "Hilar": titulos de seccion (Origen / Destino) */
+.modal-section-title {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #7a7a7a;
+  margin: 0.8rem 0 0.4rem; padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Filas de consumo en el modal de hilado */
+.lc-hilar-consumos {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  background: #faf8f5; border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.6rem;
+  max-height: 200px; overflow-y: auto;
+}
+.lc-hilar-consumo-row {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.lc-hilar-consumo-row .input-line { font-size: 0.82rem; }
+.lc-hilar-dispo { white-space: nowrap; }
+
+/* Resumen calculado en vivo en el modal de hilado */
+.lc-hilar-resumen {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem; margin: 1rem 0 0.4rem;
+  background: #fbf8f3; border: 1px solid #ede7dc;
+  border-radius: 10px; padding: 0.7rem 0.9rem;
+}
+.lc-hilar-resumen > div {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.lc-hilar-resumen span {
+  font-size: 0.66rem; color: #9a9a9a; text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 600;
+}
+.lc-hilar-resumen strong {
+  font-size: 0.95rem; color: #2a2a2a; font-weight: 700;
+}
+
+/* Info card del modal de cerrar orden (resumen de la orden pendiente) */
+.lc-cerrar-info {
+  background: #faf8f5; border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem; font-size: 0.88rem; color: #4d4d4d;
+}
+
+/* Seccion "Ordenes en hilado" (pendientes) */
+.lc-ordenes-wrap {
+  background: #faf6ee; border: 1px solid #ede5d0; border-radius: 10px;
+  padding: 0.8rem 1rem; margin: 0.8rem 0 1.2rem;
+}
+.lc-ordenes-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; color: #4d4d4d; margin-bottom: 0.6rem;
+}
+.lc-ord-lista { display: flex; flex-direction: column; gap: 0.6rem; }
+.lc-ord-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.7rem 0.9rem; display: grid;
+  grid-template-columns: 1fr auto; gap: 0.5rem 1rem;
+  align-items: start;
+}
+.lc-ord-head {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 0.88rem; flex-wrap: wrap;
+}
+.lc-ord-chip {
+  display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+  background: #e1ecf5; color: #1d4470;
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em;
+}
+.lc-ord-body { grid-column: 1; }
+.lc-ord-kpis {
+  display: flex; gap: 1.2rem; flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.lc-ord-kpis > span { display: flex; flex-direction: column; gap: 0.1rem; }
+.lc-ord-kpis small {
+  font-size: 0.66rem; color: #9a9a9a; text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 600;
+}
+.lc-ord-kpis strong { font-size: 0.92rem; color: #2a2a2a; font-weight: 700; }
+.lc-ord-origen { font-size: 0.78rem; color: #7a7a7a; margin-top: 0.3rem; }
+.lc-ord-nota { font-size: 0.78rem; color: #4d4d4d; font-style: italic; margin-top: 0.2rem; }
+.lc-ord-actions { grid-column: 2; display: flex; gap: 0.4rem; align-items: flex-start; }
+
+/* Filas de contenedor expandibles: muestran historial de hilado al hacer click */
+.lc-row-expandable { cursor: pointer; }
+.lc-row-expandable:hover { background: #faf8f5; }
+.lc-row-caret {
+  display: inline-block; margin-left: 0.35rem; color: #b09d77;
+  font-size: 0.7rem; transition: transform 0.18s;
+}
+.lc-row-expanded .lc-row-caret { transform: rotate(90deg); }
+.lc-detail-row > td {
+  background: #fbf8f3 !important;
+  padding: 0 !important;
+  border-top: none;
+}
+.lc-detail-inner {
+  padding: 0.6rem 1rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  margin: 0 0 0.3rem 0.5rem;
+}
+.lc-detail-titulo {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #7a7a7a; margin-bottom: 0.4rem;
+}
+.lc-detail-tabla {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+  background: #fff; border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.lc-detail-tabla th {
+  background: #f4ede5; padding: 0.4rem 0.55rem;
+  font-weight: 600; color: #7a7a7a; text-align: left;
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.lc-detail-tabla td { padding: 0.45rem 0.55rem; border-top: 1px solid #f0e9dc; }
+.lc-detail-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+
+

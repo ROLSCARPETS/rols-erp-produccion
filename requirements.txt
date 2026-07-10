@@ -1,0 +1,7 @@
+# Dependencias de runtime del ERP de Produccion (modulo Compras).
+# Solo lo MINIMO para que la app arranque y sirva. Todas con wheels
+# (instalacion rapida, sin compilar).
+Flask>=3.0,<4
+# Export PDF del pedido a proveedor (pdf_pedido_proveedor.py). Import
+# defensivo: la app arranca igual si faltara (el PDF queda deshabilitado).
+reportlab>=4.0
