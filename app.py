@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import json
 import os
+import secrets
 import sys
 import time
 from datetime import datetime
@@ -90,6 +91,135 @@ def _user_rol() -> str | None:
 def _user_name() -> str | None:
     """Username del usuario segun el SSO (header 'X-Rols-User-Name')."""
     return (request.headers.get("X-Rols-User-Name") or "").strip().lower() or None
+
+
+# ============================================================
+# API v1 — consumo por Rols One (escandallo de producto)
+# ============================================================
+# Este ERP es la FUENTE ÚNICA de verdad de las lanas. El escandallo de producto
+# (que vive en Rols One) las consume por HTTP en vez de tener su propia copia:
+#   GET  /api/v1/lanas                       → lista de calidades
+#   GET  /api/v1/lanas/<calidad_id>/lotes    → lotes de una calidad
+#   POST /api/v1/consumir                    → fabricar: descuenta kg de lotes
+# Autenticado con un token compartido (X-Rols-Api-Token) para no exponer el
+# inventario/costes en abierto. El token sale de ROLS_ERP_API_TOKEN o de un
+# fichero erp_api_token.txt en ROLS_DATA_DIR. Sin token → API v1 cerrada.
+
+def _erp_api_token() -> str | None:
+    tok = os.environ.get("ROLS_ERP_API_TOKEN")
+    if tok and tok.strip():
+        return tok.strip()
+    try:
+        base = os.environ.get("ROLS_DATA_DIR") or str(APP_DIR / "shared" / "data")
+        tok = (Path(base) / "erp_api_token.txt").read_text(encoding="utf-8").strip()
+        return tok or None
+    except OSError:
+        return None
+
+
+def _requiere_api_token():
+    """403 si la petición no trae un X-Rols-Api-Token válido. Fail-closed: si no
+    hay token configurado en el servidor, la API v1 queda cerrada."""
+    expected = _erp_api_token()
+    got = (request.headers.get("X-Rols-Api-Token") or "").strip()
+    if not expected or not got or not secrets.compare_digest(got, expected):
+        return jsonify({"error": "no autorizado (API v1)"}), 401
+    return None
+
+
+@app.route("/api/v1/lanas")
+def api_v1_lanas():
+    """Lista de calidades de lana (misma forma que /api/materias-primas/lanas).
+    `_source` marca la procedencia (útil para verificar que el consumidor usa
+    el ERP y no un fallback local)."""
+    bl = _requiere_api_token()
+    if bl:
+        return bl
+    mp = _mp_module()
+    return jsonify({"lanas": mp.listar_lanas(), "_source": "erp-produccion"})
+
+
+@app.route("/api/v1/lanas/<path:calidad_id>/lotes")
+def api_v1_lanas_lotes(calidad_id):
+    """Lotes de una calidad (para elegir de dónde consumir al fabricar)."""
+    bl = _requiere_api_token()
+    if bl:
+        return bl
+    mp = _mp_module()
+    lana = mp.lana_por_id(calidad_id)
+    if not lana:
+        return jsonify({"error": f"calidad {calidad_id!r} no existe"}), 404
+    return jsonify({"lotes": lana.get("lotes", []), "resumen": mp.resumen_lana(calidad_id)})
+
+
+@app.route("/api/v1/consumir", methods=["POST"])
+def api_v1_consumir():
+    """Fabricación: consume kg de los lotes indicados (fuente única de stock).
+
+    Body: {"consumos":[{"lana_id","lote","kg","nota"?}], "usuario"?, "ref"?, "m2"?}
+    Valida saldos antes de ejecutar; si algo falla en la pre-validación no toca
+    nada. Devuelve el detalle por consumo y el coste total. Es la lógica de
+    fabricar que antes vivía en Rols One (ahora la ejecuta el dueño del stock)."""
+    bl = _requiere_api_token()
+    if bl:
+        return bl
+    mp = _mp_module()
+    data = request.get_json(force=True, silent=True) or {}
+    consumos = data.get("consumos") or []
+    if not isinstance(consumos, list) or not consumos:
+        return jsonify({"error": "Falta lista 'consumos' con al menos un item"}), 400
+    ref = (data.get("ref") or "").strip()
+    try:
+        m2 = float(data.get("m2") or 0)
+    except (TypeError, ValueError):
+        m2 = 0
+    usuario = (data.get("usuario") or "").strip()
+    nota_base = (f"fabricacion ref {ref}" if ref else "fabricacion") + (f" ({m2:g} m2)" if m2 else "")
+
+    # Pre-validación: todos los lotes existen y tienen saldo suficiente.
+    errores_pre = []
+    for c in consumos:
+        lana_id = (c.get("lana_id") or "").strip()
+        lote = (c.get("lote") or "").strip()
+        try:
+            kg = float(c.get("kg") or 0)
+        except (TypeError, ValueError):
+            kg = -1
+        if not lana_id or not lote or kg <= 0:
+            errores_pre.append({"lana_id": lana_id, "lote": lote, "error": "datos invalidos"})
+            continue
+        lana = mp.lana_por_id(lana_id)
+        if not lana:
+            errores_pre.append({"lana_id": lana_id, "lote": lote, "error": f"lana {lana_id!r} no existe"})
+            continue
+        lote_obj = next((l for l in (lana.get("lotes") or []) if l.get("lote") == lote), None)
+        if not lote_obj:
+            errores_pre.append({"lana_id": lana_id, "lote": lote, "error": f"lote {lote!r} no existe en esa lana"})
+            continue
+        saldo = float(lote_obj.get("cantidad_disponible_kg") or 0)
+        if kg > saldo + 1e-6:
+            errores_pre.append({"lana_id": lana_id, "lote": lote,
+                                "error": f"saldo insuficiente ({saldo:g} kg < {kg:g} kg)"})
+    if errores_pre:
+        return jsonify({"error": "Validacion fallida antes de fabricar", "detalle": errores_pre}), 400
+
+    # Ejecutar consumos uno a uno.
+    resultado = []
+    coste_total = 0.0
+    for c in consumos:
+        lana_id = c.get("lana_id"); lote = c.get("lote"); kg = float(c.get("kg"))
+        nota = (c.get("nota") or "").strip() or nota_base
+        lote_act, err = mp.consumir_lote(lana_id, lote, kg=kg, usuario=usuario, nota=nota)
+        if err:
+            resultado.append({"lana_id": lana_id, "lote": lote, "kg": kg, "ok": False, "error": err})
+            continue
+        coste = float(lote_act.get("coste_kg") or 0)
+        coste_total += kg * coste
+        resultado.append({"lana_id": lana_id, "lote": lote, "kg": kg, "ok": True,
+                          "coste_kg": coste, "saldo_restante_kg": lote_act.get("cantidad_disponible_kg")})
+    ok_global = all(r["ok"] for r in resultado)
+    return jsonify({"ok": ok_global, "m2": m2, "ref": ref,
+                    "consumos": resultado, "coste_total_eur": round(coste_total, 2)}), (200 if ok_global else 207)
 
 
 # ============================================================
