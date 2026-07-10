@@ -23,13 +23,17 @@
 
     // Dónde vive CUENTAS (Identity Provider):
     //   - LOCAL: cada app corre en su puerto, cuentas en :5054.
-    //   - PRODUCCIÓN: la suite va COMPUESTA bajo un único dominio y cuentas
-    //     se sirve en /cuentas (mismo origen). Eso hace el SSO trivial: el
-    //     fetch a /cuentas/api/whoami es same-origin (sin CORS ni mixed-content)
-    //     y la cookie de sesión viaja sola.
+    //   - PRODUCCIÓN: este ERP es AUTÓNOMO (dominio propio produccion.rolscarpets.com),
+    //     NO va compuesto bajo one.rolscarpets.com. El IdP (cuentas) sigue en
+    //     Rols One, en OTRO subdominio: https://one.rolscarpets.com/cuentas. El
+    //     fetch a /api/whoami es cross-origin pero same-SITE (ambos *.rolscarpets.com),
+    //     así que la cookie de sesión (Domain=.rolscarpets.com, SameSite=None,
+    //     Secure) viaja igual; cuentas responde con cabeceras CORS para este origen.
+    //   Se puede sobrescribir con window.ROLS_CUENTAS_BASE antes de cargar el script.
     var _host = window.location.hostname;
     var _isLocal = (_host === "localhost" || _host === "127.0.0.1");
-    var CUENTAS_BASE = _isLocal ? "http://localhost:5054" : "/cuentas";
+    var CUENTAS_BASE = window.ROLS_CUENTAS_BASE ||
+        (_isLocal ? "http://localhost:5054" : "https://one.rolscarpets.com/cuentas");
 
     // No correr el guard dentro de las propias páginas de CUENTAS (el IdP:
     // login, admin) — evita bucle de redirecciones. En prod son /cuentas/*,
