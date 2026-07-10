@@ -54,8 +54,10 @@ LOAD_TIME = time.time()
 
 @app.route("/health")
 def health():
-    """Healthcheck del despliegue (Passenger/Plesk). No requiere login."""
-    return {"status": "ok", "app": "erp-produccion-compras", "auto_deploy": "on"}
+    """Healthcheck del despliegue (Passenger/Plesk). No requiere login.
+    El campo `version` sirve para verificar que un deploy ha surtido efecto."""
+    return {"status": "ok", "app": "erp-produccion-compras",
+            "auto_deploy": "on", "version": "1.0"}
 
 
 @app.before_request
