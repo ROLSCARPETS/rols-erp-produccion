@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import json
+import math
 import os
 import secrets
 import sys
@@ -251,6 +252,8 @@ def api_v1_consumir():
         lote = (c.get("lote") or "").strip()
         try:
             kg = float(c.get("kg") or 0)
+            if not math.isfinite(kg):
+                kg = -1
         except (TypeError, ValueError):
             kg = -1
         if not lana_id or not lote or kg <= 0:
@@ -271,23 +274,36 @@ def api_v1_consumir():
     if errores_pre:
         return jsonify({"error": "Validacion fallida antes de fabricar", "detalle": errores_pre}), 400
 
-    # Ejecutar consumos uno a uno.
+    # Ejecutar los consumos como UNA transacción atómica (todo-o-nada): si
+    # alguno falla a mitad, se revierte TODO (saldos y movimientos), no quedan
+    # fabricaciones parciales. Cada consumir_lote abre una tx anidada que se une
+    # a esta externa; el `raise` la revierte entera.
+    import jsonstore
+
+    class _ConsumoError(Exception):
+        def __init__(self, detalle):
+            self.detalle = detalle
+
     resultado = []
     coste_total = 0.0
-    for c in consumos:
-        lana_id = c.get("lana_id"); lote = c.get("lote"); kg = float(c.get("kg"))
-        nota = (c.get("nota") or "").strip() or nota_base
-        lote_act, err = mp.consumir_lote(lana_id, lote, kg=kg, usuario=usuario, nota=nota)
-        if err:
-            resultado.append({"lana_id": lana_id, "lote": lote, "kg": kg, "ok": False, "error": err})
-            continue
-        coste = float(lote_act.get("coste_kg") or 0)
-        coste_total += kg * coste
-        resultado.append({"lana_id": lana_id, "lote": lote, "kg": kg, "ok": True,
-                          "coste_kg": coste, "saldo_restante_kg": lote_act.get("cantidad_disponible_kg")})
-    ok_global = all(r["ok"] for r in resultado)
-    return jsonify({"ok": ok_global, "m2": m2, "ref": ref,
-                    "consumos": resultado, "coste_total_eur": round(coste_total, 2)}), (200 if ok_global else 207)
+    try:
+        with jsonstore.store().tx():
+            for c in consumos:
+                lana_id = c.get("lana_id"); lote = c.get("lote"); kg = float(c.get("kg"))
+                nota = (c.get("nota") or "").strip() or nota_base
+                lote_act, err = mp.consumir_lote(lana_id, lote, kg=kg, usuario=usuario, nota=nota)
+                if err:
+                    raise _ConsumoError({"lana_id": lana_id, "lote": lote, "kg": kg, "error": err})
+                coste = float(lote_act.get("coste_kg") or 0)
+                coste_total += kg * coste
+                resultado.append({"lana_id": lana_id, "lote": lote, "kg": kg, "ok": True,
+                                  "coste_kg": coste, "saldo_restante_kg": lote_act.get("cantidad_disponible_kg")})
+    except _ConsumoError as e:
+        return jsonify({"ok": False, "m2": m2, "ref": ref,
+                        "error": "Fabricación cancelada: un consumo falló; no se consumió nada.",
+                        "detalle": e.detalle}), 409
+    return jsonify({"ok": True, "m2": m2, "ref": ref,
+                    "consumos": resultado, "coste_total_eur": round(coste_total, 2)}), 200
 
 
 # ============================================================

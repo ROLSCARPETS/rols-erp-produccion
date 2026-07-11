@@ -153,7 +153,11 @@ class _Store:
         si ya hay una abierta (load→mutate→save del módulo) se une a ella; si no,
         abre una propia."""
         docs = getattr(self._local, "tx_docs", None)
-        blob = json.dumps(data, ensure_ascii=False)
+        # allow_nan=False: si algún kg/coste quedó como NaN/Infinity, esto LANZA
+        # en vez de escribir un dato corrupto (defensa central; la mutación falla
+        # limpia y no se persiste basura). Los módulos validan además en la
+        # entrada con math.isfinite para dar un error claro al usuario.
+        blob = json.dumps(data, ensure_ascii=False, allow_nan=False)
         now = datetime.now().isoformat(timespec="seconds")
         c = self._conn()
         with self.tx():

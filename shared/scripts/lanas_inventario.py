@@ -51,6 +51,7 @@ partido concretos.
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 from datetime import datetime
@@ -515,6 +516,8 @@ def agregar_partido(lid: str, partido_ref: str, kg, coste_kg=None,
         return None, "ref del partido es obligatoria"
     try:
         kg_f = float(kg)
+        if not math.isfinite(kg_f):
+            raise ValueError
     except (TypeError, ValueError):
         return None, "kg debe ser numerico"
     if kg_f < 0:
@@ -701,6 +704,8 @@ def consumir_partido(lid: str, partido_ref: str, kg, usuario: str = "",
     """Salida atomica de kg de un partido. No toca coste ni fecha."""
     try:
         kg_f = float(kg)
+        if not math.isfinite(kg_f):
+            raise ValueError
     except (TypeError, ValueError):
         return None, "Cantidad invalida"
     if kg_f <= 0:
