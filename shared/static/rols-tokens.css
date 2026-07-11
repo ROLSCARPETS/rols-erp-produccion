@@ -1,0 +1,37 @@
+/* =================================================================
+ * Rols One — tokens de diseño compartidos.
+ *
+ * Fuente ÚNICA de verdad del look Rols (paleta oficial sand / graphite
+ * / tan). Las apps lo cargan al inicio de su CSS con:
+ *
+ *     @import url("/shared/rols-tokens.css");
+ *
+ * Cambiar un color aquí lo propaga a todas las apps (calculadora,
+ * consulta-stock, asistente, pedidos, futuras rols-X). No redefinir
+ * estas variables en el CSS de cada app.
+ *
+ * Tipografía oficial: Inter (300/400/500/600/700). Cada app la carga en
+ * su <head>; mantener esa fuente para consistencia visual.
+ * ================================================================= */
+
+:root {
+  /* Fondos */
+  --bg-page:            #FAF8F6;   /* warm near-white (rols-sand-50) */
+  --bg-card:            #FFFFFF;   /* rols-white */
+  --bg-sidebar:         #4D4D4D;   /* rols-graphite */
+  --bg-sidebar-hover:   #5a5a5a;
+  --bg-sidebar-active:  #6a6a6a;
+  --soft-bg:            #F2EDE8;   /* superficie suave */
+
+  /* Texto sobre sidebar */
+  --text-sidebar:        #D7CDC5;  /* rols-sand sobre graphite */
+  --text-sidebar-active: #FFFFFF;
+
+  /* Acento (dorado / sandstone) */
+  --accent:        #D5B38C;        /* rols-tan */
+  --accent-hover:  #B89368;        /* rols-tan-400 */
+  --accent-soft:   #EFE2CD;        /* rols-tan-100 */
+
+  /* Bordes */
+  --border:        #E5DCD2;        /* rols-sand-200 */
+}
