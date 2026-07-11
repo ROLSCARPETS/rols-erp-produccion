@@ -57,6 +57,12 @@ LOAD_TIME = time.time()
 def health():
     """Healthcheck del despliegue (Passenger/Plesk). No requiere login.
     El campo `version` sirve para verificar que un deploy ha surtido efecto."""
+    _s = request.args.get("sleep")
+    if _s:
+        try:
+            time.sleep(min(float(_s), 5.0))
+        except (TypeError, ValueError):
+            pass
     return {"status": "ok", "app": "erp-produccion-compras",
             "auto_deploy": "on", "version": "1.0", "pid": os.getpid()}
 
