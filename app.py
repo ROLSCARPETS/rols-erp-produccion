@@ -58,7 +58,7 @@ def health():
     """Healthcheck del despliegue (Passenger/Plesk). No requiere login.
     El campo `version` sirve para verificar que un deploy ha surtido efecto."""
     return {"status": "ok", "app": "erp-produccion-compras",
-            "auto_deploy": "on", "version": "1.0"}
+            "auto_deploy": "on", "version": "1.0", "pid": os.getpid()}
 
 
 @app.before_request
