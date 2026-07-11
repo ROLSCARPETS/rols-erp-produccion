@@ -32,7 +32,7 @@ APP_DIR = Path(__file__).resolve().parent
 # shared/data (parent.parent/data) o en ROLS_DATA_DIR si esta definido.
 sys.path.insert(0, str(APP_DIR / "shared" / "scripts"))
 
-from flask import Flask, render_template, request, jsonify, Response  # noqa: E402
+from flask import Flask, render_template, request, jsonify, Response, g  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,32 +82,83 @@ def index():
     return render_template("materias_primas.html")
 
 
+# ---- Ecosistema Rols One: URLs del IdP (rols-cuentas) y home ----
+# Este ERP es autonomo; el login y el home viven en Rols One, en OTRO
+# subdominio. En local apuntan a los puertos de la suite; en prod a
+# one.rolscarpets.com. Sobrescribibles con ROLS_ONE_BASE / ROLS_CUENTAS_BASE.
+def _rols_one_base() -> str:
+    if os.environ.get("ROLS_ONE_BASE"):
+        return os.environ["ROLS_ONE_BASE"].rstrip("/")
+    host = (request.host or "").split(":")[0].lower()
+    return ("http://localhost:5051" if host in ("localhost", "127.0.0.1")
+            else "https://one.rolscarpets.com")
+
+
+def _cuentas_base() -> str:
+    if os.environ.get("ROLS_CUENTAS_BASE"):
+        return os.environ["ROLS_CUENTAS_BASE"].rstrip("/")
+    host = (request.host or "").split(":")[0].lower()
+    if host in ("localhost", "127.0.0.1"):
+        return "http://localhost:5054"
+    return _rols_one_base() + "/cuentas"
+
+
+# ---- Autenticacion REAL del ERP: sesion de Rols One validada en el SERVIDOR ----
+# La cookie de sesion de rols-cuentas (Domain=.rolscarpets.com) llega tambien a
+# este subdominio. La validamos server-side contra /api/whoami reenviando esa
+# cookie: es la fuente de verdad. El header X-Rols-User-Rol que ponia sso-guard.js
+# NO se usa como auth (era del cliente, spoofeable). FAIL-CLOSED: sin sesion
+# valida, no se pasa. Cacheado 60s por cookie para no llamar en cada request.
+_SSO_CACHE: dict = {}
+_SSO_TTL = 60.0
+_SSO_COOKIE = os.environ.get("ROLS_SESSION_COOKIE", "rols_one_session")
+
+
+def _sso_user():
+    """Usuario autenticado (dict del whoami) o None. Cachea en g por request."""
+    if hasattr(g, "_sso_user"):
+        return g._sso_user
+    val = request.cookies.get(_SSO_COOKIE)
+    if not val:
+        g._sso_user = None
+        return None
+    now = time.time()
+    hit = _SSO_CACHE.get(val)
+    if hit and (now - hit[1]) < _SSO_TTL:
+        g._sso_user = hit[0]
+        return hit[0]
+    user = None
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            _cuentas_base() + "/api/whoami",
+            headers={"Cookie": f"{_SSO_COOKIE}={val}"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            if resp.status == 200:
+                user = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        user = None  # 401 / cuentas caido / red -> sin sesion valida
+    _SSO_CACHE[val] = (user, now)
+    g._sso_user = user
+    return user
+
+
 def _user_rol() -> str | None:
-    """Rol del usuario segun el SSO (header 'X-Rols-User-Rol', puesto por
-    sso-guard.js via window.__rolsUser.rol). Filtro de UX, no de seguridad."""
-    return (request.headers.get("X-Rols-User-Rol") or "").strip().lower() or None
+    """Rol del usuario segun la SESION validada en el servidor (rols-cuentas)."""
+    u = _sso_user()
+    return ((u or {}).get("rol") or "").strip().lower() or None
 
 
 def _user_name() -> str | None:
-    """Username del usuario segun el SSO (header 'X-Rols-User-Name')."""
-    return (request.headers.get("X-Rols-User-Name") or "").strip().lower() or None
+    """Username segun la sesion validada en el servidor."""
+    u = _sso_user()
+    return ((u or {}).get("username") or "").strip().lower() or None
 
 
 @app.context_processor
 def _inject_sso_urls():
-    """URLs del ecosistema Rols One (IdP + home) para enlaces de plantilla.
-    Este ERP es autonomo; el login (rols-cuentas) y el home viven en Rols One,
-    en OTRO subdominio. En local apuntan a los puertos de la suite; en prod a
-    one.rolscarpets.com. Sobrescribibles con ROLS_CUENTAS_BASE / ROLS_ONE_BASE.
-    (Antes las plantillas usaban `nav.cuentas`, que caia a localhost:5054 en
-    prod porque este entrypoint no define ROLS_COMPOSED — logout roto.)"""
-    host = (request.host or "").split(":")[0].lower()
-    local = host in ("localhost", "127.0.0.1")
-    one_base = os.environ.get("ROLS_ONE_BASE") or (
-        "http://localhost:5051" if local else "https://one.rolscarpets.com")
-    cuentas_base = os.environ.get("ROLS_CUENTAS_BASE") or (
-        "http://localhost:5054" if local else one_base + "/cuentas")
-    return {"cuentas_base": cuentas_base, "rols_one_base": one_base}
+    """URLs del ecosistema Rols One (IdP + home) para enlaces de plantilla."""
+    return {"cuentas_base": _cuentas_base(), "rols_one_base": _rols_one_base()}
 
 
 # ============================================================
@@ -538,6 +589,8 @@ def api_catalogo_materia():
 
     Respuesta: {clasificaciones: [...], materiales_felpa: [...], titulos: [...]}
     """
+    bl = _requiere("compras")
+    if bl: return bl
     cat = _catalogo_module()
     return jsonify({
         "clasificaciones":  cat.listar_clasificaciones(),
@@ -1242,19 +1295,18 @@ _FALLBACK_POR_ROL = {
 
 
 def _puede(permiso: str) -> bool:
-    """¿El rol actual tiene `permiso`? Lee del modulo compartido
-    `shared/scripts/permisos`. Si no esta disponible o no hay rol, deja
-    pasar (backwards-compat con scripts server-to-server sin header)."""
-    rol = _user_rol()
-    if not rol:
-        return True  # sin header de rol → permisivo (calls internos)
-    try:
-        rols_shared.ensure_shared_on_path()
-        import permisos as _perm
-        return _perm.puede(rol, permiso)
-    except Exception:
-        # Si falla cargando permisos.json, usamos los defaults estaticos
-        return _FALLBACK_POR_ROL.get(rol, {}).get(permiso, False)
+    """¿El usuario autenticado tiene `permiso`? FAIL-CLOSED: sin una sesión
+    válida de Rols One (validada en el servidor), NO. Usa los permisos efectivos
+    que devuelve el whoami (matriz de rols-cuentas); si faltara la clave, cae al
+    fallback estático por rol."""
+    u = _sso_user()
+    if not u:
+        return False
+    perms = u.get("permisos") or {}
+    if permiso in perms:
+        return bool(perms[permiso])
+    rol = (u.get("rol") or "").strip().lower()
+    return _FALLBACK_POR_ROL.get(rol, {}).get(permiso, False)
 
 
 def _puede_compras() -> bool:
@@ -1348,6 +1400,8 @@ def api_movimientos():
     - desde, hasta (YYYY-MM-DD)
     - limit (int, default sin limite)
     """
+    bl = _requiere("compras")
+    if bl: return bl
     mi = _movs_module()
     mi.invalidar_cache()
     movs = mi.listar(
