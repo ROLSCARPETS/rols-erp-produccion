@@ -4,4 +4,6 @@
 Flask>=3.0,<4
 # Export PDF del pedido a proveedor (pdf_pedido_proveedor.py). Import
 # defensivo: la app arranca igual si faltara (el PDF queda deshabilitado).
-reportlab>=4.0
+# Acotado a la major 4 (evita saltos mayores no auditados). Se instala en el
+# venv en el deploy, no en runtime.
+reportlab>=4.0,<5

@@ -2,7 +2,7 @@
 # a Flask), pero por si alguna llegara a Apache como estático, se bloquea el
 # acceso directo a ficheros sensibles. La protección principal son las reglas
 # `deny` de nginx que se añaden en Plesk (Hosting y DNS → Apache y nginx).
-<FilesMatch "\.(env|py|pyc|db|sqlite|sqlite3|log|ini|bat|ps1|sh)$">
+<FilesMatch "\.(env|py|pyc|db|sqlite|sqlite3|log|ini|bat|ps1|sh|txt)$">
     Require all denied
 </FilesMatch>
 

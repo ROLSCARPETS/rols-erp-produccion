@@ -30,10 +30,12 @@ desktop.ini
 .env.*
 !.env.example
 
+# Token del API v1 (secreto compartido con Rols One). NUNCA commitear, aunque
+# alguien lo cree dentro de shared/data en local en vez de en ROLS_DATA_DIR.
+erp_api_token.txt
+shared/data/*.txt
+
 # Datos de runtime editados desde la UI. El repo lleva shared/data/*.json como
 # SEED; en produccion la verdad vive en ROLS_DATA_DIR (fuera del docroot).
 # Backups locales generados durante migraciones.
 shared/data/.bak/
-
-# Lock temporal del bootstrap de reportlab
-.reportlab_install.lock

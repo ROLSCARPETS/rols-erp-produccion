@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ficha proveedor — Rols ERP Producción</title>
+<link rel="icon" href="{{ url_for('static', filename='logo-rols.png') }}" />
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
@@ -148,7 +149,7 @@
       <a href="/materias-primas#proveedores" class="active"><span class="check"></span><span>Proveedores</span></a>
     </nav>
     <div class="space-y-1 pt-4 border-t border-stone-700/50">
-      <a href="{{ nav.cuentas }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
+      <a href="{{ cuentas_base }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
     </div>
   </aside>
 
@@ -369,7 +370,7 @@ function pintarHero(d) {
   document.getElementById('pv-nombre').textContent =
     (nombre && nombre.toUpperCase() !== alias.toUpperCase()) ? nombre : '';
   document.getElementById('pv-bread-alias').textContent = alias || PROV_ID;
-  document.title = `${alias || PROV_ID} — Proveedor — Rols One`;
+  document.title = `${alias || PROV_ID} — Proveedor — Rols ERP Producción`;
   // Subtitle: contacto + telefono o email si los hay
   const partes = [];
   if (p.contacto_persona) partes.push(p.contacto_persona);

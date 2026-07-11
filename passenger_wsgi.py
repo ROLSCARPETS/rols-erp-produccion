@@ -7,7 +7,7 @@ Que hace:
 - Anade shared/scripts al path (rols_shared + modulos de datos).
 - Fija ROLS_DATA_DIR: los datos de runtime persisten FUERA del docroot para que
   ni el deploy ni git los toquen. Se siembran (idempotente) desde shared/data.
-- Bootstrap de reportlab (PDF del pedido a proveedor) si no estuviera instalado.
+- (reportlab se instala en el venv en el deploy, no en runtime.)
 - Normaliza PATH_INFO (decode_path_info) por si Passenger lo entrega aun
   percent-encoded (rutas con espacios: /materia-prima/<id>, etc.).
 """
@@ -54,28 +54,11 @@ def _seed_data_dir():
 
 _seed_data_dir()
 
-
-def _ensure_reportlab():
-    """Instala reportlab la primera vez (wheel manylinux, sin compilar). Si
-    falla, el PDF de pedido queda deshabilitado con mensaje claro y la app
-    arranca igual. En local es un no-op instantaneo (ya esta en el venv)."""
-    try:
-        import reportlab  # noqa: F401
-        return
-    except ImportError:
-        pass
-    import subprocess
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--quiet", "reportlab"],
-            timeout=120, check=True,
-        )
-        print("[erp] reportlab instalado — PDF de pedido a proveedor habilitado")
-    except Exception as exc:  # noqa: BLE001 — nunca tumbar el arranque por esto
-        print(f"[erp] WARN no pude instalar reportlab: {exc}")
-
-
-_ensure_reportlab()
+# reportlab (PDF del pedido a proveedor) se instala en el venv en el DESPLIEGUE
+# (está en requirements.txt), NO en runtime: instalar paquetes desde el worker
+# web es un riesgo de cadena de suministro y una dependencia de red frágil. El
+# import de pdf_pedido_proveedor es defensivo: si faltara, el PDF queda
+# deshabilitado con mensaje claro y la app arranca igual.
 
 # Carga la app Flask (app.py en la raiz del repo) y la envuelve con el
 # normalizador de PATH_INFO como capa mas externa.

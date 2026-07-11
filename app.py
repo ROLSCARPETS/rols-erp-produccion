@@ -93,6 +93,23 @@ def _user_name() -> str | None:
     return (request.headers.get("X-Rols-User-Name") or "").strip().lower() or None
 
 
+@app.context_processor
+def _inject_sso_urls():
+    """URLs del ecosistema Rols One (IdP + home) para enlaces de plantilla.
+    Este ERP es autonomo; el login (rols-cuentas) y el home viven en Rols One,
+    en OTRO subdominio. En local apuntan a los puertos de la suite; en prod a
+    one.rolscarpets.com. Sobrescribibles con ROLS_CUENTAS_BASE / ROLS_ONE_BASE.
+    (Antes las plantillas usaban `nav.cuentas`, que caia a localhost:5054 en
+    prod porque este entrypoint no define ROLS_COMPOSED — logout roto.)"""
+    host = (request.host or "").split(":")[0].lower()
+    local = host in ("localhost", "127.0.0.1")
+    one_base = os.environ.get("ROLS_ONE_BASE") or (
+        "http://localhost:5051" if local else "https://one.rolscarpets.com")
+    cuentas_base = os.environ.get("ROLS_CUENTAS_BASE") or (
+        "http://localhost:5054" if local else one_base + "/cuentas")
+    return {"cuentas_base": cuentas_base, "rols_one_base": one_base}
+
+
 # ============================================================
 # API v1 — consumo por Rols One (escandallo de producto)
 # ============================================================

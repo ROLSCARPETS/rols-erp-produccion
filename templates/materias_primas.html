@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Materias primas — Rols ERP Producción</title>
+<link rel="icon" href="{{ url_for('static', filename='logo-rols.png') }}" />
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
@@ -20,7 +21,7 @@
     const ok = (perm !== undefined)
       ? !!perm
       : (rol === 'admin' || rol === 'comercial');
-    if (!ok) location.replace('/inicio');
+    if (!ok) location.replace('{{ rols_one_base }}/inicio');
   }
   if (window.__rolsUser) chequear(window.__rolsUser);
   window.addEventListener('rols:sso-ok', (e) => chequear(e.detail));
@@ -46,7 +47,7 @@
       <a href="/materias-primas#proveedores"><span class="check"></span><span>Proveedores</span></a>
     </nav>
     <div class="space-y-1 pt-4 border-t border-stone-700/50">
-      <a href="{{ nav.cuentas }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
+      <a href="{{ cuentas_base }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
     </div>
   </aside>
 
@@ -2455,7 +2456,7 @@ async function intentarBorrarContenedor(cid, forzar) {
     const ct = r.headers.get('content-type') || '';
     if (!ct.includes('application/json')) {
       throw new Error(`El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
-                      `Reinicia "Iniciar Rols One.bat".`);
+                      `Reinicia "Iniciar ERP Produccion.bat".`);
     }
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
@@ -3819,7 +3820,7 @@ document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
     if (!ct.includes('application/json')) {
       throw new Error(
         `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
-        `Cierra y vuelve a abrir "Iniciar Rols One.bat" para cargar la última versión.`
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
       );
     }
     const d = await r.json();
@@ -3860,7 +3861,7 @@ document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
     if (!ct.includes('application/json')) {
       throw new Error(
         `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
-        `Cierra y vuelve a abrir "Iniciar Rols One.bat" para cargar la última versión.`
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
       );
     }
     const d = await r.json();
@@ -3920,7 +3921,7 @@ document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
     if (!ct.includes('application/json')) {
       throw new Error(
         `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
-        `Cierra y vuelve a abrir "Iniciar Rols One.bat" para cargar la última versión.`
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
       );
     }
     const d = await r.json();
@@ -3949,7 +3950,7 @@ async function _guardarCampoPedidoInline(inp, campo, vid, ref) {
     if (!ct.includes('application/json')) {
       throw new Error(
         `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
-        `Cierra y vuelve a abrir "Iniciar Rols One.bat" para cargar la última versión.`
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
       );
     }
     const d = await r.json();
@@ -4240,7 +4241,7 @@ async function cargarProveedores() {
     }
     const ct = r.headers.get('content-type') || '';
     if (!ct.includes('application/json')) {
-      tb.innerHTML = `<tr><td colspan="8" class="mp-empty">El servidor no reconoce este endpoint (HTTP ${r.status}).<br/>Cierra y vuelve a abrir "Iniciar Rols One.bat" para cargar la última versión.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="8" class="mp-empty">El servidor no reconoce este endpoint (HTTP ${r.status}).<br/>Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.</td></tr>`;
       return;
     }
     const d = await r.json();
@@ -4496,7 +4497,7 @@ async function _parseJsonOrFail(r, ctxEndpoint = '') {
   if (!ct.includes('application/json')) {
     throw new Error(
       `El servidor no reconoce este endpoint${ctxEndpoint ? ' (' + ctxEndpoint + ')' : ''} ` +
-      `(HTTP ${r.status}). Cierra y vuelve a abrir "Iniciar Rols One.bat" ` +
+      `(HTTP ${r.status}). Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" ` +
       `para cargar la última versión.`
     );
   }
