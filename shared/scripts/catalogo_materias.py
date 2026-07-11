@@ -87,8 +87,14 @@ def cargar() -> dict:
     if not DATA_PATH.exists():
         DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
         _guardar(_default_data())
-    with open(DATA_PATH, encoding="utf-8") as fp:
-        d = json.load(fp)
+    try:
+        with open(DATA_PATH, encoding="utf-8") as fp:
+            d = json.load(fp)
+    except (OSError, ValueError) as e:
+        import logging
+        logging.getLogger("erp.store").error(
+            "JSON corrupto/ilegible en %s (%s); se usan defaults", DATA_PATH, e)
+        d = _default_data()
     # Garantizar que las listas existen aunque el JSON sea de una version
     # anterior (p.ej. v1 no tenia `titulos`)
     d.setdefault("clasificaciones", [])

@@ -128,9 +128,16 @@ DEFAULT_PERMISOS: dict[str, dict[str, bool]] = {
 
 
 def _cargar_raw() -> dict:
+    _vacio = {"_meta": {"version_schema": 1}, "permisos_rol": {}}
     if not DATA_PATH.exists():
-        return {"_meta": {"version_schema": 1}, "permisos_rol": {}}
-    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        return _vacio
+    try:
+        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        import logging
+        logging.getLogger("erp.store").error(
+            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
+        return _vacio
 
 
 def _guardar(data: dict) -> None:

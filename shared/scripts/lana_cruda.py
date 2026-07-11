@@ -109,13 +109,20 @@ def _id_orden_hilado() -> str:
 
 @lru_cache(maxsize=1)
 def _load_raw() -> dict:
+    _vacio = {
+        "_meta":               {"version_schema": 1},
+        "contenedores":        [],
+        "movimientos_hilado":  [],
+    }
     if not DATA_PATH.exists():
-        return {
-            "_meta":               {"version_schema": 1},
-            "contenedores":        [],
-            "movimientos_hilado":  [],
-        }
-    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        return _vacio
+    try:
+        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        import logging
+        logging.getLogger("erp.store").error(
+            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
+        return _vacio
 
 
 def invalidar_cache() -> None:

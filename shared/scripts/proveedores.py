@@ -71,9 +71,16 @@ def _slug(s: str) -> str:
 
 
 def cargar() -> dict:
+    _vacio = {"_meta": {"version_schema": 1}, "proveedores": []}
     if not DATA_PATH.exists():
-        return {"_meta": {"version_schema": 1}, "proveedores": []}
-    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        return _vacio
+    try:
+        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        import logging
+        logging.getLogger("erp.store").error(
+            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
+        return _vacio
 
 
 def _guardar(data: dict) -> None:
