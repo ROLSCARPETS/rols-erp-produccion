@@ -53,38 +53,29 @@ import os
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (queda de backup).
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "movimientos_inventario.json"
-_lock = threading.RLock()
+_lock = threading.RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
+
+_KEY = "movimientos_inventario"
 
 
-@lru_cache(maxsize=1)
-def _load_raw() -> dict:
-    _vacio = {"_meta": {"version_schema": 1}, "movimientos": []}
-    if not DATA_PATH.exists():
-        return _vacio
-    try:
-        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
-        return _vacio
+def _default() -> dict:
+    return {"_meta": {"version_schema": 1}, "movimientos": []}
 
 
 def invalidar_cache() -> None:
-    _load_raw.cache_clear()
+    pass  # SQLite se lee fresco; no-op por compat
 
 
 def cargar() -> dict:
-    return _load_raw()
+    return jsonstore.store().load(_KEY, _default, DATA_PATH)
 
 
 def _guardar(data: dict) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = DATA_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(DATA_PATH)
-    invalidar_cache()
+    jsonstore.store().save(_KEY, data)
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +112,7 @@ def registrar(
         "usuario":           usuario or "",
         "nota":              nota or "",
     }
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         data.setdefault("movimientos", []).append(mov)
         _guardar(data)

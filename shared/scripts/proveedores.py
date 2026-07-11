@@ -52,8 +52,12 @@ import os
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (queda de backup).
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "proveedores.json"
-_lock = RLock()
+_lock = RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
+_KEY = "proveedores"
 
 
 # ---------------------------------------------------------------------------
@@ -70,26 +74,18 @@ def _slug(s: str) -> str:
     return s.strip("-")
 
 
+def _default() -> dict:
+    return {"_meta": {"version_schema": 1}, "proveedores": []}
+
+
 def cargar() -> dict:
-    _vacio = {"_meta": {"version_schema": 1}, "proveedores": []}
-    if not DATA_PATH.exists():
-        return _vacio
-    try:
-        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
-        return _vacio
+    return jsonstore.store().load(_KEY, _default, DATA_PATH)
 
 
 def _guardar(data: dict) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     data.setdefault("_meta", {})
     data["_meta"]["actualizado_en"] = datetime.now().isoformat(timespec="seconds")
-    tmp = DATA_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(DATA_PATH)
+    jsonstore.store().save(_KEY, data)
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +142,7 @@ def crear(nombre: str) -> tuple[dict | None, str]:
     pid = _slug(nombre)
     if not pid:
         return None, "el nombre debe tener caracteres alfanumericos"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         provs = data.setdefault("proveedores", [])
         for p in provs:
@@ -177,7 +173,7 @@ def actualizar(prov_id: str, datos: dict) -> tuple[dict | None, str]:
     desconocidos = set(datos) - CAMPOS_EDITABLES
     if desconocidos:
         return None, f"campos no editables: {sorted(desconocidos)}"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         for p in data.get("proveedores", []):
             if (p.get("id") or "").lower() != prov_id.lower():
@@ -255,7 +251,7 @@ def borrar(prov_id: str) -> tuple[bool, str]:
     (variantes_con_proveedor) para que pase por la API correcta en lugar
     de leer el JSON directamente.
     """
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         provs = data.get("proveedores", [])
         idx = next((i for i, p in enumerate(provs)

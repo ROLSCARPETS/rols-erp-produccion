@@ -59,10 +59,12 @@ from pathlib import Path
 
 import os
 
-# Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
-# los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock; ver jsonstore.py)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (se conserva de
+# backup). En prod ROLS_DATA_DIR lo fija FUERA del docroot; en local shared/data.
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "lanas_inventario.json"
-_lock = threading.RLock()
+_lock = threading.RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
 
 
 # ---------------------------------------------------------------------------
@@ -116,37 +118,28 @@ def calidad_id(item: dict) -> str:
 # Carga / persistencia con cache
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
-def _load_raw() -> dict:
-    _vacio = {"_meta": {"version_schema": 1}, "lanas": [],
-              "basamentos": [], "backings": []}
-    if not DATA_PATH.exists():
-        return _vacio
-    try:
-        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se sirve vacío (no tumbar la app)",
-            DATA_PATH, e)
-        return _vacio
+_KEY = "lanas_inventario"
 
 
-def invalidar_cache() -> None:
-    _load_raw.cache_clear()
+def _default() -> dict:
+    return {"_meta": {"version_schema": 1}, "lanas": [],
+            "basamentos": [], "backings": []}
 
 
 def cargar() -> dict:
-    return _load_raw()
+    """Carga el documento desde SQLite (migra el JSON legacy la 1ª vez)."""
+    return jsonstore.store().load(_KEY, _default, DATA_PATH)
+
+
+def invalidar_cache() -> None:
+    # Ya no hay caché por proceso: SQLite se lee fresco. Se mantiene por compat.
+    pass
 
 
 def _guardar(data: dict) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     data.setdefault("_meta", {})
     data["_meta"]["actualizado_en"] = datetime.now().isoformat(timespec="seconds")
-    tmp = DATA_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(DATA_PATH)
+    jsonstore.store().save(_KEY, data)
     invalidar_cache()
 
 
@@ -292,7 +285,7 @@ def actualizar_lana(lid: str, campo: str, valor) -> tuple[dict | None, str]:
     (None, error)."""
     if campo not in CAMPOS_EDITABLES:
         return None, f"campo no editable: {campo!r}"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         for i, l in enumerate(data.get("lanas", [])):
             if lana_id(l) == lid:
@@ -342,7 +335,7 @@ def actualizar_partidos(lid: str, partidos: list[dict]) -> tuple[dict | None, st
     """
     if not isinstance(partidos, list):
         return None, "partidos debe ser una lista"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         for l in data.get("lanas", []):
             if l.get("id") != lid and l.get("id_legacy") != lid and lana_id(l) != lid:
@@ -536,7 +529,7 @@ def agregar_partido(lid: str, partido_ref: str, kg, coste_kg=None,
     fecha = (fecha_entrada or "").strip() or None
     obs = (observaciones or "").strip()[:300] or None
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(lid)
         if idx is None:
@@ -575,7 +568,7 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
         return None, "datos debe ser un objeto"
     nueva_ref = (datos.get("partido") or partido_ref).strip()
     saldo_anterior = 0.0
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(lid)
         if idx is None:
@@ -674,7 +667,7 @@ def borrar_partido(lid: str, partido_ref: str, usuario: str = "") -> tuple[bool,
     saldo_previo = 0.0
     coste_previo = None
     fecha_previa = ""
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(lid)
         if idx is None:
@@ -715,7 +708,7 @@ def consumir_partido(lid: str, partido_ref: str, kg, usuario: str = "",
     nota = (nota or "").strip()
     if len(nota) > 200:
         return None, "Nota demasiado larga (max 200 chars)"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(lid)
         if idx is None:
@@ -786,7 +779,7 @@ def trasladar_kg_partido(lid: str, partido_ref: str, kg,
     if len(nota) > 200:
         return None, "Nota demasiado larga (max 200 chars)"
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(lid)
         if idx is None:
@@ -889,7 +882,7 @@ def registrar_pedido(lineas: list[dict], usuario: str = "",
 
     # Pre-validar todas las lineas y resolver variantes
     resueltas: list[tuple[dict, dict, float, float | None, str]] = []
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         for ln in lineas:
             vid = (ln.get("variante_id") or "").strip()
@@ -1000,7 +993,7 @@ def actualizar_clasificacion_calidad(calidad_id: str, clasificacion: str,
     else:
         # Solo aplica a felpa — los demas no llevan material
         material_felpa = None
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         variantes = [v for v in data.get("lanas", [])
                      if v.get("calidad_id") == calidad_id]
@@ -1033,7 +1026,7 @@ def actualizar_titulo_calidad(calidad_id: str, titulo_nuevo: str
     titulo_nuevo = (titulo_nuevo or "").strip()
     if len(titulo_nuevo) > 80:
         return None, "titulo demasiado largo (max 80)"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         variantes = [v for v in data.get("lanas", [])
                      if v.get("calidad_id") == calidad_id]
@@ -1069,7 +1062,7 @@ def actualizar_tipo_calidad(calidad_id: str, tipo_nuevo: str
         return None, "el nombre de la calidad no puede estar vacio"
     if len(tipo_nuevo) > 100:
         return None, "nombre demasiado largo (max 100)"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         variantes = [v for v in data.get("lanas", [])
                      if v.get("calidad_id") == calidad_id]
@@ -1106,7 +1099,7 @@ def renombrar_proveedor_en_variantes(alias_viejo: str,
     de inventario.
     """
     n = 0
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         for v in data.get("lanas", []):
             if (v.get("proveedor") or "").upper() == (alias_viejo or "").upper():
@@ -1165,7 +1158,7 @@ def actualizar_planificacion_calidad(calidad_id: str, campo: str,
     if nuevo < 0:
         return None, f"{campo} no puede ser negativo"
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         variantes = [l for l in data.get("lanas", [])
                      if l.get("calidad_id") == calidad_id]
@@ -1216,7 +1209,7 @@ def crear_calidad_placeholder(nombre: str, titulo: str = "",
                      if titulo else _slug(nombre))
     if not cid_calculado:
         return None, f"no puedo generar un id valido a partir de {nombre!r}"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lanas = data.setdefault("lanas", [])
         # Comprobar que no existe ya una calidad con el mismo id
@@ -1267,7 +1260,7 @@ def anadir_proveedor_a_calidad(calidad_id: str, proveedor: str,
     if len(proveedor) > 80:
         return None, "proveedor demasiado largo"
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lanas = data.get("lanas") or []
         # Buscar la calidad: cualquier variante existente con ese calidad_id
@@ -1372,7 +1365,7 @@ def quitar_proveedor_de_calidad(calidad_id: str, proveedor: str,
     proveedor_norm = (proveedor or "").strip().upper()
     if not proveedor_norm:
         return False, "el proveedor es obligatorio"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lanas = data.get("lanas") or []
         # Buscar la variante objetivo
@@ -1428,7 +1421,7 @@ def borrar_calidad(calidad_id: str, forzar: bool = False,
     Devuelve (True, '') o (False, error). Si forzar=True, registra un
     movimiento de tipo 'borrado' por cada partido eliminado.
     """
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lanas = data.setdefault("lanas", [])
         a_borrar = [i for i, l in enumerate(lanas)
@@ -1505,7 +1498,7 @@ def actualizar_pedido(variante_id: str, ref_pedido: str,
         valor = valor.strip() or None
     elif valor in (None, ""):
         valor = None
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(variante_id)
         if idx is None:
@@ -1536,7 +1529,7 @@ def _cambiar_estado_pedido(variante_id: str, ref_pedido: str,
     n_cerrados = 0
     campo_fecha = "fecha_recibido" if estado_nuevo == "recibido" else "fecha_anulado"
     campo_user = "recibido_por"   if estado_nuevo == "recibido" else "anulado_por"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(variante_id)
         if idx is None:
@@ -1630,7 +1623,7 @@ def marcar_pedido_recibido(variante_id: str, ref_pedido: str = "",
             return None, ("kg_a_rols requiere ref_pedido especifica "
                           "(no se puede splittear varios pedidos a la vez)")
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         idx, item = buscar_lana(variante_id)
         if idx is None:

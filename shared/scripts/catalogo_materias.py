@@ -34,8 +34,12 @@ import os
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (queda de backup).
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "catalogo_materias.json"
-_lock = threading.RLock()
+_lock = threading.RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
+_KEY = "catalogo_materias"
 
 
 def _slug(s: str) -> str:
@@ -83,19 +87,10 @@ def _default_data() -> dict:
 
 
 def cargar() -> dict:
-    """Carga el JSON. Si no existe, lo crea con los defaults."""
-    if not DATA_PATH.exists():
-        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _guardar(_default_data())
-    try:
-        with open(DATA_PATH, encoding="utf-8") as fp:
-            d = json.load(fp)
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se usan defaults", DATA_PATH, e)
-        d = _default_data()
-    # Garantizar que las listas existen aunque el JSON sea de una version
+    """Carga el catálogo desde SQLite (migra el JSON legacy la 1ª vez; si no hay
+    nada, usa los defaults)."""
+    d = jsonstore.store().load(_KEY, _default_data, DATA_PATH)
+    # Garantizar que las listas existen aunque el doc sea de una version
     # anterior (p.ej. v1 no tenia `titulos`)
     d.setdefault("clasificaciones", [])
     d.setdefault("materiales_felpa", [])
@@ -108,12 +103,7 @@ def cargar() -> dict:
 
 
 def _guardar(data: dict) -> None:
-    """Escritura atomica para evitar JSON a medio escribir."""
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = DATA_PATH.with_suffix(".json.tmp")
-    with open(tmp, "w", encoding="utf-8") as fp:
-        json.dump(data, fp, ensure_ascii=False, indent=2)
-    tmp.replace(DATA_PATH)
+    jsonstore.store().save(_KEY, data)
 
 
 # Mapa interno: tipo logico -> clave del JSON. Centralizado aqui para
@@ -168,7 +158,7 @@ def anadir(tipo: str, label: str) -> tuple[dict | None, str]:
     sid = _slug(label)
     if not sid:
         return None, f"No puedo generar un id valido a partir de {label!r}"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lista = data.setdefault(key, [])
         # Idempotente: si ya existe (mismo id), devuelvo la existente
@@ -187,7 +177,7 @@ def quitar(tipo: str, id_: str) -> tuple[bool, str]:
     key = _TIPOS.get(tipo)
     if not key:
         return False, f"tipo invalido: {tipo!r}"
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         lista = data.setdefault(key, [])
         idx = next((i for i, it in enumerate(lista) if it.get("id") == id_), -1)

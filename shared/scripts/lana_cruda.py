@@ -70,8 +70,12 @@ import os
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (queda de backup).
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "lana_cruda.json"
-_lock = threading.RLock()
+_lock = threading.RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
+_KEY = "lana_cruda"
 
 
 # ---------------------------------------------------------------------------
@@ -107,41 +111,26 @@ def _id_orden_hilado() -> str:
 # Persistencia
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
-def _load_raw() -> dict:
-    _vacio = {
+def _default() -> dict:
+    return {
         "_meta":               {"version_schema": 1},
         "contenedores":        [],
         "movimientos_hilado":  [],
     }
-    if not DATA_PATH.exists():
-        return _vacio
-    try:
-        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
-        return _vacio
 
 
 def invalidar_cache() -> None:
-    _load_raw.cache_clear()
+    pass  # SQLite se lee fresco; no-op por compat
 
 
 def cargar() -> dict:
-    return _load_raw()
+    return jsonstore.store().load(_KEY, _default, DATA_PATH)
 
 
 def _guardar(data: dict) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     data.setdefault("_meta", {})
     data["_meta"]["actualizado_en"] = _now_iso()
-    tmp = DATA_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False),
-                   encoding="utf-8")
-    tmp.replace(DATA_PATH)
-    invalidar_cache()
+    jsonstore.store().save(_KEY, data)
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +290,7 @@ def crear_contenedor(ref: str, hilador_actual: str, kg_inicial,
         "fecha_creacion":        _now_iso(),
         "creado_por":            usuario or "",
     }
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         contenedores = data.setdefault("contenedores", [])
         if any(c.get("id") == cid or c.get("ref") == ref
@@ -326,7 +315,7 @@ def actualizar_contenedor(cid: str, datos: dict,
     EDITABLES = {"ref", "hilador_actual", "coste_kg", "fecha_compra",
                  "fecha_llegada_hilador", "proveedor_origen",
                  "observaciones"}
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         contenedores = data.get("contenedores") or []
         idx = next((i for i, c in enumerate(contenedores)
@@ -373,7 +362,7 @@ def borrar_contenedor(cid: str, forzar: bool = False,
     real); con forzar=True se borra de todos modos y se registra un
     movimiento de hilado tipo `borrado-contenedor` para auditoria.
     """
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         contenedores = data.get("contenedores") or []
         idx = next((i for i, c in enumerate(contenedores)
@@ -467,7 +456,7 @@ def apartar_para_hilar(contenedores_consumo: list[dict],
     # Verificar saldo + descontar + crear orden
     coste_crudo_eur = 0.0
     snapshots_prev: dict[str, float] = {}
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         contenedores = data.get("contenedores") or []
         cid_to_idx = {c.get("id"): i for i, c in enumerate(contenedores)}
@@ -558,7 +547,7 @@ def cerrar_orden_hilado(orden_id: str, kg_hilado, tarifa_hilado_eur_kg,
     if tarifa_f < 0:
         return None, "tarifa_hilado_eur_kg no puede ser negativa"
 
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         movs = data.get("movimientos_hilado") or []
         idx = next((i for i, m in enumerate(movs) if m.get("id") == orden_id), -1)
@@ -617,7 +606,7 @@ def cerrar_orden_hilado(orden_id: str, kg_hilado, tarifa_hilado_eur_kg,
     if err_part:
         # Revertir el estado de la orden (los kg ya estan descontados
         # del crudo desde el apartado — eso se mantiene).
-        with _lock:
+        with jsonstore.store().tx():
             data = cargar()
             movs = data.get("movimientos_hilado") or []
             idx = next((i for i, m in enumerate(movs) if m.get("id") == orden_id), -1)
@@ -639,7 +628,7 @@ def anular_orden_hilado(orden_id: str, motivo: str = "",
     """Anula una orden pendiente y devuelve los kg al(los) contenedor(es)
     de origen. Solo aplica a ordenes en estado 'pendiente'."""
     motivo = (motivo or "").strip()
-    with _lock:
+    with jsonstore.store().tx():
         data = cargar()
         movs = data.get("movimientos_hilado") or []
         idx = next((i for i, m in enumerate(movs) if m.get("id") == orden_id), -1)

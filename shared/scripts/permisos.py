@@ -30,8 +30,12 @@ import os
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
+import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock)
+
+# Ruta del JSON LEGACY: solo para la migración one-time a SQLite (queda de backup).
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "permisos.json"
-_lock = RLock()
+_lock = RLock()  # (histórico; los `with jsonstore.store().tx():` ahora son transacciones)
+_KEY = "permisos"
 
 ROLES = ("admin", "comercial", "representante")
 
@@ -127,26 +131,18 @@ DEFAULT_PERMISOS: dict[str, dict[str, bool]] = {
 }
 
 
+def _default() -> dict:
+    return {"_meta": {"version_schema": 1}, "permisos_rol": {}}
+
+
 def _cargar_raw() -> dict:
-    _vacio = {"_meta": {"version_schema": 1}, "permisos_rol": {}}
-    if not DATA_PATH.exists():
-        return _vacio
-    try:
-        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        import logging
-        logging.getLogger("erp.store").error(
-            "JSON corrupto/ilegible en %s (%s); se sirve vacío", DATA_PATH, e)
-        return _vacio
+    return jsonstore.store().load(_KEY, _default, DATA_PATH)
 
 
 def _guardar(data: dict) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     data.setdefault("_meta", {})
     data["_meta"]["actualizado_en"] = datetime.now().isoformat(timespec="seconds")
-    tmp = DATA_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(DATA_PATH)
+    jsonstore.store().save(_KEY, data)
 
 
 def matriz_completa() -> dict[str, dict[str, bool]]:
@@ -182,7 +178,7 @@ def actualizar(rol: str, permiso: str, allowed: bool) -> tuple[bool, str]:
         return False, f"rol invalido: {rol!r}"
     if permiso not in PERMISOS:
         return False, f"permiso invalido: {permiso!r}"
-    with _lock:
+    with jsonstore.store().tx():
         data = _cargar_raw()
         prol = data.setdefault("permisos_rol", {})
         prol.setdefault(rol, {})[permiso] = bool(allowed)

@@ -35,6 +35,13 @@ desktop.ini
 erp_api_token.txt
 shared/data/*.txt
 
+# BD SQLite de runtime (la fuente de verdad tras la migración). En prod vive en
+# ROLS_DATA_DIR (fuera del docroot); en local en shared/data/. NUNCA al repo.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
 # Datos de runtime editados desde la UI. El repo lleva shared/data/*.json como
 # SEED; en produccion la verdad vive en ROLS_DATA_DIR (fuera del docroot).
 # Backups locales generados durante migraciones.
