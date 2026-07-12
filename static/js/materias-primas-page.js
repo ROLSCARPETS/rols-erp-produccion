@@ -1,0 +1,3750 @@
+const tbody = document.querySelector('#tabla-lanas tbody');
+const countEl = document.getElementById('lanas-count');
+const form = document.getElementById('form-add-lana');
+// Solo el campo Nombre. Material/titulo/etc. se rellenan despues
+// desde la ficha de la calidad (el form de aqui solo sirve para crear
+// el placeholder rapidamente).
+const inpTipo = document.getElementById('lana-tipo');
+const btnAdd = document.getElementById('btn-add-lana');
+const feedback = document.getElementById('lana-feedback');
+
+// Devuelve el username del usuario logueado (SSO). Cae a '' si por
+// alguna razon el guard no termino aun. El servidor solo lo guarda
+// como metadata en el historico (trazabilidad), no autentica con el.
+function currentUsuario() {
+  try { return (window.__rolsUser && window.__rolsUser.username) || ''; }
+  catch (_) { return ''; }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showFeedback(msg, ok) {
+  feedback.textContent = msg;
+  feedback.className = 'mp-feedback ' + (ok ? 'ok' : 'err');
+  setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+}
+
+// Cache global: calidad_id -> {variantes, ...} para que cargarLotes
+// pueda saber qué proveedores hay sin volver a pedir la lista.
+const LANAS_POR_ID = {};
+
+// Cache global de las materias primas (calidades). Recargada por cargar().
+let LANAS_ALL = [];
+
+// Etiquetas humanas para los slugs de clasificacion y material_felpa.
+// Se hidratan desde /api/catalogos/materia (catalogo editable por el
+// usuario). Empiezan con los defaults para no romper la primera pintada
+// si la red tarda — y luego se reemplazan al cargar el catalogo.
+let CLASIFICACION_LABELS = {
+  'materia-felpa': 'Materia felpa',
+  'basamentos':    'Basamentos',
+  'otros':         'Otros',
+};
+let MATERIAL_FELPA_LABELS = {
+  'lana-hilada': 'Lana hilada',
+  'lana-bruto':  'Lana en bruto',
+  'pp':          'Polipropileno (PP)',
+  'pes':         'Poliéster (PES)',
+};
+
+// Carga el catalogo y reemplaza los dicts de labels. Se ejecuta antes
+// del primer pintado del listado para que los selects de filtros y la
+// tabla muestren los nombres correctos (incluidos los que el usuario
+// haya anadido desde la ficha).
+async function cargarCatalogoMaterias() {
+  try {
+    const r = await fetch('/api/catalogos/materia');
+    if (!r.ok) return;
+    const d = await r.json();
+    const toDict = (arr) => Object.fromEntries(
+      (arr || []).map(it => [it.id, it.label || it.id])
+    );
+    CLASIFICACION_LABELS  = toDict(d.clasificaciones);
+    MATERIAL_FELPA_LABELS = toDict(d.materiales_felpa);
+    // Datalist de sugerencias para el input "Título" del form de alta.
+    // Los titulos del catalogo aparecen como autocompletar pero el
+    // usuario puede tambien escribir uno nuevo.
+    const dl = document.getElementById('lana-titulo-options');
+    if (dl) {
+      dl.innerHTML = (d.titulos || [])
+        .map(t => `<option value="${escapeHtml(t.label || t.id)}"></option>`)
+        .join('');
+    }
+  } catch (_) { /* fallback silencioso a defaults */ }
+}
+
+async function cargar() {
+  try {
+    const r = await fetch('/api/materias-primas/lanas');
+    const d = await r.json();
+    LANAS_ALL = d.lanas || [];
+    LANAS_ALL.forEach(l => { LANAS_POR_ID[l.id] = l; });
+    poblarFiltros(LANAS_ALL);
+    pintar(aplicarFiltros(LANAS_ALL));
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="mp-empty">Error: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+// Rellena los <select> de filtros con los valores distintos encontrados
+// en el catalogo actual. Conserva la seleccion previa si sigue siendo
+// valida.
+function poblarFiltros(lanas) {
+  const distinct = (key) => {
+    const set = new Set();
+    lanas.forEach(l => { const v = (l[key] || '').trim(); if (v) set.add(v); });
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'));
+  };
+  const setOptions = (sel, items, labelFn) => {
+    const prev = sel.value;
+    // Mantenemos el placeholder (<option value="">) y reemplazamos el resto
+    const placeholder = sel.querySelector('option[value=""]');
+    sel.innerHTML = '';
+    if (placeholder) sel.appendChild(placeholder);
+    items.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = labelFn ? labelFn(v) : v;
+      sel.appendChild(opt);
+    });
+    if (items.includes(prev)) sel.value = prev;
+  };
+  setOptions(document.getElementById('mp-f-clasificacion'),
+             distinct('clasificacion'),
+             v => CLASIFICACION_LABELS[v] || v);
+  // El filtro "Material" trabaja sobre material_felpa (Lana hilada / Lana
+  // bruto / PP / PES) — el campo `material` bruto siempre es "lana" en
+  // este catalogo y no aporta nada como filtro.
+  setOptions(document.getElementById('mp-f-material'),
+             distinct('material_felpa'),
+             v => MATERIAL_FELPA_LABELS[v] || v);
+  setOptions(document.getElementById('mp-f-titulo'),
+             distinct('titulo'));
+  setOptions(document.getElementById('mp-f-calidad'),
+             distinct('tipo'));
+}
+
+function aplicarFiltros(lanas) {
+  const fC = document.getElementById('mp-f-clasificacion').value;
+  const fM = document.getElementById('mp-f-material').value;
+  const fT = document.getElementById('mp-f-titulo').value;
+  const fK = document.getElementById('mp-f-calidad').value;
+  const filtradas = lanas.filter(l => {
+    if (fC && (l.clasificacion || '') !== fC) return false;
+    // Filtramos sobre material_felpa, que es lo que mostramos en la
+    // columna "Material" y lo que el usuario edita desde la ficha.
+    if (fM && (l.material_felpa || '') !== fM) return false;
+    if (fT && (l.titulo || '') !== fT) return false;
+    if (fK && (l.tipo || '') !== fK) return false;
+    return true;
+  });
+  // Pequeño contador a la derecha que indica cuantas pasan el filtro
+  const ctr = document.getElementById('mp-f-counter');
+  if (ctr) {
+    ctr.textContent = (filtradas.length === lanas.length)
+      ? ''
+      : `${filtradas.length} de ${lanas.length}`;
+  }
+  return filtradas;
+}
+
+// Wire-up de los filtros
+['mp-f-clasificacion', 'mp-f-material', 'mp-f-titulo', 'mp-f-calidad'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => pintar(aplicarFiltros(LANAS_ALL)));
+});
+const _btnReset = document.getElementById('mp-f-reset');
+if (_btnReset) _btnReset.addEventListener('click', () => {
+  ['mp-f-clasificacion', 'mp-f-material', 'mp-f-titulo', 'mp-f-calidad'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  pintar(aplicarFiltros(LANAS_ALL));
+});
+
+// ============ Columnas configurables (visibilidad + orden) ============
+//
+// Cada columna se define una sola vez en MP_COLS_DEF (label + renderer
+// de celda). El estado persistido en localStorage es {order, hidden}:
+//   - order:  lista de keys en el orden que el usuario las quiere
+//   - hidden: set de keys ocultas
+// Asi anadir/quitar/mover una columna es un cambio en MP_COLS_DEF y
+// (opcionalmente) en MP_COLS_ORDEN_DEFAULT para el primer alta.
+//
+// `fixed: true` marca columnas que no se pueden ocultar (Calidad y
+// Acciones — sin ellas la tabla pierde sentido). Sí se pueden mover.
+
+const MP_COLS_DEF = {
+  clasificacion: {
+    label: 'Clasificación',
+    thAttrs: '',
+    tdAttrs: '',
+    cell: (l, ctx) => ctx.clasifHtml,
+  },
+  material: {
+    label: 'Material',
+    thAttrs: '',
+    tdAttrs: '',
+    cell: (l, ctx) => ctx.materialHtml,
+  },
+  titulo: {
+    label: 'Título',
+    thAttrs: '',
+    tdAttrs: '',
+    cell: (l) => `<strong>${escapeHtml(l.titulo)}</strong>`,
+  },
+  calidad: {
+    label: 'Calidad',
+    thAttrs: '',
+    tdAttrs: '',
+    fixed: true,
+    cell: (l) => escapeHtml(l.tipo),
+  },
+  stock: {
+    label: 'Stock',
+    thAttrs: ' style="text-align:right"',
+    tdAttrs: ' style="text-align:right"',
+    cell: (l, ctx) => ctx.stockHtml,
+  },
+  coste: {
+    label: 'Coste medio',
+    thAttrs: ' style="text-align:right"',
+    tdAttrs: ' style="text-align:right"',
+    cell: (l, ctx) => ctx.costeHtml,
+  },
+  min_seguridad: {
+    label: 'Mín. seguridad',
+    thAttrs: ' style="text-align:right"',
+    tdAttrs: ' style="text-align:right"',
+    cell: (l) => {
+      const v = Number(l.limite_kg) || 0;
+      return v > 0
+        ? `<span style="color:#4d4d4d">${fmtKg(v)}</span>`
+        : '<span style="color:#bbb">—</span>';
+    },
+  },
+  reposicion: {
+    label: 'Reposición',
+    thAttrs: ' style="text-align:right"',
+    tdAttrs: ' style="text-align:right"',
+    cell: (l) => {
+      const v = Number(l.kg_a_pedir) || 0;
+      return v > 0
+        ? `<span style="color:#4d4d4d">${fmtKg(v)}</span>`
+        : '<span style="color:#bbb">—</span>';
+    },
+  },
+  partidos: {
+    label: 'Partidos',
+    thAttrs: ' style="text-align:center"',
+    tdAttrs: ' style="text-align:center"',
+    cell: (l, ctx) => ctx.lotesHtml,
+  },
+  acciones: {
+    label: 'Acciones',
+    thAttrs: ' style="text-align:right"',
+    tdAttrs: '',
+    fixed: true,
+    cell: () => `
+      <div class="mp-row-actions">
+        <button class="mp-btn-row" data-action="editar">Editar</button>
+        <button class="mp-btn-row danger" data-action="borrar">Borrar</button>
+      </div>`,
+  },
+};
+
+const MP_COLS_ORDEN_DEFAULT = [
+  'clasificacion', 'material', 'titulo', 'calidad',
+  'stock', 'coste', 'min_seguridad', 'reposicion',
+  'partidos', 'acciones',
+];
+
+// localStorage v2: incluye order. v1 solo tenia visibles (array de keys).
+// La migracion no rompe nada: si encuentra v1 lo descarta y empieza
+// limpio (los defaults son razonables, el usuario perdera su selecccion
+// previa una sola vez).
+const MP_COLS_KEY = 'mp_lanas_cols_v2';
+
+function _mpCargarColsState() {
+  try {
+    const raw = localStorage.getItem(MP_COLS_KEY);
+    if (!raw) return _mpDefaultState();
+    const o = JSON.parse(raw);
+    if (!o || !Array.isArray(o.order)) return _mpDefaultState();
+    // Sanitizar: filtrar keys que ya no existen + anadir keys nuevas
+    const known = new Set(Object.keys(MP_COLS_DEF));
+    let order = o.order.filter(k => known.has(k));
+    // Anadir cualquier columna nueva del DEF que no estuviera en el
+    // orden guardado (al final).
+    Object.keys(MP_COLS_DEF).forEach(k => {
+      if (!order.includes(k)) order.push(k);
+    });
+    const hidden = new Set((o.hidden || []).filter(k => known.has(k) && !MP_COLS_DEF[k].fixed));
+    return {order, hidden};
+  } catch { return _mpDefaultState(); }
+}
+function _mpDefaultState() {
+  return {order: [...MP_COLS_ORDEN_DEFAULT], hidden: new Set()};
+}
+function _mpGuardarColsState() {
+  try {
+    localStorage.setItem(MP_COLS_KEY, JSON.stringify({
+      order: MP_COLS_STATE.order,
+      hidden: [...MP_COLS_STATE.hidden],
+    }));
+  } catch {}
+}
+
+let MP_COLS_STATE = _mpCargarColsState();
+
+// Devuelve la lista de keys visibles en el orden configurado.
+function _mpKeysVisibles() {
+  return MP_COLS_STATE.order.filter(k => !MP_COLS_STATE.hidden.has(k));
+}
+
+// Renderiza el <thead> en orden. Re-llamado al cambiar orden/visibilidad.
+function pintarHeaderColumnas() {
+  const tr = document.getElementById('mp-tabla-head-row');
+  if (!tr) return;
+  tr.innerHTML = _mpKeysVisibles().map(k => {
+    const def = MP_COLS_DEF[k];
+    return `<th data-col="${k}"${def.thAttrs}>${escapeHtml(def.label)}</th>`;
+  }).join('');
+}
+
+// Renderiza una fila <tr> entera, iterando las columnas visibles en
+// el orden configurado. `ctx` es un dict con HTMLs precomputados.
+function pintarCeldasFila(l, ctx) {
+  return _mpKeysVisibles().map(k => {
+    const def = MP_COLS_DEF[k];
+    return `<td data-col="${k}"${def.tdAttrs}>${def.cell(l, ctx)}</td>`;
+  }).join('');
+}
+
+// Renderiza el popup de gestion (drag handle + checkbox + label) en el
+// orden actual. Cada item es draggable.
+function pintarPopupColumnas() {
+  const cont = document.getElementById('mp-cols-popup-list');
+  if (!cont) return;
+  cont.innerHTML = MP_COLS_STATE.order.map(k => {
+    const def = MP_COLS_DEF[k];
+    const visible = !MP_COLS_STATE.hidden.has(k);
+    const fixedTitle = def.fixed ? ' title="Esta columna siempre es visible"' : '';
+    return `
+      <div class="mp-cols-item" draggable="true" data-col="${k}">
+        <span class="mp-cols-handle" aria-hidden="true">⋮⋮</span>
+        <input type="checkbox" id="mp-col-cb-${k}"
+               ${visible ? 'checked' : ''}
+               ${def.fixed ? 'disabled' : ''}${fixedTitle} />
+        <label class="mp-cols-label" for="mp-col-cb-${k}">${escapeHtml(def.label)}</label>
+      </div>`;
+  }).join('');
+}
+
+// Handlers de checkbox (cambio de visibilidad) y de drag-and-drop
+// (cambio de orden). Delegacion para que sirva tras re-pintar el popup.
+(function _wireColsPicker() {
+  const btn = document.getElementById('mp-cols-btn');
+  const popup = document.getElementById('mp-cols-popup');
+  const list = document.getElementById('mp-cols-popup-list');
+  if (!btn || !popup || !list) return;
+
+  // Cambio de visibilidad
+  list.addEventListener('change', (e) => {
+    const cb = e.target;
+    if (!(cb instanceof HTMLInputElement) || cb.type !== 'checkbox') return;
+    const item = cb.closest('.mp-cols-item');
+    if (!item) return;
+    const key = item.dataset.col;
+    if (!key || MP_COLS_DEF[key]?.fixed) return;
+    if (cb.checked) MP_COLS_STATE.hidden.delete(key);
+    else            MP_COLS_STATE.hidden.add(key);
+    _mpGuardarColsState();
+    pintarHeaderColumnas();
+    if (typeof pintar === 'function') pintar(aplicarFiltros(LANAS_ALL));
+  });
+
+  // Drag & drop para reordenar
+  let dragKey = null;
+  list.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.mp-cols-item');
+    if (!item) return;
+    dragKey = item.dataset.col;
+    item.classList.add('dragging');
+    // Necesario para Firefox
+    try { e.dataTransfer.setData('text/plain', dragKey); } catch (_) {}
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  list.addEventListener('dragend', (e) => {
+    const item = e.target.closest('.mp-cols-item');
+    if (item) item.classList.remove('dragging');
+    list.querySelectorAll('.drop-before, .drop-after')
+        .forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    dragKey = null;
+  });
+  list.addEventListener('dragover', (e) => {
+    if (!dragKey) return;
+    const item = e.target.closest('.mp-cols-item');
+    if (!item || item.dataset.col === dragKey) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Marca visual: si el cursor esta en la mitad superior, drop-before
+    const rect = item.getBoundingClientRect();
+    const antes = (e.clientY - rect.top) < rect.height / 2;
+    list.querySelectorAll('.drop-before, .drop-after')
+        .forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    item.classList.add(antes ? 'drop-before' : 'drop-after');
+  });
+  list.addEventListener('drop', (e) => {
+    if (!dragKey) return;
+    const item = e.target.closest('.mp-cols-item');
+    if (!item) return;
+    e.preventDefault();
+    const targetKey = item.dataset.col;
+    if (targetKey === dragKey) return;
+    const rect = item.getBoundingClientRect();
+    const antes = (e.clientY - rect.top) < rect.height / 2;
+    // Reordenar: sacar dragKey del array y meterlo antes/despues de targetKey
+    const newOrder = MP_COLS_STATE.order.filter(k => k !== dragKey);
+    const idx = newOrder.indexOf(targetKey);
+    newOrder.splice(antes ? idx : idx + 1, 0, dragKey);
+    MP_COLS_STATE.order = newOrder;
+    _mpGuardarColsState();
+    pintarPopupColumnas();
+    pintarHeaderColumnas();
+    if (typeof pintar === 'function') pintar(aplicarFiltros(LANAS_ALL));
+  });
+
+  // Toggle del popup
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !popup.classList.contains('open');
+    popup.classList.toggle('open', open);
+    btn.classList.toggle('open', open);
+  });
+
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (popup.classList.contains('open')
+        && !popup.contains(e.target)
+        && !btn.contains(e.target)) {
+      popup.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+  // Cerrar con Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && popup.classList.contains('open')) {
+      popup.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+
+// Pintar el header y el popup al cargar
+pintarHeaderColumnas();
+pintarPopupColumnas();
+
+function fmtKg(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' kg';
+}
+function fmtEur(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €/kg';
+}
+
+function calcResumen(lana) {
+  const lotes = lana.lotes || [];
+  const activos = lotes.filter(l => (l.cantidad_disponible_kg || 0) > 0);
+  const total = activos.reduce((s, l) => s + (parseFloat(l.cantidad_disponible_kg) || 0), 0);
+  let coste = null;
+  if (total > 0) {
+    const valor = activos.reduce((s, l) => s + (parseFloat(l.cantidad_disponible_kg) || 0) * (parseFloat(l.coste_kg) || 0), 0);
+    coste = valor / total;
+  }
+  return { total_kg: total, coste_medio_kg: coste, n_activos: activos.length, n_agotados: lotes.length - activos.length };
+}
+
+function pintar(lanas) {
+  // El contador del tab (chip junto al nombre de la tab) refleja el TOTAL
+  // de materias primas, no el filtrado, asi el usuario sabe cuantas hay
+  // de fondo aunque tenga un filtro aplicado.
+  countEl.textContent = LANAS_ALL.length;
+  // Actualizamos tambien el pill del tab (la cifra junto a "Materias
+  // primas" arriba). Antes se quedaba siempre en 0 porque nadie lo
+  // tocaba — el contador de la seccion (`lanas-count`) era otra cosa.
+  const tabCount = document.getElementById('tc-por-lana');
+  if (tabCount) tabCount.textContent = LANAS_ALL.length;
+  // numero de columnas visibles (lo usamos para el colspan de las filas
+  // de "expandir lotes" y del mensaje "sin resultados")
+  const nCols = _mpKeysVisibles().length;
+  if (!lanas.length) {
+    const vacio = LANAS_ALL.length
+      ? 'Ningún resultado con esos filtros.'
+      : 'No hay materias primas. Añade la primera arriba ↑';
+    tbody.innerHTML = `<tr><td colspan="${nCols}" class="mp-empty">${vacio}</td></tr>`;
+    return;
+  }
+  let html = '';
+  lanas.forEach((l, i) => {
+    // Precalculamos los fragmentos de HTML que las columnas necesitan
+    // (stock total, coste medio, pills de partidos, etiquetas...). Asi
+    // las funciones cell() en MP_COLS_DEF solo tienen que devolverlos.
+    const r = calcResumen(l);
+    const stockHtml = r.total_kg > 0
+      ? `<span class="mp-stock">${fmtKg(r.total_kg)}</span>`
+      : `<span class="mp-stock-zero">— sin stock —</span>`;
+    const costeHtml = r.coste_medio_kg != null
+      ? `<span class="mp-coste">${fmtEur(r.coste_medio_kg)}</span>`
+      : `<span class="mp-coste-na">n/d</span>`;
+    let clasifHtml = '<span style="color:#bbb">—</span>';
+    if (l.clasificacion) {
+      const cl = CLASIFICACION_LABELS[l.clasificacion] || l.clasificacion;
+      clasifHtml = `<span style="font-size:0.82rem">${escapeHtml(cl)}</span>`;
+    }
+    let materialHtml = '<span style="color:#bbb">—</span>';
+    if (l.material_felpa) {
+      const mf = MATERIAL_FELPA_LABELS[l.material_felpa] || l.material_felpa;
+      materialHtml = `<span style="font-size:0.86rem">${escapeHtml(mf)}</span>`;
+    }
+    const activos = (l.lotes || []).filter(x => (Number(x.cantidad_disponible_kg) || 0) > 0);
+    const pillsHtml = activos.length
+      ? activos.map(x => `<span class="part" style="background:#f4ede5; padding:0.08rem 0.45rem; border-radius:4px; font-size:0.74rem; color:#4d4d4d; margin:0.05rem 0.15rem 0.05rem 0; display:inline-block">${escapeHtml(x.lote || '?')}</span>`).join('')
+      : '<span style="color:#9a9a9a; font-size:0.74rem">— sin partidos activos —</span>';
+    const lotesHtml = `
+      <div style="display:flex; align-items:center; justify-content:center; gap:0.4rem; flex-wrap:wrap">
+        <div style="text-align:left">${pillsHtml}</div>
+        <button class="mp-toggle-lotes" data-action="toggle-lotes" title="Ver detalle">
+          <span class="chev">▾</span>
+        </button>
+      </div>`;
+    const ctx = {stockHtml, costeHtml, clasifHtml, materialHtml, lotesHtml};
+    html += `
+      <tr class="lana-row" data-id="${escapeHtml(l.id)}" data-titulo="${escapeHtml(l.titulo)}" data-tipo="${escapeHtml(l.tipo)}">
+        ${pintarCeldasFila(l, ctx)}
+      </tr>
+      <tr class="lotes-row" data-parent="${escapeHtml(l.id)}" style="display:none">
+        <td colspan="${nCols}" style="padding:0">
+          <div class="lotes-wrap" data-loaded="0"></div>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nombre = (inpTipo.value || '').trim();
+  if (!nombre) { inpTipo.focus(); return; }
+  btnAdd.disabled = true;
+  btnAdd.textContent = 'Creando…';
+  try {
+    const r = await fetch('/api/materias-primas/lanas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: nombre }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    // Navegar a la ficha de la calidad recien creada para que el
+    // usuario complete el resto (clasificacion, material, titulo,
+    // proveedores, partidos).
+    location.href = `/materia-prima/${encodeURIComponent(d.calidad_id)}`;
+  } catch (err) {
+    showFeedback(`Error: ${err.message}`, false);
+    btnAdd.disabled = false;
+    btnAdd.textContent = '+ Crear';
+  }
+});
+
+tbody.addEventListener('click', async (e) => {
+  // Si el click NO es en un boton/input/etc dentro de la fila lana-row,
+  // navegamos a la ficha de detalle de la materia prima. Permite usar
+  // toda la fila como link sin pisar las acciones internas.
+  const trLana = e.target.closest('tr.lana-row');
+  if (trLana && !trLana.classList.contains('editando')) {
+    const interactivo = e.target.closest('button, input, a, select, [data-action]');
+    if (!interactivo && trLana.dataset.id) {
+      window.location.href = '/materia-prima/' + encodeURIComponent(trLana.dataset.id);
+      return;
+    }
+  }
+
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const id = tr.dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === 'toggle-lotes') {
+    const sub = tbody.querySelector(`tr.lotes-row[data-parent="${CSS.escape(id)}"]`);
+    if (!sub) return;
+    const isOpen = sub.style.display !== 'none';
+    if (isOpen) {
+      sub.style.display = 'none';
+      btn.classList.remove('expanded');
+    } else {
+      sub.style.display = '';
+      btn.classList.add('expanded');
+      const wrap = sub.querySelector('.lotes-wrap');
+      if (wrap.dataset.loaded !== '1') {
+        await cargarLotes(id, wrap);
+      }
+    }
+    return;
+  }
+
+  if (action === 'borrar') {
+    const titulo = tr.dataset.titulo || tr.cells[1].textContent;
+    const tipo = tr.dataset.tipo || tr.cells[2].textContent;
+    if (!confirm(`¿Borrar lana "${titulo} ${tipo}"? Se borrarán también todos sus lotes.`)) return;
+    try {
+      const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      cargar();
+    } catch (err) {
+      mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+    }
+  }
+
+  if (action === 'editar') {
+    const material = tr.cells[0].textContent;
+    const titulo = tr.cells[1].textContent.trim();
+    const tipo = tr.cells[2].textContent;
+    tr.classList.add('editando');
+    tr.innerHTML = `
+      <td><input type="text" class="mp-edit-material" value="${escapeHtml(material)}" maxlength="50" /></td>
+      <td><input type="text" class="mp-edit-titulo" value="${escapeHtml(titulo)}" maxlength="100" /></td>
+      <td><input type="text" class="mp-edit-tipo" value="${escapeHtml(tipo)}" maxlength="100" /></td>
+      <td colspan="3" style="text-align:center; color:#9a9a9a; font-size:0.78rem; font-style:italic">(editando)</td>
+      <td>
+        <div class="mp-row-actions">
+          <button class="mp-btn-row" data-action="guardar">Guardar</button>
+          <button class="mp-btn-row" data-action="cancelar">Cancelar</button>
+        </div>
+      </td>
+    `;
+    tr.querySelectorAll('input').forEach(i => {
+      i.style.cssText = 'border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.85rem; background:#FAF8F6; width:100%;';
+    });
+    tr.querySelector('.mp-edit-titulo').focus();
+  }
+
+  if (action === 'guardar') {
+    const nuevoMaterial = tr.querySelector('.mp-edit-material').value;
+    const nuevoTitulo = tr.querySelector('.mp-edit-titulo').value;
+    const nuevoTipo = tr.querySelector('.mp-edit-tipo').value;
+    try {
+      const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ material: nuevoMaterial, titulo: nuevoTitulo, tipo: nuevoTipo }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      cargar();
+    } catch (err) {
+      mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+      cargar();
+    }
+  }
+
+  if (action === 'cancelar') {
+    cargar();
+  }
+});
+
+
+// ====== Lotes: render sub-tabla expandible + CRUD inline ======
+
+async function cargarLotes(lanaId, wrap) {
+  wrap.innerHTML = '<div class="lotes-empty">Cargando lotes…</div>';
+  try {
+    const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(lanaId)}/lotes`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    pintarLotes(lanaId, wrap, d.lotes || [], false);
+    wrap.dataset.loaded = '1';
+  } catch (err) {
+    wrap.innerHTML = `<div class="lotes-empty">Error: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
+  const visibles = mostrarAgotados ? lotes : lotes.filter(l => (l.cantidad_disponible_kg || 0) > 0);
+  const nAgotados = lotes.filter(l => (l.cantidad_disponible_kg || 0) <= 0).length;
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  // Construye el selector de proveedor con TODOS los proveedores
+  // existentes (_PROVS_GLOBAL), no solo los que ya suministran esta
+  // calidad. Los que ya suministran se marcan con "● " al principio
+  // para que el operario sepa que ya tienen variante en uso.
+  const calidad = LANAS_POR_ID[lanaId] || {};
+  const variantes = calidad.variantes || [];
+  const provsActuales = new Set(
+    variantes.map(v => (v.proveedor || '').trim().toUpperCase()).filter(Boolean)
+  );
+  // Si existe el catalogo global de proveedores, lo usamos. Si esta
+  // vacio por algun motivo, caemos al comportamiento antiguo (solo
+  // variantes actuales). Asi la UI nunca queda sin opciones.
+  let opcionesProvs = [];
+  if (_PROVS_GLOBAL && _PROVS_GLOBAL.length) {
+    // Ordenar: primero los que ya suministran, luego el resto, ambos
+    // ordenados alfabeticamente.
+    const conPlaceholder = _PROVS_GLOBAL.map(p => {
+      const nombre = (p.alias || p.nombre || '').trim();
+      return {nombre, enUso: provsActuales.has(nombre.toUpperCase())};
+    }).filter(p => p.nombre);
+    conPlaceholder.sort((a, b) => {
+      if (a.enUso !== b.enUso) return a.enUso ? -1 : 1;
+      return a.nombre.localeCompare(b.nombre, 'es');
+    });
+    opcionesProvs = conPlaceholder.map(p =>
+      `<option value="${escapeHtml(p.nombre)}">${p.enUso ? '● ' : ''}${escapeHtml(p.nombre)}</option>`
+    );
+  } else {
+    opcionesProvs = variantes.map(v =>
+      `<option value="${escapeHtml(v.proveedor)}">${escapeHtml(v.proveedor)}</option>`
+    );
+  }
+  const provSelect = `
+    <select class="inp-proveedor" style="border:1px solid var(--border); border-radius:6px; padding:0.32rem 0.45rem; font-size:0.78rem; background:#fff; width:100%; font-family:inherit"
+            title="● = ya suministra esta calidad">
+      ${variantes.length === 0 && opcionesProvs.length ? '<option value="">— elegir proveedor —</option>' : ''}
+      ${opcionesProvs.join('')}
+      <option value="__otro__">+ Otro proveedor (nuevo)...</option>
+    </select>`;
+
+  let filasHtml = '';
+  if (visibles.length === 0) {
+    filasHtml = `<tr><td colspan="6" class="lotes-empty">${
+      lotes.length === 0
+        ? 'Aún no hay lotes. Añade el primero abajo ↓'
+        : `Sin lotes activos${nAgotados ? ` (${nAgotados} agotado${nAgotados === 1 ? '' : 's'} ocultos)` : ''}`
+    }</td></tr>`;
+  } else {
+    filasHtml = visibles.map(l => {
+      const agotado = (l.cantidad_disponible_kg || 0) <= 0;
+      const prov = l.proveedor || '';
+      const provKey = prov.split('/')[0].trim().toUpperCase();
+      return `
+        <tr data-lote="${escapeHtml(l.lote)}" data-proveedor="${escapeHtml(prov)}" class="${agotado ? 'lote-agotado' : ''}">
+          <td><strong>${escapeHtml(l.lote)}</strong></td>
+          <td>${prov ? `<span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(prov)}</span>` : '—'}</td>
+          <td style="text-align:right">${fmtKg(l.cantidad_disponible_kg)}</td>
+          <td style="text-align:right">${fmtEur(l.coste_kg)}</td>
+          <td>${escapeHtml(l.fecha_entrada || '—')}</td>
+          <td style="text-align:right">
+            ${agotado ? '' : '<button class="btn-lote-consumir" data-lote-action="consumir">Consumir</button>'}
+            <button class="btn-lote-ghost" data-lote-action="editar">Editar</button>
+            <button class="btn-lote-danger" data-lote-action="borrar">Borrar</button>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  wrap.innerHTML = `
+    <div class="lotes-header">
+      <div class="lotes-header-title">Lotes (partidas)</div>
+      ${nAgotados > 0 ? `
+        <label class="lotes-show-agotados">
+          <input type="checkbox" class="chk-agotados" ${mostrarAgotados ? 'checked' : ''} />
+          Mostrar agotados (${nAgotados})
+        </label>` : ''}
+    </div>
+    <table class="lotes-tabla">
+      <thead>
+        <tr>
+          <th>Nº partido</th>
+          <th>Proveedor</th>
+          <th style="text-align:right">Cantidad</th>
+          <th style="text-align:right">Coste</th>
+          <th>Entrada</th>
+          <th style="text-align:right"></th>
+        </tr>
+      </thead>
+      <tbody class="lotes-rows">
+        ${filasHtml}
+        <tr class="lote-form-row">
+          <td><input type="text" class="inp-lote" placeholder="L-2026-001" maxlength="60" /></td>
+          <td>${provSelect}</td>
+          <td><input type="number" step="0.01" min="0" class="inp-kg num" placeholder="100" /></td>
+          <td><input type="number" step="0.01" min="0" class="inp-coste num" placeholder="5.20" /></td>
+          <td><input type="date" class="inp-fecha" value="${hoy}" /></td>
+          <td style="text-align:right">
+            <button class="btn-lote-add" data-lote-action="add">+ Añadir lote</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+  // Wire-up handlers
+  const tbl = wrap.querySelector('.lotes-tabla');
+
+  tbl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-lote-action]');
+    if (!btn) return;
+    const action = btn.dataset.loteAction;
+
+    if (action === 'add') {
+      const lote = wrap.querySelector('.inp-lote').value.trim();
+      const kg = parseFloat(wrap.querySelector('.inp-kg').value);
+      const coste = parseFloat(wrap.querySelector('.inp-coste').value);
+      const fecha = wrap.querySelector('.inp-fecha').value;
+      let proveedor = (wrap.querySelector('.inp-proveedor')?.value || '').trim();
+      if (proveedor === '__otro__') {
+        proveedor = (prompt('Proveedor nuevo (mayúsculas, ej. COBO):') || '').trim().toUpperCase();
+        if (!proveedor) return;
+      }
+      if (!lote || isNaN(kg) || isNaN(coste) || !fecha) {
+        await mostrarAlerta({titulo: 'Faltan datos',
+          mensaje: 'Rellena lote, cantidad, coste y fecha antes de añadir.'});
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(lanaId)}/lotes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lote, cantidad_disponible_kg: kg, coste_kg: coste, fecha_entrada: fecha, usuario: currentUsuario(), proveedor }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        // Recargar la tabla principal (para actualizar resumen) y reabrir esta fila
+        await recargarConservandoExpansion(lanaId);
+      } catch (err) {
+        mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    const tr = btn.closest('tr');
+    const lote = tr.dataset.lote;
+    const proveedor = tr.dataset.proveedor || '';
+
+    if (action === 'consumir') {
+      // En multi-proveedor, dos lotes distintos pueden compartir ref;
+      // localizamos el correcto comparando tambien proveedor.
+      const loteObj = lotes.find(l => l.lote === lote && (l.proveedor || '') === proveedor);
+      if (!loteObj) return;
+      const lanaRow = document.querySelector(`tr.lana-row[data-id="${CSS.escape(lanaId)}"]`);
+      const labelText = lanaRow
+        ? `${lanaRow.dataset.titulo || ''} ${lanaRow.dataset.tipo || ''}`.trim()
+        : lanaId;
+      abrirModalConsumir({
+        lanaId,
+        lote,
+        proveedor,
+        saldo: parseFloat(loteObj.cantidad_disponible_kg) || 0,
+        coste: parseFloat(loteObj.coste_kg) || 0,
+        lanaLabelText: labelText,
+        onDone: () => recargarConservandoExpansion(lanaId),
+      });
+      return;
+    }
+
+    if (action === 'borrar') {
+      if (!confirm(`¿Borrar lote "${lote}" (${proveedor})?`)) return;
+      try {
+        const qs = `usuario=${encodeURIComponent(currentUsuario())}&proveedor=${encodeURIComponent(proveedor)}`;
+        const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(lanaId)}/lotes/${encodeURIComponent(lote)}?${qs}`, { method: 'DELETE' });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        await recargarConservandoExpansion(lanaId);
+      } catch (err) { mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'}); }
+    }
+
+    if (action === 'editar') {
+      // Inline edit: reemplazamos cells por inputs. La columna de
+      // proveedor no es editable (cambiar proveedor seria mover el
+      // lote a otra variante; se hace borrando y creando).
+      const kg = parseFloat(tr.cells[2].textContent) || 0;
+      const coste = parseFloat(tr.cells[3].textContent) || 0;
+      const fecha = (tr.cells[4].textContent || '').trim();
+      const provDisplay = tr.cells[1].innerHTML;
+      tr.innerHTML = `
+        <td><input type="text" class="inp-lote" value="${escapeHtml(lote)}" maxlength="60" /></td>
+        <td>${provDisplay}</td>
+        <td><input type="number" step="0.01" min="0" class="inp-kg num" value="${kg}" /></td>
+        <td><input type="number" step="0.01" min="0" class="inp-coste num" value="${coste}" /></td>
+        <td><input type="date" class="inp-fecha" value="${escapeHtml(fecha === '—' ? '' : fecha)}" /></td>
+        <td style="text-align:right">
+          <button class="btn-lote-ghost" data-lote-action="guardar">Guardar</button>
+          <button class="btn-lote-ghost" data-lote-action="cancelar">Cancelar</button>
+        </td>`;
+    }
+
+    if (action === 'guardar') {
+      const nuevoLote = tr.querySelector('.inp-lote').value.trim();
+      const kg = parseFloat(tr.querySelector('.inp-kg').value);
+      const coste = parseFloat(tr.querySelector('.inp-coste').value);
+      const fecha = tr.querySelector('.inp-fecha').value;
+      try {
+        const r = await fetch(`/api/materias-primas/lanas/${encodeURIComponent(lanaId)}/lotes/${encodeURIComponent(lote)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lote: nuevoLote, cantidad_disponible_kg: kg, coste_kg: coste, fecha_entrada: fecha, usuario: currentUsuario(), proveedor }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+        await recargarConservandoExpansion(lanaId);
+      } catch (err) { mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'}); }
+    }
+
+    if (action === 'cancelar') {
+      await recargarConservandoExpansion(lanaId);
+    }
+  });
+
+  // Toggle agotados
+  const chk = wrap.querySelector('.chk-agotados');
+  if (chk) {
+    chk.addEventListener('change', () => {
+      pintarLotes(lanaId, wrap, lotes, chk.checked);
+    });
+  }
+}
+
+async function recargarConservandoExpansion(lanaId) {
+  // Tras cualquier CRUD de lote, recargar la tabla principal y reabrir
+  // la lana que estabas editando (para que el comercial no pierda el sitio).
+  const r = await fetch('/api/materias-primas/lanas');
+  const d = await r.json();
+  LANAS_ALL = d.lanas || [];
+  LANAS_ALL.forEach(l => { LANAS_POR_ID[l.id] = l; });
+  // Repintamos los selects de filtros (puede haber aparecido un valor nuevo)
+  // y aplicamos el filtro actual para no perder la seleccion del usuario.
+  poblarFiltros(LANAS_ALL);
+  pintar(aplicarFiltros(LANAS_ALL));
+  // Reabrir
+  const toggle = tbody.querySelector(`tr.lana-row[data-id="${CSS.escape(lanaId)}"] [data-action="toggle-lotes"]`);
+  if (toggle) toggle.click();
+}
+
+// Cache global de proveedores (cargado al bootstrap para que el
+// selector inline de "añadir lote" pueda pintar todos los proveedores
+// existentes — no solo los que ya suministran esta calidad).
+let _PROVS_GLOBAL = [];
+async function _cargarProvsGlobal() {
+  try {
+    const r = await fetch('/api/proveedores');
+    if (!r.ok) return;
+    const d = await r.json();
+    _PROVS_GLOBAL = d.proveedores || [];
+  } catch (_) { /* fallback: el select se queda solo con los actuales */ }
+}
+
+// Bootstrap: catalogo (para labels) + proveedores antes que el listado.
+// Asi la primera pintada ya muestra los nombres correctos y, al
+// expandir lotes, el selector incluye todos los proveedores existentes.
+(async () => {
+  await Promise.all([cargarCatalogoMaterias(), _cargarProvsGlobal()]);
+  await cargar();
+})();
+
+
+// ============================================================
+// Tabs (Por lana / Todos los lotes / Movimientos)
+// ============================================================
+function activarTabMP(tab) {
+  const btn = document.querySelector(`.tabs-bar .tab-btn[data-tab="${tab}"]`);
+  if (!btn) return;
+  document.querySelectorAll('.tabs-bar .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('hidden', p.dataset.tabPanel !== tab);
+  });
+  if (tab === 'todos-lotes') cargarLotesGlobales();
+  if (tab === 'movimientos') cargarMovimientos();
+  if (tab === 'compras')     cargarCompras();
+  if (tab === 'kanban')      cargarCompras();   // misma fuente; renderCompras dispatcha a kanban
+  if (tab === 'lana-cruda')  cargarLanaCruda();
+  if (tab === 'proveedores') cargarProveedores();
+  // Tras cambiar de tab, refrescar la UI de filtros (las dos tabs
+  // Compras/Kanban comparten estado pero tienen pills duplicadas).
+  if (tab === 'compras' || tab === 'kanban') sincronizarFiltrosCompras();
+  // Refleja la tab en la URL (hash) sin recargar, para que se pueda
+  // compartir el link y marcar como favorito.
+  history.replaceState(null, '', '#' + tab);
+}
+
+document.querySelectorAll('.tabs-bar .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => activarTabMP(btn.dataset.tab));
+});
+
+// Al cargar la pagina, si la URL trae un hash valido (#compras,
+// #movimientos, etc.) activamos esa tab directamente. Asi un favorito
+// o un link directo /materias-primas#compras lleva al user al sitio
+// sin que tenga que hacer click.
+//
+// Tambien soportamos #pedido:<calidad_id> — cuando viene de la ficha
+// haciendo click en "Hacer pedido nuevo": activamos tab Compras, pre-
+// seleccionamos todas las variantes de esa calidad y abrimos el modal.
+// Diferimos a la siguiente tick para que `const COMPRAS` ya este
+// inicializado cuando el handler de #pedido: lo lea (esta IIFE esta
+// declarada antes en el archivo, de modo que sin defer caeria en TDZ).
+// Al cargar la pagina, si la URL trae un hash valido (#compras,
+// #movimientos, #pedido:<id>) activamos la tab adecuada. El caso
+// #pedido:<id> guarda la calidad en una variable temporal porque
+// activarTabMP() sobrescribe el hash con #compras al cambiar de tab.
+// cargarCompras() la lee al terminar y abre el modal.
+window.__initTabFromHash = function() {
+  const TABS_VALIDAS = ['por-lana', 'todos-lotes', 'movimientos', 'compras', 'kanban', 'lana-cruda', 'proveedores'];
+  const raw = (location.hash || '').replace(/^#/, '');
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('pedido:')) {
+    window.__pendingPedidoCalidad = decodeURIComponent(raw.slice('pedido:'.length));
+    activarTabMP('compras');
+    return;
+  }
+  if (lower.startsWith('proveedores:')) {
+    // Hash con sufijo de proveedor → abrir tab + expandir su ficha al cargar
+    window.__pendingProveedorAbrir = decodeURIComponent(raw.slice('proveedores:'.length));
+    activarTabMP('proveedores');
+    return;
+  }
+  if (TABS_VALIDAS.includes(lower)) {
+    activarTabMP(lower);
+  }
+};
+
+
+// ============================================================
+// Tab "Todos los lotes"
+// ============================================================
+let _lotesGlobalesCache = []; // ultimos lotes cargados (sin filtros locales)
+
+async function cargarLotesGlobales() {
+  const tb = document.getElementById('lt-tbody');
+  tb.innerHTML = '<tr><td colspan="7" class="mp-empty">Cargando…</td></tr>';
+  const incluirAgotados = document.getElementById('lt-show-agotados').checked;
+  try {
+    const r = await fetch('/api/materias-primas/lotes?incluir_agotados=' + (incluirAgotados ? '1' : '0'));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    _lotesGlobalesCache = d.lotes || [];
+    document.getElementById('lt-resumen-totales').textContent =
+      `${d.totales.n_lotes} lotes · ${fmtKg(d.totales.total_kg)} · valor ${fmtEurTotal(d.totales.valor_total_eur)}`;
+    document.getElementById('tc-todos-lotes').textContent = d.totales.n_lotes;
+    poblarFiltrosLotes();
+    renderLotesGlobales();
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="7" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function fmtEurTotal(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+// Pueblo los 4 selects de filtros con los valores DISTINTOS presentes
+// en los lotes cargados. Reutilizo CLASIFICACION_LABELS y
+// MATERIAL_FELPA_LABELS (ya hidratadas desde el catalogo).
+function poblarFiltrosLotes() {
+  const distinct = (key) => {
+    const set = new Set();
+    _lotesGlobalesCache.forEach(l => {
+      const v = (l[key] || '').trim();
+      if (v) set.add(v);
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'));
+  };
+  const setOptions = (sel, items, labelFn) => {
+    if (!sel) return;
+    const prev = sel.value;
+    const placeholder = sel.querySelector('option[value=""]');
+    sel.innerHTML = '';
+    if (placeholder) sel.appendChild(placeholder);
+    items.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = labelFn ? labelFn(v) : v;
+      sel.appendChild(opt);
+    });
+    if (items.includes(prev)) sel.value = prev;
+  };
+  setOptions(document.getElementById('lt-f-clasificacion'),
+             distinct('clasificacion'),
+             v => CLASIFICACION_LABELS[v] || v);
+  setOptions(document.getElementById('lt-f-material'),
+             distinct('material_felpa'),
+             v => MATERIAL_FELPA_LABELS[v] || v);
+  setOptions(document.getElementById('lt-f-titulo'),
+             distinct('titulo'));
+  setOptions(document.getElementById('lt-f-calidad'),
+             distinct('tipo'));
+}
+
+function renderLotesGlobales() {
+  const tb = document.getElementById('lt-tbody');
+  const fC = document.getElementById('lt-f-clasificacion').value;
+  const fM = document.getElementById('lt-f-material').value;
+  const fT = document.getElementById('lt-f-titulo').value;
+  const fK = document.getElementById('lt-f-calidad').value;
+  // Buscador de nº partido: case-insensitive, substring (asi "39" matchea
+  // tanto 3923C como 3934C). Trim para evitar el espacio accidental.
+  const fP = (document.getElementById('lt-f-partido')?.value || '').trim().toLowerCase();
+  let filtrados = _lotesGlobalesCache.filter(l => {
+    if (fC && (l.clasificacion  || '') !== fC) return false;
+    if (fM && (l.material_felpa || '') !== fM) return false;
+    if (fT && (l.titulo         || '') !== fT) return false;
+    if (fK && (l.tipo           || '') !== fK) return false;
+    if (fP && !((l.lote || '').toLowerCase().includes(fP))) return false;
+    return true;
+  });
+  // Contador "N de TOTAL" cuando hay filtros activos
+  const ctr = document.getElementById('lt-f-counter');
+  if (ctr) {
+    ctr.textContent = (filtrados.length === _lotesGlobalesCache.length)
+      ? ''
+      : `${filtrados.length} de ${_lotesGlobalesCache.length}`;
+  }
+  if (!filtrados.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="mp-empty">Sin partidos que coincidan.</td></tr>';
+    return;
+  }
+  tb.innerHTML = filtrados.map(l => {
+    // La calidad (titulo + tipo) y el nº lote llevan link a la ficha de
+    // la materia prima — asi este tab "Todos los partidos" es realmente
+    // la capa granular de Materias primas, vinculada al detalle.
+    const fichaUrl = `/materia-prima/${encodeURIComponent(l.lana_id || '')}`;
+    const provPill = l.proveedor
+      ? ` <span class="prov-pill prov-${escapeHtml((l.proveedor || '').split('/')[0].trim().toUpperCase())}" style="margin-left:0.4rem">${escapeHtml(l.proveedor)}</span>`
+      : '';
+    return `
+    <tr class="${l.agotado ? 'lote-agotado' : ''}" data-lana-id="${escapeHtml(l.lana_id)}" data-lote="${escapeHtml(l.lote)}" data-proveedor="${escapeHtml(l.proveedor || '')}">
+      <td>
+        <a href="${escapeHtml(fichaUrl)}" class="cmp-link-calidad" title="Abrir ficha de la materia prima">
+          <strong>${escapeHtml(l.titulo)}</strong> <span style="color:#7a7a7a">${escapeHtml(l.tipo)}</span>
+        </a>${provPill}
+      </td>
+      <td>
+        <a href="${escapeHtml(fichaUrl)}" class="cmp-link-calidad" title="Abrir ficha de la materia prima">
+          ${escapeHtml(l.lote)}
+        </a>
+      </td>
+      <td style="text-align:right">${fmtKg(l.cantidad_disponible_kg)}</td>
+      <td style="text-align:right">${fmtEur(l.coste_kg)}</td>
+      <td style="text-align:right">${fmtEurTotal(l.valor_eur)}</td>
+      <td>${escapeHtml(l.fecha_entrada || '—')}</td>
+      <td style="text-align:right">
+        ${l.agotado ? '<span style="color:#b0b0b0; font-size:0.74rem">agotado</span>'
+                    : '<button class="btn-lote-consumir" data-lt-consumir>Consumir</button>'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Delegacion para el boton Consumir en la tabla global
+document.getElementById('lt-tbody').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-lt-consumir]');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const lanaId = tr.dataset.lanaId;
+  const lote = tr.dataset.lote;
+  // En multi-proveedor un mismo `lote` puede existir en dos variantes;
+  // localizamos el correcto comparando tambien proveedor (data-attr).
+  const proveedor = tr.dataset.proveedor || '';
+  const it = _lotesGlobalesCache.find(l =>
+    l.lana_id === lanaId && l.lote === lote && (l.proveedor || '') === proveedor);
+  if (!it) return;
+  abrirModalConsumir({
+    lanaId,
+    lote,
+    proveedor: it.proveedor || '',
+    saldo: parseFloat(it.cantidad_disponible_kg) || 0,
+    coste: parseFloat(it.coste_kg) || 0,
+    lanaLabelText: it.titulo_completo,
+    onDone: () => cargarLotesGlobales(),
+  });
+});
+
+document.getElementById('lt-show-agotados').addEventListener('change', cargarLotesGlobales);
+// Wire-up de los 4 selects de filtro
+['lt-f-clasificacion', 'lt-f-material', 'lt-f-titulo', 'lt-f-calidad'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', renderLotesGlobales);
+});
+// Buscador por nº partido (input → re-render en cada tecla)
+document.getElementById('lt-f-partido')?.addEventListener('input', renderLotesGlobales);
+// Boton "Limpiar filtros"
+const _ltBtnReset = document.getElementById('lt-f-reset');
+if (_ltBtnReset) _ltBtnReset.addEventListener('click', () => {
+  ['lt-f-clasificacion', 'lt-f-material', 'lt-f-titulo', 'lt-f-calidad',
+   'lt-f-partido'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderLotesGlobales();
+});
+
+
+// ============================================================
+// Tab "Movimientos"
+// ============================================================
+let _movsCache = [];
+let _lanasCache = []; // para mapear lana_id -> label
+
+// Lookup variante_id (o calidad_id) → atributos de la calidad
+// (clasificacion, material_felpa, titulo, tipo). Lo construye
+// _construirMvLookup() desde _lanasCache. Lo usan los filtros nuevos
+// (clasif/material/titulo/calidad) y lanaLabel() para mostrar nombre.
+let _mvLookup = new Map();
+
+async function cargarMovimientos() {
+  const tb = document.getElementById('mv-tbody');
+  tb.innerHTML = '<tr><td colspan="8" class="mp-empty">Cargando…</td></tr>';
+  try {
+    // Cargar primero las lanas (para mapeo y dropdown). Solo refrescamos
+    // si la cache esta vacia — si el usuario añade/quita calidades sin
+    // recargar la pagina puede quedar un poco stale, pero los selects
+    // se repueblan cada vez que llegan movimientos.
+    if (!_lanasCache.length) {
+      const rl = await fetch('/api/materias-primas/lanas');
+      const dl = await rl.json();
+      _lanasCache = dl.lanas || [];
+    }
+    _mvLookup = _construirMvLookup();
+    // Filtros de servidor: solo tipo + rango de fechas (los que el
+    // backend ya entendia). Los 4 selects nuevos (clasif/material/
+    // titulo/calidad) se aplican CLIENT-SIDE en renderMovimientos()
+    // para evitar fetch en cada cambio y porque el join con la calidad
+    // se hace aqui de todas formas.
+    const params = new URLSearchParams();
+    const tipo = document.getElementById('mv-filter-tipo').value;
+    const desde = document.getElementById('mv-desde').value;
+    const hasta = document.getElementById('mv-hasta').value;
+    if (tipo) params.set('tipo', tipo);
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    const r = await fetch('/api/materias-primas/movimientos?' + params.toString());
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    _movsCache = d.movimientos || [];
+    // El total del header lo actualiza renderMovimientos() (refleja
+    // filtros client-side activos). El tab-counter se queda con el
+    // total bruto del backend para no minar la sensacion de "hay X
+    // movimientos en historico".
+    document.getElementById('tc-movimientos').textContent = d.total;
+    poblarMvFiltrosCalidad();
+    renderMovimientos();
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="8" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// variante_id → atributos de la calidad. Tambien indexa por calidad_id
+// (algunos movimientos historicos podrian estar registrados a nivel
+// calidad en lugar de variante). Si una variante no esta en la cache
+// (porque la calidad se borro despues), devuelve null y el movimiento
+// pasa todos los filtros de calidad (no podemos saber).
+function _construirMvLookup() {
+  const map = new Map();
+  _lanasCache.forEach(cal => {
+    const calAttrs = {
+      clasificacion:  cal.clasificacion  || '',
+      material_felpa: cal.material_felpa || '',
+      titulo:         cal.titulo         || '',
+      tipo:           cal.tipo           || '',
+      // label compuesto para la columna "Lana" / select de filtro lana
+      label:          `${cal.titulo || ''} ${cal.tipo || ''}`.trim(),
+    };
+    map.set(cal.id, calAttrs);
+    (cal.variantes || []).forEach(v => {
+      // Anotar el proveedor por variante para el label
+      map.set(v.id, {
+        ...calAttrs,
+        proveedor: v.proveedor || '',
+        label: calAttrs.label + (v.proveedor ? ` · ${v.proveedor}` : ''),
+      });
+    });
+  });
+  return map;
+}
+
+// Pueblo los 4 selects de filtros con los valores DISTINTOS presentes
+// en los movimientos cargados (joinando con la calidad). Asi solo
+// aparecen las clasificaciones/materiales/titulos/calidades que
+// realmente tienen movimientos — evita opciones muertas.
+function poblarMvFiltrosCalidad() {
+  const distinct = (key) => {
+    const set = new Set();
+    _movsCache.forEach(m => {
+      const cal = _mvLookup.get(m.lana_id);
+      const v = (cal && cal[key] || '').trim();
+      if (v) set.add(v);
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'));
+  };
+  const setOptions = (sel, items, labelFn) => {
+    if (!sel) return;
+    const prev = sel.value;
+    const placeholder = sel.querySelector('option[value=""]');
+    sel.innerHTML = '';
+    if (placeholder) sel.appendChild(placeholder);
+    items.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = labelFn ? labelFn(v) : v;
+      sel.appendChild(opt);
+    });
+    if (items.includes(prev)) sel.value = prev;
+  };
+  setOptions(document.getElementById('mv-f-clasificacion'),
+             distinct('clasificacion'),
+             v => CLASIFICACION_LABELS[v] || v);
+  setOptions(document.getElementById('mv-f-material'),
+             distinct('material_felpa'),
+             v => MATERIAL_FELPA_LABELS[v] || v);
+  setOptions(document.getElementById('mv-f-titulo'),
+             distinct('titulo'));
+  setOptions(document.getElementById('mv-f-calidad'),
+             distinct('tipo'));
+}
+
+function lanaLabel(lanaId) {
+  const cal = _mvLookup.get(lanaId);
+  if (cal) return cal.label || lanaId;
+  // Fallback: variante huerfana (calidad borrada). Aun asi el id es
+  // legible (formato titulo__tipo__proveedor con guiones).
+  return lanaId;
+}
+
+function fmtTs(iso) {
+  if (!iso) return '—';
+  // 2026-05-20T19:32:15 -> 2026-05-20 19:32
+  return iso.replace('T', ' ').slice(0, 16);
+}
+
+function fmtSigned(n) {
+  if (n == null || isNaN(n)) return '—';
+  const v = Number(n);
+  if (v === 0) return '0';
+  const sign = v > 0 ? '+' : '−';
+  return sign + Math.abs(v).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' kg';
+}
+
+const TIPO_PILL = {
+  entrada: '<span class="pill-tipo pill-entrada">Entrada</span>',
+  ajuste:  '<span class="pill-tipo pill-ajuste">Ajuste</span>',
+  salida:  '<span class="pill-tipo pill-salida">Salida</span>',
+  borrado: '<span class="pill-tipo pill-borrado">Borrado</span>',
+};
+
+function renderMovimientos() {
+  const tb = document.getElementById('mv-tbody');
+  // Filtros client-side (clasif/material/titulo/calidad). El resto
+  // (tipo, desde, hasta) los aplica el backend y ya vienen filtrados
+  // en _movsCache.
+  const fC = document.getElementById('mv-f-clasificacion').value;
+  const fM = document.getElementById('mv-f-material').value;
+  const fT = document.getElementById('mv-f-titulo').value;
+  const fK = document.getElementById('mv-f-calidad').value;
+  const filtrados = _movsCache.filter(m => {
+    if (!fC && !fM && !fT && !fK) return true;
+    const cal = _mvLookup.get(m.lana_id);
+    if (!cal) return true; // huerfano: lo dejamos pasar
+    if (fC && (cal.clasificacion  || '') !== fC) return false;
+    if (fM && (cal.material_felpa || '') !== fM) return false;
+    if (fT && (cal.titulo         || '') !== fT) return false;
+    if (fK && (cal.tipo           || '') !== fK) return false;
+    return true;
+  });
+  // Counter "N de TOTAL" cuando hay filtros client-side activos
+  const ctr = document.getElementById('mv-f-counter');
+  if (ctr) {
+    ctr.textContent = (filtrados.length === _movsCache.length)
+      ? ''
+      : `${filtrados.length} de ${_movsCache.length}`;
+  }
+  // Total del header refleja lo que se ve (post-filtros)
+  document.getElementById('mv-total').textContent = filtrados.length;
+  if (!filtrados.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="mp-empty">No hay movimientos con esos filtros.</td></tr>';
+    return;
+  }
+  tb.innerHTML = filtrados.map(m => `
+    <tr>
+      <td style="white-space:nowrap; font-size:0.8rem; color:#4d4d4d">${fmtTs(m.timestamp)}</td>
+      <td>${TIPO_PILL[m.tipo] || escapeHtml(m.tipo)}</td>
+      <td>${escapeHtml(lanaLabel(m.lana_id))}</td>
+      <td><strong>${escapeHtml(m.lote)}</strong></td>
+      <td style="text-align:right; font-variant-numeric: tabular-nums">${fmtSigned(m.cantidad_kg)}</td>
+      <td style="text-align:right; color:#7a7a7a; font-size:0.8rem">${fmtKg(m.saldo_nuevo_kg)}</td>
+      <td style="color:#4d4d4d; font-size:0.8rem">${m.usuario ? escapeHtml(m.usuario) : '<span style="color:#b0b0b0; font-style:italic">—</span>'}</td>
+      <td style="color:#7a7a7a; font-size:0.8rem">${escapeHtml(m.nota || '')}</td>
+    </tr>
+  `).join('');
+}
+
+// Filtros server-side: re-fetch al cambiar (tipo + rango de fechas)
+['mv-filter-tipo', 'mv-desde', 'mv-hasta'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', cargarMovimientos);
+});
+// Filtros client-side: solo re-render (sin re-fetch)
+['mv-f-clasificacion', 'mv-f-material', 'mv-f-titulo', 'mv-f-calidad'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', renderMovimientos);
+});
+// Boton "Limpiar filtros": resetea ambos sets y re-fetch
+document.getElementById('mv-reset').addEventListener('click', () => {
+  ['mv-f-clasificacion', 'mv-f-material', 'mv-f-titulo', 'mv-f-calidad',
+   'mv-filter-tipo', 'mv-desde', 'mv-hasta'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  cargarMovimientos();
+});
+
+
+// ============================================================
+// Tab "Lana en crudo"
+// ============================================================
+// Caches del modulo
+const LC = {
+  contenedores:        [],
+  ordenesPendientes:   [],       // ordenes en estado 'pendiente' (apartadas)
+  estadisticas:        {},
+  filtroHilador:       '',
+  incluirAgotados:     true,
+  // Caches auxiliares (para los selects de los modales)
+  proveedoresCache:    null,
+  calidadesCache:      null,
+  // Contexto del modal de cierre de orden
+  cerrarCtx:           null,
+};
+
+async function cargarLanaCruda() {
+  const tb = document.getElementById('lc-tbody');
+  if (tb) tb.innerHTML = '<tr><td colspan="10" class="mp-empty">Cargando…</td></tr>';
+  try {
+    const params = new URLSearchParams();
+    if (LC.filtroHilador) params.set('hilador', LC.filtroHilador);
+    params.set('incluir_agotados', LC.incluirAgotados ? '1' : '0');
+    const r = await fetch('/api/lana-cruda?' + params.toString());
+    if (r.status === 403) {
+      tb.innerHTML = '<tr><td colspan="10" class="mp-empty">Tu rol no tiene acceso a esta sección.</td></tr>';
+      return;
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    LC.contenedores = d.contenedores || [];
+    LC.estadisticas = d.estadisticas || {};
+    LC.ordenesPendientes = d.ordenes_pendientes || [];
+    pintarLcKpis();
+    poblarLcFiltroHilador();
+    renderOrdenesPendientes();
+    renderLanaCruda();
+    // Contador del tab top-level
+    document.getElementById('tc-lana-cruda').textContent =
+      LC.estadisticas.n_contenedores_activos ?? 0;
+    document.getElementById('lc-total-count').textContent =
+      LC.contenedores.length;
+  } catch (err) {
+    if (tb) tb.innerHTML = `<tr><td colspan="10" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function pintarLcKpis() {
+  const s = LC.estadisticas || {};
+  document.getElementById('lc-kpi-kg-total').textContent = fmtNum(s.kg_total || 0, 0);
+  document.getElementById('lc-kpi-n-cont').textContent   = s.n_contenedores_activos ?? 0;
+  document.getElementById('lc-kpi-valor').textContent    = fmtNum(s.valor_eur || 0, 0) + ' €';
+  const hil = s.por_hilador || {};
+  const partes = Object.entries(hil)
+    .filter(([, info]) => (info.kg || 0) > 0)
+    .sort((a, b) => (b[1].kg || 0) - (a[1].kg || 0))
+    .map(([nombre, info]) => `<strong>${escapeHtml(nombre)}</strong> ${fmtNum(info.kg, 0)} kg`);
+  document.getElementById('lc-kpi-hiladores').innerHTML = partes.length
+    ? partes.join(' · ') : '<span style="color:#9a9a9a">—</span>';
+}
+
+function poblarLcFiltroHilador() {
+  const sel = document.getElementById('lc-f-hilador');
+  if (!sel) return;
+  const valor = sel.value;
+  const hil = LC.estadisticas?.por_hilador || {};
+  const opts = Object.keys(hil).sort();
+  sel.innerHTML = '<option value="">Todos los hiladores</option>' +
+    opts.map(h => `<option value="${escapeHtml(h)}" ${h.toUpperCase() === valor.toUpperCase() ? 'selected' : ''}>${escapeHtml(h)}</option>`).join('');
+}
+
+function renderLanaCruda() {
+  const tb = document.getElementById('lc-tbody');
+  if (!tb) return;
+  const items = LC.contenedores;
+  const ctr = document.getElementById('lc-f-counter');
+  if (ctr) ctr.textContent = '';   // (sin filtro client-side por ahora)
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="10" class="mp-empty">No hay contenedores registrados. Pulsa <strong>+ Nuevo contenedor</strong> para empezar.</td></tr>';
+    return;
+  }
+  tb.innerHTML = items.map(c => {
+    const kgAct = Number(c.kg_actual || 0);
+    const kgIni = Number(c.kg_inicial || 0);
+    const consumidoPct = kgIni > 0 ? Math.round(((kgIni - kgAct) / kgIni) * 100) : 0;
+    const coste = Number(c.coste_kg || 0);
+    const agotado = kgAct <= 0;
+    return `
+    <tr class="${agotado ? 'lote-agotado' : ''} lc-row-expandable" data-cid="${escapeHtml(c.id)}">
+      <td><strong>${escapeHtml(c.ref || '—')}</strong>
+          <span class="lc-row-caret" title="Click en la fila para ver el historial de hilado">▸</span></td>
+      <td>${c.hilador_actual
+            ? escapeHtml(c.hilador_actual)
+            : '<span style="color:#9a9a9a; font-style:italic; font-size:0.78rem">Sin asignar</span>'}</td>
+      <td style="color:#7a7a7a">${escapeHtml(c.proveedor_origen || '—')}</td>
+      <td class="num">${fmtNum(kgAct, 0)} kg</td>
+      <td class="num" style="color:#7a7a7a">${fmtNum(kgIni, 0)} kg</td>
+      <td>
+        <div class="lc-progress" title="${consumidoPct}% consumido">
+          <div class="lc-progress-bar" style="width:${consumidoPct}%"></div>
+        </div>
+      </td>
+      <td class="num">${coste ? fmtNum(coste, 2) + ' €' : '—'}</td>
+      <td class="num">${kgAct && coste ? fmtNum(kgAct * coste, 0) + ' €' : '—'}</td>
+      <td>${escapeHtml(c.fecha_compra || '—')}</td>
+      <td style="text-align:right; white-space:nowrap">
+        ${agotado ? '<span style="color:#b0b0b0; font-size:0.74rem; margin-right:0.5rem">agotado</span>'
+                  : `<button class="mp-btn-row" data-lc-hilar style="font-size:0.74rem; margin-right:0.3rem">🧶 Hilar</button>`}
+        <button class="mp-btn-row" data-lc-borrar
+                style="font-size:0.74rem; color:#9b1c1c; border-color:#e0a0a0">Borrar</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ----- Wire-up de filtros -----
+document.getElementById('lc-f-hilador')?.addEventListener('change', (e) => {
+  LC.filtroHilador = e.target.value;
+  cargarLanaCruda();
+});
+document.getElementById('lc-show-agotados')?.addEventListener('change', (e) => {
+  LC.incluirAgotados = e.target.checked;
+  cargarLanaCruda();
+});
+// Por defecto incluir_agotados marca el checkbox
+const _lcShowAg = document.getElementById('lc-show-agotados');
+if (_lcShowAg) _lcShowAg.checked = LC.incluirAgotados;
+
+// ----- Click en la tabla (Hilar / Borrar / Expandir historial) -----
+document.getElementById('lc-tbody')?.addEventListener('click', async (e) => {
+  const tr = e.target.closest('tr[data-cid]');
+  if (!tr) return;
+  const cid = tr.dataset.cid;
+  if (e.target.closest('[data-lc-hilar]')) {
+    abrirModalHilar({ contenedorIdPre: cid });
+    return;
+  }
+  if (e.target.closest('[data-lc-borrar]')) {
+    const cont = LC.contenedores.find(c => c.id === cid);
+    if (!cont) return;
+    const kg = Number(cont.kg_actual || 0);
+    const { ok } = await mostrarConfirmacion({
+      titulo: `Borrar contenedor ${cont.ref}`,
+      mensaje: kg > 0
+        ? `El contenedor tiene ${fmtNum(kg, 0)} kg sin hilar. Si lo borras se pierde ese stock.`
+        : 'Esto eliminará el contenedor del histórico. ¿Continuar?',
+      textoConfirmar: 'Borrar',
+      tipo: 'danger',
+    });
+    if (!ok) return;
+    await intentarBorrarContenedor(cid, kg > 0);
+    return;
+  }
+  // Click en cualquier otra parte de la fila → toggle del historial
+  if (tr.classList.contains('lc-row-expandable')) {
+    await _toggleHistorialContenedor(tr, cid);
+  }
+});
+
+// Expande/colapsa la fila de detalle de un contenedor mostrando las
+// ordenes de hilado donde se ha consumido kg de ese contenedor.
+async function _toggleHistorialContenedor(tr, cid) {
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('lc-detail-row') && next.dataset.cid === cid) {
+    // Ya esta expandido → colapsar
+    next.remove();
+    tr.classList.remove('lc-row-expanded');
+    return;
+  }
+  // Marcar expandido
+  tr.classList.add('lc-row-expanded');
+  // Insertar fila de detalle con placeholder
+  const detail = document.createElement('tr');
+  detail.className = 'lc-detail-row';
+  detail.dataset.cid = cid;
+  detail.innerHTML = `<td colspan="10">
+    <div class="lc-detail-inner">
+      <div class="lc-detail-titulo">Historial de hilado de este contenedor</div>
+      <div class="lc-detail-body" style="color:#9a9a9a; font-style:italic">Cargando…</div>
+    </div>
+  </td>`;
+  tr.parentNode.insertBefore(detail, tr.nextSibling);
+  // Fetch ordenes
+  try {
+    const r = await fetch(`/api/lana-cruda/ordenes?contenedor_id=${encodeURIComponent(cid)}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    const ords = (d.ordenes || [])
+      .filter(o => o.tipo !== 'borrado-contenedor');   // omitimos los entries de auditoria de borrados
+    const body = detail.querySelector('.lc-detail-body');
+    if (!ords.length) {
+      body.innerHTML = '<div style="color:#7a7a7a; font-style:italic">Este contenedor no se ha hilado todavía.</div>';
+      return;
+    }
+    // Asegurar calidades en cache para mostrar nombres legibles
+    await _cargarCalidadesParaSelect();
+    body.innerHTML = `
+      <table class="lc-detail-tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th>Calidad hilada</th>
+            <th>Hilador</th>
+            <th class="num">Kg crudo</th>
+            <th class="num">Kg hilado</th>
+            <th class="num">Merma</th>
+            <th>Partido</th>
+            <th class="num">€/kg partido</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ords.map(o => _filaOrdenDetail(o, cid)).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    detail.querySelector('.lc-detail-body').innerHTML =
+      `<div style="color:#9b1c1c; font-size:0.82rem">Error: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function _filaOrdenDetail(o, cidEnfocado) {
+  const calLabel = LC.calidadesCache?.find(c => c.id === o.calidad_destino_id);
+  const calNombre = calLabel ? `${calLabel.titulo || ''} ${calLabel.tipo || ''}`.trim() : (o.calidad_destino_id || '—');
+  // Kg crudo aportados POR ESTE contenedor concreto (puede haber otros)
+  const aportes = (o.contenedores_origen || []).find(co => co.contenedor_id === cidEnfocado);
+  const kgCrudoEste = aportes ? Number(aportes.kg || 0) : 0;
+  const estado = (o.estado || '').toLowerCase();
+  const chip = estado === 'recibido'
+      ? '<span class="ped-chip ped-chip-recibido">✓ Recibido</span>'
+      : estado === 'pendiente'
+      ? '<span class="ped-chip ped-chip-abierto">🚚 Pendiente</span>'
+      : estado === 'anulado'
+      ? '<span class="ped-chip ped-chip-anulado">× Anulado</span>'
+      : `<span style="color:#9a9a9a">${escapeHtml(estado || '—')}</span>`;
+  const merma = (o.merma_kg != null && o.merma_pct != null)
+    ? `${fmtNum(o.merma_kg, 0)} kg <span style="color:#9a9a9a">(${Number(o.merma_pct).toFixed(1)}%)</span>`
+    : '—';
+  // Partido linkeable: si esta recibido, la calidad hilada existe y va al detalle
+  const partidoCell = o.partido_creado
+    ? (estado === 'recibido'
+        ? `<a href="/materia-prima/${encodeURIComponent(o.calidad_destino_id)}" class="pv-link">${escapeHtml(o.partido_creado)}</a>`
+        : escapeHtml(o.partido_creado))
+    : '<span style="color:#9a9a9a; font-style:italic">por asignar</span>';
+  return `
+    <tr>
+      <td style="white-space:nowrap; font-size:0.8rem; color:#4d4d4d">${escapeHtml(o.fecha_orden || (o.timestamp || '').slice(0,10) || '—')}</td>
+      <td>${chip}</td>
+      <td>${escapeHtml(calNombre)}</td>
+      <td>${escapeHtml(o.hilador || '—')}</td>
+      <td class="num">${fmtNum(kgCrudoEste, 0)} kg</td>
+      <td class="num">${o.kg_hilado != null ? fmtNum(o.kg_hilado, 0) + ' kg' : '—'}</td>
+      <td class="num">${merma}</td>
+      <td>${partidoCell}</td>
+      <td class="num">${o.coste_kg_partido != null ? fmtNum(o.coste_kg_partido, 2) + ' €' : '—'}</td>
+    </tr>`;
+}
+
+async function intentarBorrarContenedor(cid, forzar) {
+  try {
+    const r = await fetch(`/api/lana-cruda/contenedores/${encodeURIComponent(cid)}` +
+                          (forzar ? '?forzar=1' : ''),
+                         { method: 'DELETE' });
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(`El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
+                      `Reinicia "Iniciar ERP Produccion.bat".`);
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    await cargarLanaCruda();
+  } catch (err) {
+    mostrarAlerta({ titulo: 'No se pudo borrar el contenedor',
+                     mensaje: err.message, tipo: 'danger' });
+  }
+}
+
+// ============================================================
+// Modal "Nuevo contenedor"
+// ============================================================
+async function _cargarProveedoresParaSelect() {
+  if (LC.proveedoresCache) return LC.proveedoresCache;
+  try {
+    const r = await fetch('/api/proveedores?incluir_inactivos=0');
+    const d = await r.json();
+    LC.proveedoresCache = d.proveedores || [];
+    return LC.proveedoresCache;
+  } catch {
+    LC.proveedoresCache = [];
+    return [];
+  }
+}
+
+async function _cargarCalidadesParaSelect() {
+  if (LC.calidadesCache) return LC.calidadesCache;
+  try {
+    const r = await fetch('/api/materias-primas/lanas');
+    const d = await r.json();
+    LC.calidadesCache = d.lanas || [];
+    return LC.calidadesCache;
+  } catch {
+    LC.calidadesCache = [];
+    return [];
+  }
+}
+
+async function abrirModalNuevoContenedor() {
+  const modal = document.getElementById('modal-lc-nuevo');
+  // Limpiar campos
+  ['lc-nuevo-ref', 'lc-nuevo-kg', 'lc-nuevo-coste', 'lc-nuevo-fcompra',
+   'lc-nuevo-fllegada', 'lc-nuevo-proveedor-origen', 'lc-nuevo-obs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('lc-nuevo-error').textContent = '';
+  document.getElementById('lc-nuevo-error').classList.remove('show');
+  // Poblar selects: ambos usan la lista de proveedores existentes.
+  // - Hilador: opcional (se puede decidir al hilar)
+  // - Proveedor origen: quien te vendio la lana cruda
+  const provs = await _cargarProveedoresParaSelect();
+  const optsProvs = provs.map(p => {
+    const nom = p.alias || p.nombre;
+    return `<option value="${escapeHtml(nom)}">${escapeHtml(nom)}</option>`;
+  }).join('');
+  document.getElementById('lc-nuevo-hilador').innerHTML =
+    '<option value="">— Sin asignar (decidir al hilar)</option>' + optsProvs;
+  document.getElementById('lc-nuevo-proveedor-origen').innerHTML =
+    '<option value="">— Selecciona…</option>' + optsProvs;
+  // Fecha por defecto = hoy
+  const hoy = new Date().toISOString().slice(0, 10);
+  document.getElementById('lc-nuevo-fcompra').value = hoy;
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('lc-nuevo-ref').focus(), 50);
+}
+
+function cerrarModalNuevoContenedor() {
+  document.getElementById('modal-lc-nuevo').classList.remove('open');
+}
+
+document.getElementById('lc-btn-nuevo')?.addEventListener('click', abrirModalNuevoContenedor);
+document.getElementById('lc-nuevo-cancelar')?.addEventListener('click', cerrarModalNuevoContenedor);
+document.getElementById('modal-lc-nuevo')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modal-lc-nuevo') cerrarModalNuevoContenedor();
+});
+
+document.getElementById('lc-nuevo-confirmar')?.addEventListener('click', async () => {
+  const err = document.getElementById('lc-nuevo-error');
+  err.textContent = '';
+  err.classList.remove('show');
+  const body = {
+    ref:                   document.getElementById('lc-nuevo-ref').value.trim(),
+    hilador_actual:        document.getElementById('lc-nuevo-hilador').value,
+    kg_inicial:            parseFloat(document.getElementById('lc-nuevo-kg').value) || 0,
+    coste_kg:              parseFloat(document.getElementById('lc-nuevo-coste').value) || 0,
+    fecha_compra:          document.getElementById('lc-nuevo-fcompra').value,
+    fecha_llegada_hilador: document.getElementById('lc-nuevo-fllegada').value,
+    proveedor_origen:      document.getElementById('lc-nuevo-proveedor-origen').value.trim(),
+    observaciones:         document.getElementById('lc-nuevo-obs').value.trim(),
+  };
+  if (!body.ref) { err.textContent = 'La ref del contenedor es obligatoria.'; err.classList.add('show'); return; }
+  if (body.kg_inicial <= 0) { err.textContent = 'Los kg iniciales deben ser > 0.'; err.classList.add('show'); return; }
+  try {
+    const r = await fetch('/api/lana-cruda/contenedores', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    cerrarModalNuevoContenedor();
+    await cargarLanaCruda();
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+  }
+});
+
+// ============================================================
+// Seccion "Ordenes en hilado" (pendientes)
+// ============================================================
+function renderOrdenesPendientes() {
+  const wrap = document.getElementById('lc-ordenes-pendientes');
+  const lista = document.getElementById('lc-ord-lista');
+  const count = document.getElementById('lc-ord-count');
+  if (!wrap) return;
+  const ords = LC.ordenesPendientes || [];
+  count.textContent = ords.length;
+  if (!ords.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  lista.innerHTML = ords.map(o => {
+    // Resumen de contenedores origen
+    const origenes = (o.contenedores_origen || []).map(co => {
+      const c = LC.contenedores.find(x => x.id === co.contenedor_id);
+      return `${escapeHtml(c?.ref || co.contenedor_id)}: ${fmtNum(co.kg, 0)} kg`;
+    }).join(' · ');
+    const calLabel = LC.calidadesCache?.find(c => c.id === o.calidad_destino_id);
+    const calNombre = calLabel ? `${calLabel.titulo || ''} ${calLabel.tipo || ''}`.trim() : o.calidad_destino_id;
+    return `
+    <div class="lc-ord-card" data-oid="${escapeHtml(o.id)}">
+      <div class="lc-ord-head">
+        <span class="lc-ord-chip">🚚 pendiente</span>
+        <strong>${escapeHtml(calNombre)}</strong>
+        <span style="color:#7a7a7a; font-size:0.78rem">en ${escapeHtml(o.hilador || '—')}</span>
+        ${o.partido_creado
+          ? `<span style="color:#7a7a7a; font-size:0.78rem; margin-left:auto">partido ${escapeHtml(o.partido_creado)}</span>`
+          : `<span style="color:#9a9a9a; font-style:italic; font-size:0.78rem; margin-left:auto">partido por asignar</span>`}
+      </div>
+      <div class="lc-ord-body">
+        <div class="lc-ord-kpis">
+          <span><small>Crudo apartado</small><strong>${fmtNum(o.kg_crudo_total, 0)} kg</strong></span>
+          <span><small>Coste crudo</small><strong>${fmtNum(o.coste_crudo_eur, 0)} €</strong></span>
+          <span><small>Fecha orden</small><strong>${escapeHtml(o.fecha_orden || '—')}</strong></span>
+        </div>
+        <div class="lc-ord-origen" title="${escapeHtml(origenes)}">${origenes}</div>
+        ${o.nota ? `<div class="lc-ord-nota">${escapeHtml(o.nota)}</div>` : ''}
+      </div>
+      <div class="lc-ord-actions">
+        <button type="button" class="btn-pedido-ghost" data-lc-anular
+                style="color:#9b1c1c; border-color:#e0a0a0; font-size:0.78rem">Anular</button>
+        <button type="button" class="btn-pedido" data-lc-cerrar
+                style="font-size:0.78rem; padding:0.45rem 0.9rem">✓ Marcar recibido</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Click en cards de orden pendiente (cerrar / anular)
+document.getElementById('lc-ord-lista')?.addEventListener('click', async (e) => {
+  const card = e.target.closest('.lc-ord-card');
+  if (!card) return;
+  const oid = card.dataset.oid;
+  const orden = LC.ordenesPendientes.find(o => o.id === oid);
+  if (!orden) return;
+  if (e.target.closest('[data-lc-cerrar]')) {
+    abrirModalCerrarOrden(orden);
+  } else if (e.target.closest('[data-lc-anular]')) {
+    const {ok} = await mostrarConfirmacion({
+      titulo: 'Anular orden de hilado',
+      mensaje: `Los kg apartados volverán al(los) contenedor(es) de origen. ¿Anular?`,
+      textoConfirmar: 'Anular orden',
+      tipo: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const r = await fetch(`/api/lana-cruda/ordenes/${encodeURIComponent(oid)}/anular`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({motivo: 'anulada desde UI'}),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      await cargarLanaCruda();
+    } catch (err) {
+      mostrarAlerta({ titulo: 'No se pudo anular', mensaje: err.message, tipo: 'danger' });
+    }
+  }
+});
+
+
+// ============================================================
+// Modal "Apartar para hilar" (paso 1)
+// ============================================================
+let _hilarConsumos = []; // [{contenedor_id, kg}, ...]
+
+function _renderHilarConsumos() {
+  const cont = document.getElementById('lc-hilar-consumos');
+  if (!_hilarConsumos.length) {
+    cont.innerHTML = '<div style="color:#9a9a9a; font-size:0.82rem; font-style:italic; padding:0.4rem 0">Añade al menos un contenedor.</div>';
+    return;
+  }
+  cont.innerHTML = _hilarConsumos.map((c, idx) => {
+    const cont_obj = LC.contenedores.find(x => x.id === c.contenedor_id);
+    const dispo = cont_obj ? Number(cont_obj.kg_actual || 0) : 0;
+    const optsContenedores = LC.contenedores
+      .filter(o => Number(o.kg_actual || 0) > 0)
+      .map(o => {
+        const hilLabel = o.hilador_actual || 'sin hilador';
+        return `<option value="${escapeHtml(o.id)}" ${o.id === c.contenedor_id ? 'selected' : ''}>${escapeHtml(o.ref)} — ${escapeHtml(hilLabel)} (${fmtNum(o.kg_actual, 0)} kg)</option>`;
+      })
+      .join('');
+    return `
+    <div class="lc-hilar-consumo-row" data-idx="${idx}">
+      <select class="input-line lc-hilar-cid" style="flex:2; padding:0.4rem 0.6rem">
+        <option value="">Selecciona contenedor…</option>
+        ${optsContenedores}
+      </select>
+      <input type="number" class="input-line lc-hilar-kg" step="0.01" min="0.01"
+             value="${c.kg || ''}" placeholder="kg crudo" style="flex:1; padding:0.4rem 0.6rem" />
+      <span class="lc-hilar-dispo" style="font-size:0.74rem; color:#7a7a7a; min-width:80px">
+        ${dispo ? `máx ${fmtNum(dispo, 0)}` : '—'}
+      </span>
+      <button type="button" class="mp-btn-row lc-hilar-quitar"
+              style="font-size:0.74rem; color:#9b1c1c; border-color:#e0a0a0">×</button>
+    </div>`;
+  }).join('');
+  _actualizarResumenApartar();
+}
+
+function _actualizarResumenApartar() {
+  // Suma del crudo apartado y su coste
+  let kgCrudo = 0;
+  let costeCrudo = 0;
+  _hilarConsumos.forEach(c => {
+    const kg = Number(c.kg) || 0;
+    kgCrudo += kg;
+    const cont_obj = LC.contenedores.find(x => x.id === c.contenedor_id);
+    if (cont_obj) costeCrudo += kg * Number(cont_obj.coste_kg || 0);
+  });
+  document.getElementById('lc-res-crudo').textContent = fmtNum(kgCrudo, 0) + ' kg';
+  document.getElementById('lc-res-coste-total').textContent = fmtNum(costeCrudo, 0) + ' €';
+
+  // Validar (kg_hilado y tarifa no son requeridos en este paso)
+  const calidad = document.getElementById('lc-hilar-calidad').value;
+  const hilador = document.getElementById('lc-hilar-hilador').value;
+  const ok = kgCrudo > 0 && calidad && hilador
+          && _hilarConsumos.every(c => c.contenedor_id && Number(c.kg) > 0);
+  document.getElementById('lc-hilar-confirmar').disabled = !ok;
+}
+
+async function abrirModalHilar({ contenedorIdPre = '' } = {}) {
+  // Reset campos
+  _hilarConsumos = [contenedorIdPre
+    ? { contenedor_id: contenedorIdPre, kg: '' }
+    : { contenedor_id: '', kg: '' }];
+  ['lc-hilar-partido', 'lc-hilar-nota'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('lc-hilar-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lc-hilar-error').textContent = '';
+  document.getElementById('lc-hilar-error').classList.remove('show');
+
+  // Preseleccionar hilador si viene desde una fila
+  let hiladorPre = '';
+  if (contenedorIdPre) {
+    const c = LC.contenedores.find(x => x.id === contenedorIdPre);
+    if (c) hiladorPre = c.hilador_actual || '';
+  }
+
+  const cals = await _cargarCalidadesParaSelect();
+  document.getElementById('lc-hilar-calidad').innerHTML =
+    '<option value="">Selecciona calidad…</option>' +
+    cals.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml((c.titulo || '') + ' ' + (c.tipo || '')).trim()}</option>`).join('');
+
+  const provs = await _cargarProveedoresParaSelect();
+  document.getElementById('lc-hilar-hilador').innerHTML =
+    '<option value="">Selecciona…</option>' +
+    provs.map(p => {
+      const nom = p.alias || p.nombre;
+      return `<option value="${escapeHtml(nom)}" ${nom === hiladorPre ? 'selected' : ''}>${escapeHtml(nom)}</option>`;
+    }).join('');
+
+  _renderHilarConsumos();
+  document.getElementById('modal-lc-hilar').classList.add('open');
+}
+
+function cerrarModalHilar() {
+  document.getElementById('modal-lc-hilar').classList.remove('open');
+}
+
+document.getElementById('lc-btn-hilar')?.addEventListener('click', () => abrirModalHilar());
+document.getElementById('lc-hilar-cancelar')?.addEventListener('click', cerrarModalHilar);
+document.getElementById('modal-lc-hilar')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modal-lc-hilar') cerrarModalHilar();
+});
+document.getElementById('lc-hilar-add-cont')?.addEventListener('click', () => {
+  _hilarConsumos.push({ contenedor_id: '', kg: '' });
+  _renderHilarConsumos();
+});
+document.getElementById('lc-hilar-consumos')?.addEventListener('change', (e) => {
+  const row = e.target.closest('.lc-hilar-consumo-row');
+  if (!row) return;
+  const idx = Number(row.dataset.idx);
+  if (e.target.classList.contains('lc-hilar-cid')) {
+    _hilarConsumos[idx].contenedor_id = e.target.value;
+    _renderHilarConsumos();
+  } else if (e.target.classList.contains('lc-hilar-kg')) {
+    _hilarConsumos[idx].kg = e.target.value;
+    _actualizarResumenApartar();
+  }
+});
+document.getElementById('lc-hilar-consumos')?.addEventListener('input', (e) => {
+  if (!e.target.classList.contains('lc-hilar-kg')) return;
+  const row = e.target.closest('.lc-hilar-consumo-row');
+  if (!row) return;
+  _hilarConsumos[Number(row.dataset.idx)].kg = e.target.value;
+  _actualizarResumenApartar();
+});
+document.getElementById('lc-hilar-consumos')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.lc-hilar-quitar');
+  if (!btn) return;
+  const row = btn.closest('.lc-hilar-consumo-row');
+  _hilarConsumos.splice(Number(row.dataset.idx), 1);
+  _renderHilarConsumos();
+});
+['lc-hilar-calidad', 'lc-hilar-hilador'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', _actualizarResumenApartar);
+});
+
+document.getElementById('lc-hilar-confirmar')?.addEventListener('click', async () => {
+  const err = document.getElementById('lc-hilar-error');
+  err.textContent = '';
+  err.classList.remove('show');
+  const body = {
+    contenedores_consumo: _hilarConsumos
+      .filter(c => c.contenedor_id && Number(c.kg) > 0)
+      .map(c => ({ contenedor_id: c.contenedor_id, kg: Number(c.kg) })),
+    calidad_destino_id: document.getElementById('lc-hilar-calidad').value,
+    hilador:            document.getElementById('lc-hilar-hilador').value,
+    partido_ref:        document.getElementById('lc-hilar-partido').value.trim(),
+    fecha_orden:        document.getElementById('lc-hilar-fecha').value,
+    nota:               document.getElementById('lc-hilar-nota').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/lana-cruda/apartar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    cerrarModalHilar();
+    await cargarLanaCruda();
+    mostrarAlerta({
+      titulo: 'Orden en hilado',
+      mensaje: `${fmtNum(d.orden.kg_crudo_total, 0)} kg apartados. Cuando llegue el partido pulsa "Marcar recibido" para anotar los kg producidos y la tarifa.`,
+      tipo: 'success',
+    });
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+  }
+});
+
+
+// ============================================================
+// Modal "Cerrar orden" (paso 2 — marcar recibido)
+// ============================================================
+function _actualizarResumenCerrar() {
+  if (!LC.cerrarCtx) return;
+  const orden = LC.cerrarCtx;
+  const kgCrudo = Number(orden.kg_crudo_total || 0);
+  const costeCrudo = Number(orden.coste_crudo_eur || 0);
+  const kgHilado = Number(document.getElementById('lc-cerrar-kg-hilado').value) || 0;
+  const tarifa = Number(document.getElementById('lc-cerrar-tarifa').value) || 0;
+  const costeHilado = kgHilado * tarifa;
+  const costeTotal = costeCrudo + costeHilado;
+  const merma = kgCrudo - kgHilado;
+  const mermaPct = kgCrudo > 0 ? (merma / kgCrudo) * 100 : 0;
+  const costeKgPart = kgHilado > 0 ? costeTotal / kgHilado : 0;
+
+  document.getElementById('lc-cr-crudo').textContent  = fmtNum(kgCrudo, 0) + ' kg';
+  document.getElementById('lc-cr-hilado').textContent = fmtNum(kgHilado, 0) + ' kg';
+  document.getElementById('lc-cr-merma').innerHTML    = (kgCrudo > 0 && merma >= 0 && kgHilado > 0)
+    ? `${fmtNum(merma, 0)} kg <span style="color:#7a7a7a; font-size:0.78rem">(${mermaPct.toFixed(1)}%)</span>`
+    : '—';
+  document.getElementById('lc-cr-coste-total').textContent = fmtNum(costeTotal, 0) + ' €';
+  document.getElementById('lc-cr-coste-kg').textContent    = costeKgPart
+    ? fmtNum(costeKgPart, 2) + ' €/kg' : '—';
+
+  const partido = document.getElementById('lc-cerrar-partido').value.trim();
+  const ok = kgHilado > 0 && kgHilado <= kgCrudo + 0.01 && tarifa >= 0 && partido;
+  document.getElementById('lc-cerrar-confirmar').disabled = !ok;
+}
+
+function abrirModalCerrarOrden(orden) {
+  LC.cerrarCtx = orden;
+  // Info de la orden
+  const calLabel = LC.calidadesCache?.find(c => c.id === orden.calidad_destino_id);
+  const calNombre = calLabel ? `${calLabel.titulo || ''} ${calLabel.tipo || ''}`.trim() : orden.calidad_destino_id;
+  document.getElementById('lc-cerrar-info').innerHTML = `
+    <div><strong>${escapeHtml(calNombre)}</strong> · hilada por <strong>${escapeHtml(orden.hilador)}</strong></div>
+    <div style="color:#7a7a7a; font-size:0.82rem; margin-top:0.2rem">
+      ${fmtNum(orden.kg_crudo_total, 0)} kg de crudo apartados por ${fmtNum(orden.coste_crudo_eur, 0)} €.
+      Fecha orden: ${escapeHtml(orden.fecha_orden || '—')}.
+    </div>`;
+  document.getElementById('lc-cerrar-kg-hilado').value = '';
+  document.getElementById('lc-cerrar-tarifa').value = '';
+  document.getElementById('lc-cerrar-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lc-cerrar-partido').value = orden.partido_creado || '';
+  document.getElementById('lc-cerrar-error').textContent = '';
+  document.getElementById('lc-cerrar-error').classList.remove('show');
+  _actualizarResumenCerrar();
+  document.getElementById('modal-lc-cerrar').classList.add('open');
+}
+
+function cerrarModalCerrarOrden() {
+  document.getElementById('modal-lc-cerrar').classList.remove('open');
+  LC.cerrarCtx = null;
+}
+
+document.getElementById('lc-cerrar-cancelar')?.addEventListener('click', cerrarModalCerrarOrden);
+document.getElementById('modal-lc-cerrar')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modal-lc-cerrar') cerrarModalCerrarOrden();
+});
+['lc-cerrar-kg-hilado', 'lc-cerrar-tarifa', 'lc-cerrar-partido'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', _actualizarResumenCerrar);
+});
+
+document.getElementById('lc-cerrar-anular')?.addEventListener('click', async () => {
+  if (!LC.cerrarCtx) return;
+  const orden = LC.cerrarCtx;
+  const {ok} = await mostrarConfirmacion({
+    titulo: 'Anular orden',
+    mensaje: 'Los kg apartados volverán al(los) contenedor(es). ¿Anular?',
+    textoConfirmar: 'Anular',
+    tipo: 'danger',
+  });
+  if (!ok) return;
+  try {
+    const r = await fetch(`/api/lana-cruda/ordenes/${encodeURIComponent(orden.id)}/anular`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({motivo: 'anulada desde UI'}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    cerrarModalCerrarOrden();
+    await cargarLanaCruda();
+  } catch (err) {
+    document.getElementById('lc-cerrar-error').textContent = err.message;
+    document.getElementById('lc-cerrar-error').classList.add('show');
+  }
+});
+
+document.getElementById('lc-cerrar-confirmar')?.addEventListener('click', async () => {
+  if (!LC.cerrarCtx) return;
+  const orden = LC.cerrarCtx;
+  const err = document.getElementById('lc-cerrar-error');
+  err.textContent = '';
+  err.classList.remove('show');
+  const body = {
+    kg_hilado:            Number(document.getElementById('lc-cerrar-kg-hilado').value) || 0,
+    tarifa_hilado_eur_kg: Number(document.getElementById('lc-cerrar-tarifa').value) || 0,
+    partido_ref:          document.getElementById('lc-cerrar-partido').value.trim(),
+    fecha_recibido:       document.getElementById('lc-cerrar-fecha').value,
+  };
+  try {
+    const r = await fetch(`/api/lana-cruda/ordenes/${encodeURIComponent(orden.id)}/cerrar`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    cerrarModalCerrarOrden();
+    await cargarLanaCruda();
+    // Si Compras esta abierto, invalidar su cache para que recoja el partido nuevo
+    if (typeof COMPRAS !== 'undefined') { try { COMPRAS.lanas = []; } catch {} }
+    mostrarAlerta({
+      titulo: 'Orden cerrada',
+      mensaje: `Partido ${escapeHtml(d.orden.partido_creado)} creado con ` +
+               `${fmtNum(d.orden.kg_hilado, 0)} kg a ${fmtNum(d.orden.coste_kg_partido, 2)} €/kg ` +
+               `(merma ${d.orden.merma_pct.toFixed(1)}%).`,
+      tipo: 'success',
+    });
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+  }
+});
+
+
+// ============================================================
+// Modal de consumo de lote
+// ============================================================
+let _mcCtx = null;
+const $mc = {
+  modal:    document.getElementById('modal-consumir'),
+  info:     document.getElementById('mc-info'),
+  err:      document.getElementById('mc-error'),
+  kg:       document.getElementById('mc-kg'),
+  nota:     document.getElementById('mc-nota'),
+  cancelar: document.getElementById('mc-cancelar'),
+  confirmar: document.getElementById('mc-confirmar'),
+};
+
+function abrirModalConsumir({ lanaId, lote, proveedor, saldo, coste, onDone, lanaLabelText }) {
+  _mcCtx = { lanaId, lote, proveedor: proveedor || '', saldo, onDone };
+  const label = lanaLabelText || (typeof lanaLabel === 'function' ? lanaLabel(lanaId) : lanaId);
+  const provBadge = proveedor ? ` <span style="font-size:0.75rem; color:#7a7a7a">(${escapeHtml(proveedor)})</span>` : '';
+  $mc.info.innerHTML =
+    `<div><strong>${escapeHtml(label)}</strong> · lote <strong>${escapeHtml(lote)}</strong>${provBadge}</div>` +
+    `<div style="margin-top:0.25rem">Saldo actual: <strong>${fmtKg(saldo)}</strong>` +
+    (coste ? ` (${fmtEur(coste)})` : '') + `</div>`;
+  $mc.err.classList.remove('show');
+  $mc.err.textContent = '';
+  $mc.kg.value = '';
+  $mc.kg.max = saldo;
+  $mc.nota.value = '';
+  $mc.modal.classList.add('open');
+  setTimeout(() => $mc.kg.focus(), 50);
+}
+
+function cerrarModalConsumir() {
+  $mc.modal.classList.remove('open');
+  _mcCtx = null;
+}
+
+$mc.cancelar.addEventListener('click', cerrarModalConsumir);
+$mc.modal.addEventListener('click', (e) => {
+  if (e.target === $mc.modal) cerrarModalConsumir();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $mc.modal.classList.contains('open')) cerrarModalConsumir();
+});
+$mc.kg.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); $mc.confirmar.click(); }
+});
+
+$mc.confirmar.addEventListener('click', async () => {
+  if (!_mcCtx) return;
+  const kg = parseFloat($mc.kg.value);
+  if (!isFinite(kg) || kg <= 0) {
+    $mc.err.textContent = 'Indica una cantidad mayor que 0.';
+    $mc.err.classList.add('show');
+    return;
+  }
+  if (kg > _mcCtx.saldo + 1e-6) {
+    $mc.err.textContent = `Solo hay ${fmtKg(_mcCtx.saldo)} en el lote.`;
+    $mc.err.classList.add('show');
+    return;
+  }
+  $mc.confirmar.disabled = true;
+  try {
+    const url = `/api/materias-primas/lanas/${encodeURIComponent(_mcCtx.lanaId)}/lotes/${encodeURIComponent(_mcCtx.lote)}/consumir`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kg, nota: $mc.nota.value || '', usuario: currentUsuario(), proveedor: _mcCtx.proveedor || '' }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    const cb = _mcCtx.onDone;
+    cerrarModalConsumir();
+    if (cb) cb();
+  } catch (err) {
+    $mc.err.textContent = err.message;
+    $mc.err.classList.add('show');
+  } finally {
+    $mc.confirmar.disabled = false;
+  }
+});
+
+
+// ============================================================
+// Tab "Compras" — inventario operativo (estilo Alberto)
+// ============================================================
+const COMPRAS = {
+  lanas: [],
+  filtroCat: 'all',
+  filtroProv: 'all',
+  filtroEstado: null,   // null | 'pedir' | 'bajo' | 'ok' (click en stats)
+  buscar: '',
+  ordenCampo: 'categoria',  // categoria | proveedor | total_kg | limite_kg | estado | kg_a_pedir | precio_2026
+  ordenDir: 'asc',          // asc | desc
+  vista: 'tabla',           // 'tabla' | 'kanban'
+  seleccion: new Set(),     // ids de variantes seleccionadas para pedido
+  preseleccionado: false,   // marca si ya pre-seleccionamos al primer render
+};
+
+// Orden de estados de mas urgente a menos (para ordenar por estado)
+const ESTADO_RANK = { pedir: 0, 'en-camino': 1, bajo: 2, ok: 3 };
+const ESTADO_LABEL = { pedir: 'pedir', 'en-camino': 'en camino', bajo: 'bajo', ok: 'ok' };
+
+// Slug del proveedor consistente con backend (proveedores.py:_slug):
+// quita acentos, baja a minusculas, sustituye no-alfanum por '-'.
+// Lo usamos para construir el hash #proveedores:<slug> y vincular
+// la tabla de Compras con la ficha del proveedor.
+function slugFromProveedor(s) {
+  return (s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '')
+                   .toLowerCase().trim()
+                   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// Mapa categoria -> abreviado para mostrar
+const CMP_CAT_LBL = {LA65:'65 2/C', LA80:'80 2/C', LA100:'100 2/C',
+                     LA103:'100 3/C', LA140:'140 2/C', LA143:'140 3/C',
+                     OTROS:'OTROS'};
+
+function fmtNum(n, dec=0) {
+  if (n == null || isNaN(n)) return '';
+  // useGrouping: 'always' fuerza el separador incluso con 4 digitos
+  // (por defecto es-ES omite el punto en 2.250 / 1.810 / ...).
+  return Number(n).toLocaleString('es-ES', {
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+    useGrouping: 'always',
+  });
+}
+
+// Helper: formato cantidad con sufijo kg (siempre punto de miles).
+function fmtKgDisp(n) {
+  if (n == null || isNaN(n)) return '—';
+  return fmtNum(n, 0) + ' kg';
+}
+
+function tienePedidoAbierto(it) {
+  // Solo pedidos[] estructurados cuentan. El campo legacy pedido_hecho
+  // queda como dato historico pero ya no afecta al estado (era ambiguo).
+  if (Array.isArray(it.pedidos)) {
+    for (const p of it.pedidos) {
+      if ((p.estado || '').toLowerCase() === 'abierto') return true;
+    }
+  }
+  return false;
+}
+
+function estadoDeFila(it) {
+  if (tienePedidoAbierto(it)) return 'en-camino';
+  const total = Number(it.total_kg) || 0;
+  const limite = Number(it.limite_kg) || 0;
+  if (limite <= 0) return 'ok';
+  if (total <= limite) return 'pedir';
+  if (total <= limite * 1.3) return 'bajo';
+  return 'ok';
+}
+
+async function cargarCompras() {
+  const tb = document.getElementById('cmp-tbody');
+  tb.innerHTML = '<tr><td colspan="11" class="mp-empty">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/lanas-inventario');
+    if (r.status === 403) {
+      tb.innerHTML = '<tr><td colspan="11" class="mp-empty">Tu rol no tiene acceso a esta sección.</td></tr>';
+      return;
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    COMPRAS.lanas = d.lanas || [];
+    pintarComprasStats(d.estadisticas || {});
+    preseleccionarSiHaceFalta();
+    renderCompras();
+    actualizarBarraSeleccion();
+    document.getElementById('tc-compras').textContent = COMPRAS.lanas.length;
+    // Si veniamos con hash #pedido:<id>, __initTabFromHash dejo la
+    // calidad en window.__pendingPedidoCalidad (antes de que activarTabMP
+    // sobrescribiera el hash con #compras).
+    const calidadPendiente = window.__pendingPedidoCalidad;
+    if (calidadPendiente) {
+      delete window.__pendingPedidoCalidad;
+      COMPRAS.seleccion.clear();
+      COMPRAS.lanas.forEach(l => {
+        if (l.calidad_id === calidadPendiente) COMPRAS.seleccion.add(l.id);
+      });
+      if (COMPRAS.seleccion.size) {
+        renderCompras();
+        actualizarBarraSeleccion();
+        abrirModalPedido();
+      }
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="11" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function pintarComprasStats(s) {
+  // Compras tab
+  document.getElementById('cmp-n-pedir').textContent     = s.n_pedir     ?? 0;
+  document.getElementById('cmp-n-en-camino').textContent = s.n_en_camino ?? 0;
+  document.getElementById('cmp-n-bajo').textContent      = s.n_bajo      ?? 0;
+  document.getElementById('cmp-n-ok').textContent        = s.n_ok        ?? 0;
+  document.getElementById('cmp-total-kg').textContent = fmtNum(s.total_kg || 0, 0);
+  // stat "kg total" ya muestra "kg" como small a la derecha; no añadimos sufijo aqui.
+  document.getElementById('cmp-valor').textContent =
+    fmtNum(s.valor_total_eur || 0, 2) + ' €';
+  // Kanban tab (mismos datos, IDs prefijados kbn-)
+  const setKbn = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setKbn('kbn-n-pedir',     s.n_pedir     ?? 0);
+  setKbn('kbn-n-en-camino', s.n_en_camino ?? 0);
+  setKbn('kbn-n-bajo',      s.n_bajo      ?? 0);
+  setKbn('kbn-n-ok',        s.n_ok        ?? 0);
+  setKbn('kbn-total-kg',    fmtNum(s.total_kg || 0, 0));
+  setKbn('kbn-valor',       fmtNum(s.valor_total_eur || 0, 2) + ' €');
+  // Contador del tab top-level (suma de los 4 estados)
+  const tcKan = document.getElementById('tc-kanban');
+  if (tcKan) tcKan.textContent =
+    (s.n_pedir || 0) + (s.n_en_camino || 0) + (s.n_bajo || 0) + (s.n_ok || 0);
+}
+
+function renderCompras() {
+  // Despachador: la "vista" se deriva del tab activo (Compras o Kanban
+  // son ahora dos tabs hermanas que comparten datos y filtros). Asi
+  // todos los handlers de filtros/buscar/orden que llaman a
+  // renderCompras() funcionan en ambas sin reescribir.
+  const tabKanbanActivo = document.querySelector(
+    '.tabs-bar .tab-btn.active')?.dataset.tab === 'kanban';
+  COMPRAS.vista = tabKanbanActivo ? 'kanban' : 'tabla';
+  if (COMPRAS.vista === 'kanban') {
+    renderKanban();
+    return;
+  }
+  const tb = document.getElementById('cmp-tbody');
+  const term = (COMPRAS.buscar || '').toLowerCase().trim();
+
+  // 1) Filtrar
+  let visibles = COMPRAS.lanas.filter(l => {
+    if (COMPRAS.filtroCat !== 'all' && l.categoria !== COMPRAS.filtroCat) {
+      return false;
+    }
+    if (COMPRAS.filtroProv !== 'all') {
+      const prov = (l.proveedor || '').toUpperCase();
+      if (COMPRAS.filtroProv === 'OTROS') {
+        if (['COBO','HTC','FILMURO'].some(x => prov.includes(x))) return false;
+      } else if (!prov.includes(COMPRAS.filtroProv)) {
+        return false;
+      }
+    }
+    if (term && !(l.nombre || '').toLowerCase().includes(term) &&
+                !(l.proveedor || '').toLowerCase().includes(term)) return false;
+    if (COMPRAS.filtroEstado && estadoDeFila(l) !== COMPRAS.filtroEstado) {
+      return false;
+    }
+    return true;
+  });
+
+  // 2) Ordenar segun COMPRAS.ordenCampo / ordenDir
+  const dir = COMPRAS.ordenDir === 'desc' ? -1 : 1;
+  visibles.sort((a, b) => {
+    let va, vb;
+    if (COMPRAS.ordenCampo === 'estado') {
+      va = ESTADO_RANK[estadoDeFila(a)] ?? 99;
+      vb = ESTADO_RANK[estadoDeFila(b)] ?? 99;
+    } else {
+      va = a[COMPRAS.ordenCampo];
+      vb = b[COMPRAS.ordenCampo];
+    }
+    // null/undefined al final
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), 'es') * dir;
+  });
+
+  // 3) Pintar fila TOTAL al pie (suma de las visibles)
+  let totalKg = 0, totalEur = 0;
+  for (const l of visibles) {
+    const t = Number(l.total_kg) || 0;
+    totalKg += t;
+    const p = Number(l.precio_2026) || Number(l.precio_2025) || 0;
+    totalEur += t * p;
+  }
+  document.getElementById('cmp-foot-kg').textContent = fmtKgDisp(totalKg);
+  document.getElementById('cmp-foot-eur').textContent = fmtNum(totalEur, 2) + ' €';
+
+  // 4) Marcar headers ordenables con flecha
+  document.querySelectorAll('.cmp-tabla th.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === COMPRAS.ordenCampo) {
+      th.classList.add(COMPRAS.ordenDir === 'desc' ? 'sort-desc' : 'sort-asc');
+    }
+  });
+
+  if (!visibles.length) {
+    tb.innerHTML = '<tr><td colspan="11" class="mp-empty">Sin resultados con esos filtros.</td></tr>';
+    return;
+  }
+
+  // 5) Si ordenamos por categoria, insertar separadores de grupo
+  const insertarGrupos = (COMPRAS.ordenCampo === 'categoria');
+  let htmlOut = '';
+  let grupoActual = null;
+  for (const l of visibles) {
+    if (insertarGrupos && l.categoria !== grupoActual) {
+      grupoActual = l.categoria;
+      const enGrupo = visibles.filter(x => x.categoria === grupoActual);
+      const sumaGrupo = enGrupo.reduce((s, x) => s + (Number(x.total_kg) || 0), 0);
+      htmlOut += `<tr class="cmp-grupo"><td colspan="11">${escapeHtml(l.seccion || grupoActual)}<small>${enGrupo.length} calidades · ${fmtNum(sumaGrupo, 0)} kg</small></td></tr>`;
+    }
+    htmlOut += pintarFilaCompra(l);
+  }
+  tb.innerHTML = htmlOut;
+  // Sincronizar checkbox maestro con el subconjunto visible
+  if (typeof actualizarBarraSeleccion === 'function') actualizarBarraSeleccion();
+}
+
+function pintarFilaCompra(l) {
+    const estado = estadoDeFila(l);
+    const partidosHtml = (l.partidos || []).map(p =>
+      `<span class="part">${escapeHtml(p.partido || '?')}&nbsp;<strong>${fmtKgDisp(p.kg)}</strong></span>`
+    ).join('') || '<span style="color:#9a9a9a; font-size:0.78rem">—</span>';
+    const provKey = (l.proveedor || '').split('/')[0].trim().toUpperCase();
+    const seleccionada = COMPRAS.seleccion.has(l.id);
+    return `
+      <tr class="fila-${estado}${seleccionada ? ' seleccionada' : ''}" data-id="${escapeHtml(l.id)}">
+        <td class="cmp-check">
+          <input type="checkbox" data-cmp-check ${seleccionada ? 'checked' : ''} />
+        </td>
+        <td class="semaforo"></td>
+        <td class="calidad">
+          <a href="/materia-prima/${encodeURIComponent(l.calidad_id || l.id)}"
+             class="cmp-link-calidad"
+             title="Abrir ficha de la materia prima">${escapeHtml(l.nombre || '')}</a>
+        </td>
+        <td style="text-align:center">
+          <a href="/materias-primas#proveedores:${encodeURIComponent(slugFromProveedor(l.proveedor || ''))}"
+             class="cmp-link-prov"
+             data-prov-slug="${escapeHtml(slugFromProveedor(l.proveedor || ''))}"
+             title="Abrir ficha del proveedor">
+            <span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(l.proveedor || '')}</span>
+          </a>
+        </td>
+        <td class="partidos">${partidosHtml}</td>
+        <td class="num"><strong>${fmtKgDisp(l.total_kg)}</strong></td>
+        <td class="num editable">
+          <input type="number" step="1" min="0" value="${l.limite_kg ?? ''}"
+                 data-campo="limite_kg" />
+        </td>
+        <td class="num">
+          <span class="estado-chip estado-${estado}">${ESTADO_LABEL[estado] || estado}</span>
+        </td>
+        <td class="num editable">
+          <input type="number" step="1" min="0" value="${l.kg_a_pedir ?? ''}"
+                 data-campo="kg_a_pedir" />
+        </td>
+        <td class="num editable">
+          <input type="number" step="0.01" min="0" value="${l.precio_2026 ?? ''}"
+                 data-campo="precio_2026" />
+        </td>
+        <td class="editable obs-edit">
+          <input type="text" maxlength="200" value="${escapeHtml(l.observaciones || '')}"
+                 data-campo="observaciones" placeholder="—" />
+        </td>
+      </tr>
+    `;
+}
+
+// Vista Kanban: agrupa las lanas visibles en 4 columnas por estado.
+// Reaplica los mismos filtros que la tabla (cat, prov, buscar) pero
+// IGNORA el filtro de estado (porque las columnas ya separan por estado).
+function renderKanban() {
+  const term = (COMPRAS.buscar || '').toLowerCase().trim();
+  let visibles = COMPRAS.lanas.filter(l => {
+    if (COMPRAS.filtroCat !== 'all' && l.categoria !== COMPRAS.filtroCat) return false;
+    if (COMPRAS.filtroProv !== 'all') {
+      const prov = (l.proveedor || '').toUpperCase();
+      if (COMPRAS.filtroProv === 'OTROS') {
+        if (['COBO','HTC','FILMURO'].some(x => prov.includes(x))) return false;
+      } else if (!prov.includes(COMPRAS.filtroProv)) {
+        return false;
+      }
+    }
+    if (term && !(l.nombre || '').toLowerCase().includes(term) &&
+                !(l.proveedor || '').toLowerCase().includes(term)) return false;
+    return true;
+  });
+  // 1. Cards "en-camino": SIEMPRE por pedido individual (un pedido =
+  //    una card), porque cada partido puede llegar en fechas distintas
+  //    y se gestionan por separado. No agrupamos por calidad aqui.
+  const cardsEnCamino = [];
+  visibles.forEach(l => {
+    if (estadoDeFila(l) !== 'en-camino') return;
+    const abiertos = (l.pedidos || []).filter(p =>
+      (p.estado || '').toLowerCase() === 'abierto');
+    if (abiertos.length) {
+      abiertos.forEach(p => cardsEnCamino.push({ variante: l, pedido: p }));
+    }
+    const legacy = (typeof l.pedido_hecho === 'string' && l.pedido_hecho.trim())
+      ? l.pedido_hecho.trim() : '';
+    if (!abiertos.length && legacy) {
+      cardsEnCamino.push({ variante: l, legacy });
+    }
+  });
+  document.getElementById('kb-cnt-en-camino').textContent = cardsEnCamino.length;
+  const bodyCam = document.getElementById('kb-body-en-camino');
+  bodyCam.innerHTML = cardsEnCamino.length
+    ? cardsEnCamino.map(kbCardPedido).join('')
+    : '<div class="kb-empty">— sin items —</div>';
+
+  // 1b. Cards "En almacen proveedor": una por PARTIDO con kg_proveedor > 0.
+  //     A diferencia del resto de columnas no agrupamos por calidad
+  //     porque cada partido es un trato distinto (lote unico que el
+  //     proveedor te guarda) y necesitas verlo individual para poder
+  //     "traer" kg de uno concreto.
+  const cardsEnProveedor = [];
+  visibles.forEach(l => {
+    (l.partidos || []).forEach(p => {
+      const kgProv = Number(p.kg_proveedor) || 0;
+      if (kgProv > 0) {
+        cardsEnProveedor.push({ variante: l, partido: p });
+      }
+    });
+  });
+  // Orden: mayor kg en proveedor arriba (mas relevante)
+  cardsEnProveedor.sort((a, b) =>
+    (Number(b.partido.kg_proveedor) || 0) - (Number(a.partido.kg_proveedor) || 0));
+  document.getElementById('kb-cnt-en-proveedor').textContent = cardsEnProveedor.length;
+  const bodyProv = document.getElementById('kb-body-en-proveedor');
+  bodyProv.innerHTML = cardsEnProveedor.length
+    ? cardsEnProveedor.map(kbCardEnProveedor).join('')
+    : '<div class="kb-empty">— sin items —</div>';
+
+  // 2. Resto de columnas: AGRUPAR por calidad_id (varias variantes con
+  //    la misma calidad → una sola card que las suma y muestra todos
+  //    los proveedores). Las variantes que estan "en-camino" (pedido
+  //    abierto) ya salen arriba — no las contamos aqui para la card de
+  //    calidad porque ese stock fisico podria estar bajo igualmente.
+  //    PERO si TODAS las variantes de la calidad estan en-camino, no
+  //    aparece card aqui (solo en la columna en-camino).
+  const porCalidad = {};
+  visibles.forEach(l => {
+    const cid = l.calidad_id || l.id;
+    (porCalidad[cid] = porCalidad[cid] || []).push(l);
+  });
+  const cols = { pedir: [], bajo: [], ok: [], sin: [] };
+  Object.entries(porCalidad).forEach(([cid, variantes]) => {
+    // Si todas las variantes de esta calidad estan en-camino, su card
+    // unica ya se ve en la columna en-camino — no la duplicamos.
+    const sinPedido = variantes.filter(v => estadoDeFila(v) !== 'en-camino');
+    if (!sinPedido.length) return;
+    const cal = agregarCalidad(sinPedido);
+    cols[cal.estado].push(cal);
+  });
+  for (const estado of ['pedir', 'bajo', 'ok', 'sin']) {
+    document.getElementById('kb-cnt-' + estado).textContent = cols[estado].length;
+    const body = document.getElementById('kb-body-' + estado);
+    body.innerHTML = cols[estado].length
+      ? cols[estado].map(kbCardCalidad).join('')
+      : '<div class="kb-empty">— sin items —</div>';
+  }
+}
+
+// Agrega varias variantes (misma calidad) en un objeto unificado para
+// pintar una unica card Kanban. Suma stock/limite/kg_a_pedir y junta
+// partidos y proveedores.
+function agregarCalidad(variantes) {
+  const ref = variantes[0];
+  const total_kg     = variantes.reduce((s, v) => s + (Number(v.total_kg)    || 0), 0);
+  const limite_kg    = variantes.reduce((s, v) => s + (Number(v.limite_kg)   || 0), 0);
+  const kg_a_pedir   = variantes.reduce((s, v) => s + (Number(v.kg_a_pedir)  || 0), 0);
+  // Estado: peor de los estados de cada variante (pedir > bajo > ok > sin)
+  const orden = { pedir: 0, bajo: 1, ok: 2, sin: 3 };
+  let estadoAg = 'ok';
+  let peor = 99;
+  for (const v of variantes) {
+    let e = estadoDeFila(v);
+    if (e === 'en-camino') continue;
+    if ((Number(v.limite_kg) || 0) <= 0) e = 'sin';
+    if (orden[e] < peor) { peor = orden[e]; estadoAg = e; }
+  }
+  if (limite_kg <= 0) estadoAg = 'sin';
+  // Partidos: union, cada uno anotado con su proveedor (solo activos)
+  const partidos = [];
+  variantes.forEach(v => {
+    (v.partidos || []).forEach(p => {
+      if ((Number(p.kg) || 0) > 0) {
+        partidos.push({
+          partido:   p.partido,
+          kg:        p.kg,
+          proveedor: v.proveedor || '',
+          variante_id: v.id,
+        });
+      }
+    });
+  });
+  // Precios: rango (min - max) si hay varios distintos
+  const precios = variantes.map(v => Number(v.precio_2026) || Number(v.precio_2025) || 0)
+                           .filter(p => p > 0);
+  return {
+    calidad_id: ref.calidad_id || ref.id,
+    titulo:     ref.titulo || '',
+    tipo:       ref.tipo || '',
+    nombre:     (ref.titulo + ' ' + ref.tipo).trim().toUpperCase() ||
+                ref.nombre || ref.id,
+    categoria:  ref.categoria,
+    variantes,
+    proveedores: variantes.map(v => v.proveedor).filter(Boolean),
+    total_kg, limite_kg, kg_a_pedir,
+    estado: estadoAg,
+    partidos,
+    precio_min: precios.length ? Math.min(...precios) : null,
+    precio_max: precios.length ? Math.max(...precios) : null,
+    observaciones: variantes.map(v => v.observaciones).filter(Boolean).join(' · '),
+  };
+}
+
+// Card AGRUPADA por calidad (lo que ve el usuario en "a pedir", "bajo",
+// "ok", "sin minimo"). Suma stock y junta partidos de todas las variantes
+// (proveedores). Cada pill de partido lleva el proveedor anotado.
+// Click en "+ Hacer pedido" pre-selecciona TODAS las variantes de la
+// calidad para que en el modal puedas mandar a uno o varios proveedores.
+function kbCardCalidad(c) {
+  const total  = c.total_kg;
+  const limite = c.limite_kg;
+  const pct = limite > 0 ? Math.min(100, Math.round(total / limite * 100)) : 0;
+  const cat = CMP_CAT_LBL[c.categoria] || c.categoria || '';
+  const partsHtml = c.partidos.length
+    ? c.partidos.map(p => {
+        const pk = (p.proveedor || '').split('/')[0].trim().toUpperCase();
+        return `<span class="kb-part"
+                       data-vid="${escapeHtml(p.variante_id)}"
+                       data-partido="${escapeHtml(p.partido || '')}"
+                       title="Click para editar / borrar">
+                  Partido ${escapeHtml(p.partido || '?')} <strong>${fmtKgDisp(p.kg)}</strong>
+                  ${p.proveedor ? `<span class="prov-pill prov-${escapeHtml(pk)}" style="margin-left:0.25rem; padding:0 0.3rem; font-size:0.6rem">${escapeHtml(p.proveedor)}</span>` : ''}
+                </span>`;
+      }).join('')
+    : '<span style="color:#9a9a9a; font-size:0.72rem">— sin partidos activos —</span>';
+  // Pills de proveedores (todos los activos de la calidad)
+  const provHtml = c.proveedores.map(p => {
+    const k = p.split('/')[0].trim().toUpperCase();
+    return `<span class="prov-pill prov-${escapeHtml(k)}">${escapeHtml(p)}</span>`;
+  }).join(' ');
+  // Precio: rango si hay variedad
+  let precioHtml = '—';
+  if (c.precio_min != null) {
+    precioHtml = c.precio_min === c.precio_max
+      ? `${fmtNum(c.precio_min, 2)} €/kg`
+      : `${fmtNum(c.precio_min, 2)} – ${fmtNum(c.precio_max, 2)} €/kg`;
+  }
+  const pedirBtn = c.estado === 'pedir'
+    ? `<button class="kb-card-pedir" data-kb-pedir-calidad
+               data-cid="${escapeHtml(c.calidad_id)}">+ Hacer pedido</button>`
+    : '';
+  // Link a la ficha — toda la card es clicable salvo botones/inputs/pills internas
+  return `<div class="kb-card kb-card-calidad" data-cid="${escapeHtml(c.calidad_id)}">
+    <div class="kb-card-hdr">
+      <div class="kb-card-name">${escapeHtml(c.nombre)}</div>
+      <span class="kb-card-cat">${escapeHtml(cat)}</span>
+    </div>
+    <div class="kb-card-prov">${provHtml}</div>
+    <div class="kb-card-stock">
+      <span class="kb-card-kg">${fmtKgDisp(total)}</span>
+      ${limite > 0 ? `<span class="kb-card-min">mín ${fmtKgDisp(limite)}</span>` : ''}
+    </div>
+    ${limite > 0 ? `<div class="kb-progress"><div class="kb-progress-bar bar-${c.estado}" style="width:${pct}%"></div></div>` : ''}
+    <div class="kb-card-parts">${partsHtml}</div>
+    <div class="kb-card-foot">
+      <span class="kb-card-precio">${precioHtml}</span>
+      ${c.observaciones ? `<span class="kb-card-obs" title="${escapeHtml(c.observaciones)}">${escapeHtml(c.observaciones)}</span>` : ''}
+    </div>
+    ${pedirBtn}
+  </div>`;
+}
+
+// Card por VARIANTE (legacy, ya no se usa en el render principal pero
+// la dejamos definida por si alguien la llama en el futuro).
+function kbCard(l) {
+  const total  = Number(l.total_kg)  || 0;
+  const limite = Number(l.limite_kg) || 0;
+  const pct = limite > 0 ? Math.min(100, Math.round(total / limite * 100)) : 0;
+  let estado = estadoDeFila(l);
+  if (limite <= 0) estado = 'sin';
+  const provKey = (l.proveedor || '').split('/')[0].trim().toUpperCase();
+  const partsHtml = (l.partidos || []).map(p =>
+    `<span class="kb-part"
+           data-vid="${escapeHtml(l.id)}"
+           data-partido="${escapeHtml(p.partido || '')}"
+           title="Click para editar / borrar">Partido ${escapeHtml(p.partido || '?')} <strong>${fmtKgDisp(p.kg)}</strong></span>`
+  ).join('');
+  const cat = CMP_CAT_LBL[l.categoria] || l.categoria;
+  const precio = l.precio_2026 ?? l.precio_2025;
+  // CTA "Hacer pedido" solo en cards de estado "pedir" (urgentes).
+  // Atajo: abre el modal con esta variante pre-seleccionada y nada mas.
+  const pedirBtn = estado === 'pedir'
+    ? `<button class="kb-card-pedir" data-kb-pedir data-vid="${escapeHtml(l.id)}">+ Hacer pedido</button>`
+    : '';
+
+  return `<div class="kb-card" data-id="${escapeHtml(l.id)}">
+    <div class="kb-card-hdr">
+      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <span class="kb-card-cat">${escapeHtml(cat)}</span>
+    </div>
+    <div class="kb-card-prov"><span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(l.proveedor || '—')}</span></div>
+    <div class="kb-card-stock">
+      <span class="kb-card-kg">${fmtKgDisp(total)}</span>
+      ${limite > 0 ? `<span class="kb-card-min">mín ${fmtKgDisp(limite)}</span>` : ''}
+    </div>
+    ${limite > 0 ? `<div class="kb-progress"><div class="kb-progress-bar bar-${estado}" style="width:${pct}%"></div></div>` : ''}
+    ${partsHtml ? `<div class="kb-card-parts">${partsHtml}</div>` : ''}
+    <div class="kb-card-foot">
+      <span class="kb-card-precio">${precio != null ? fmtNum(precio, 2) + ' €/kg' : '—'}</span>
+      ${l.observaciones ? `<span class="kb-card-obs" title="${escapeHtml(l.observaciones)}">${escapeHtml(l.observaciones)}</span>` : ''}
+    </div>
+    ${pedirBtn}
+  </div>`;
+}
+
+// Card de un PEDIDO en camino (no de la variante completa).
+// Si el item.legacy esta presente, es una nota antigua sin estructura
+// (no tiene ref, kg ni ETA).
+function kbCardPedido({ variante: l, pedido, legacy }) {
+  const provKey = (l.proveedor || '').split('/')[0].trim().toUpperCase();
+  const cat = CMP_CAT_LBL[l.categoria] || l.categoria;
+  const isLegacy = !!legacy;
+  const ref = pedido?.ref || '';
+  const kg  = pedido?.kg;
+  const eurKg = pedido?.eur_kg;
+  const eta = pedido?.fecha_estimada_llegada || '';
+
+  // Bloque kg + ETA
+  let kgBlock;
+  if (isLegacy) {
+    kgBlock = `<div class="kb-card-pedido-legacy">Nota: ${escapeHtml(legacy)}</div>`;
+  } else {
+    kgBlock = `
+      <div class="kb-card-stock">
+        <span class="kb-card-kg">${fmtKgDisp(kg)}</span>
+        ${eurKg != null ? `<span class="kb-card-min">@ ${fmtNum(eurKg, 2)} €/kg</span>` : ''}
+      </div>`;
+  }
+
+  // ETA + Partido editables (solo para pedidos formales)
+  const partidoVal = pedido?.partido_previsto || '';
+  const etaBlock = isLegacy ? '' : `
+    <div class="kb-card-eta">
+      <label>ETA</label>
+      <input type="date" class="kb-eta-input"
+             data-eta-vid="${escapeHtml(l.id)}"
+             data-eta-ref="${escapeHtml(ref)}"
+             value="${escapeHtml(eta)}" />
+    </div>
+    <div class="kb-card-eta">
+      <label>Partido</label>
+      <input type="text" class="kb-partido-input"
+             data-partido-vid="${escapeHtml(l.id)}"
+             data-partido-ref="${escapeHtml(ref)}"
+             value="${escapeHtml(partidoVal)}"
+             placeholder="Sin confirmar"
+             maxlength="40" />
+    </div>`;
+
+  // Boton recibido — pasa ref especifica si es pedido formal,
+  // "*" si es legacy (cierra el pedido_hecho).
+  const refAttr = isLegacy ? '*' : escapeHtml(ref);
+
+  return `<div class="kb-card kb-card-pedido${isLegacy ? ' kb-card-legacy' : ''}"
+              data-id="${escapeHtml(l.id)}" data-ref="${refAttr}">
+    <div class="kb-card-hdr">
+      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <span class="kb-card-cat">${escapeHtml(cat)}</span>
+    </div>
+    <div class="kb-card-prov">
+      <span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(l.proveedor || '—')}</span>
+      ${ref ? `<span class="kb-card-pedido-ref" style="margin-left:0.35rem">${escapeHtml(ref)}</span>` : ''}
+    </div>
+    ${kgBlock}
+    ${etaBlock}
+    <button class="kb-card-recibido" data-kb-recibido
+            data-vid="${escapeHtml(l.id)}"
+            data-ref="${refAttr}"
+            data-kg="${kg != null ? kg : ''}">
+      ✓ Marcar recibido
+    </button>
+    <button class="kb-card-anular" data-kb-anular
+            data-vid="${escapeHtml(l.id)}"
+            data-ref="${refAttr}">
+      Anular pedido
+    </button>
+    ${kbStockActualBlock(l)}
+  </div>`;
+}
+
+// Bloque "Ya en almacen": muestra los partidos físicos con kg>0 de la
+// misma variante. Pensado para dar contexto al operario en una card de
+// pedido en camino — saber qué le queda hasta que llegue lo nuevo.
+function kbStockActualBlock(l) {
+  const activos = (l.partidos || []).filter(p => (Number(p.kg) || 0) > 0);
+  const totalActual = activos.reduce((s, p) => s + (Number(p.kg) || 0), 0);
+  if (!activos.length) {
+    return `
+      <div class="kb-card-stock-actual">
+        <div class="kb-card-stock-actual-lbl">Ya en almacén</div>
+        <div class="kb-card-stock-actual-empty">— ningún partido activo —</div>
+      </div>`;
+  }
+  const pills = activos.map(p =>
+    `<span class="kb-part"
+           data-vid="${escapeHtml(l.id)}"
+           data-partido="${escapeHtml(p.partido || '')}"
+           title="Click para editar partido">Partido ${escapeHtml(p.partido || '?')} <strong>${fmtKgDisp(p.kg)}</strong></span>`
+  ).join('');
+  return `
+    <div class="kb-card-stock-actual">
+      <div class="kb-card-stock-actual-lbl">Ya en almacén <small>· ${fmtKgDisp(totalActual)} en ${activos.length} partido${activos.length === 1 ? '' : 's'}</small></div>
+      <div class="kb-card-stock-actual-list">${pills}</div>
+    </div>`;
+}
+
+// Card "En almacen proveedor": un card por PARTIDO con kg_proveedor>0.
+// El proveedor te lo guarda ya hilado y lo "vas trayendo" cuando lo
+// necesitas. Muestra kg en proveedor (grande) + kg en almacen Rols
+// (pequeno) + boton "Traer kg" para mover de proveedor a Rols.
+function kbCardEnProveedor({ variante: l, partido: p }) {
+  const provKey = (l.proveedor || '').split('/')[0].trim().toUpperCase();
+  const cat = CMP_CAT_LBL[l.categoria] || l.categoria || '';
+  const kgProv = Number(p.kg_proveedor) || 0;
+  const kgRols = Number(p.kg) || 0;
+  // data-cid → la card es clicable y navega a la ficha de la calidad
+  // (mismo patron que kb-card-calidad). El click en el boton "Traer"
+  // o la pill del proveedor NO dispara navegacion (handler filtra
+  // por button/input/a/pill).
+  return `<div class="kb-card kb-card-en-proveedor"
+              data-vid="${escapeHtml(l.id)}"
+              data-cid="${escapeHtml(l.calidad_id || l.id)}"
+              data-partido="${escapeHtml(p.partido || '')}"
+              style="cursor:pointer"
+              title="Abrir ficha de la materia prima">
+    <div class="kb-card-hdr">
+      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <span class="kb-card-cat">${escapeHtml(cat)}</span>
+    </div>
+    <div class="kb-card-prov">
+      <span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(l.proveedor || '—')}</span>
+    </div>
+    <div class="kb-prov-lote">Partido <strong>${escapeHtml(p.partido || '?')}</strong></div>
+    <div class="kb-card-stock">
+      <span class="kb-card-kg">${fmtKgDisp(kgProv)}</span>
+      <span class="kb-card-min">en proveedor</span>
+    </div>
+    ${kgRols > 0
+      ? `<div class="kb-prov-kg-rols">+ <strong>${fmtKgDisp(kgRols)}</strong> ya en tu almacén de este partido</div>`
+      : `<div class="kb-prov-kg-rols">— Nada todavía en tu almacén de este partido —</div>`}
+    <button class="kb-card-traer" data-kb-traer
+            data-vid="${escapeHtml(l.id)}"
+            data-partido="${escapeHtml(p.partido || '')}"
+            data-max="${kgProv}">
+      Traer kg al almacén →
+    </button>
+  </div>`;
+}
+
+// Click delegado en el board Kanban — boton "Hacer pedido" (cards de
+// estado "pedir"). Dos modalidades:
+//   - data-kb-pedir-calidad: card agrupada por calidad → pre-selecciona
+//     TODAS las variantes de esa calidad (multi-proveedor).
+//   - data-kb-pedir: card por variante (legacy) → pre-selecciona solo
+//     esa variante.
+document.querySelector('.kb-board')?.addEventListener('click', (e) => {
+  const btnCal = e.target.closest('[data-kb-pedir-calidad]');
+  if (btnCal) {
+    const cid = btnCal.dataset.cid;
+    COMPRAS.seleccion.clear();
+    COMPRAS.lanas.forEach(l => {
+      if (l.calidad_id === cid) COMPRAS.seleccion.add(l.id);
+    });
+    abrirModalPedido();
+    return;
+  }
+  const btn = e.target.closest('[data-kb-pedir]');
+  if (btn) {
+    const vid = btn.dataset.vid;
+    COMPRAS.seleccion.clear();
+    COMPRAS.seleccion.add(vid);
+    abrirModalPedido();
+  }
+});
+
+// Click en cualquier parte de una card clicable (calidad agrupada o
+// card de "En almacén proveedor") navega a la ficha de la calidad.
+// Excluye clicks en elementos interactivos internos (botón "Traer",
+// pill de proveedor, etc.) para que esos sigan funcionando solos.
+document.querySelector('.kb-board')?.addEventListener('click', (e) => {
+  const card = e.target.closest('.kb-card-calidad, .kb-card-en-proveedor');
+  if (!card) return;
+  const interactivo = e.target.closest('button, input, a, .kb-part, .prov-pill');
+  if (interactivo) return;
+  const cid = card.dataset.cid;
+  if (cid) window.location.href = '/materia-prima/' + encodeURIComponent(cid);
+});
+
+// Click delegado en cualquier pill de partido (todas las columnas del
+// Kanban). Abre el modal compartido static/modal-partido.js
+document.querySelector('.kb-board')?.addEventListener('click', (e) => {
+  const pill = e.target.closest('.kb-part');
+  if (!pill) return;
+  const vid = pill.dataset.vid;
+  const partidoRef = pill.dataset.partido;
+  if (!vid || !partidoRef) return;
+  const lana = COMPRAS.lanas.find(x => x.id === vid);
+  if (!lana) return;
+  const partido = (lana.partidos || []).find(p => p.partido === partidoRef);
+  if (!partido) return;
+  abrirModalPartido({
+    vid,
+    calidad_id: lana.calidad_id,
+    proveedor:  lana.proveedor || '',
+    partido,
+    lanaLabel:  lana.nombre || lana.id,
+    usuario:    currentUsuario(),
+    onSaved:    () => cargarCompras(),
+    onDeleted:  () => cargarCompras(),
+  });
+});
+
+// mostrarConfirmacion / mostrarPrompt / mostrarAlerta vienen de
+// static/ui-modales.js (cargado en el <head>).
+
+// Click delegado en el board Kanban: botón "Marcar recibido".
+// Usa la ref especifica de la card (no cierra todos los pedidos de la
+// variante salvo que sea la nota legacy, en cuyo caso ref="*").
+//
+// Para pedidos formales: abrimos modal con opciones de destino (todo
+// a Rols / parte queda en proveedor). Para el caso legacy ref="*"
+// usamos el confirmacion simple (no hay kg que splittear).
+document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-kb-recibido]');
+  if (!btn) return;
+  const vid = btn.dataset.vid;
+  const ref = btn.dataset.ref || '*';
+  const kgTotal = parseFloat(btn.dataset.kg) || 0;
+  let kgARols = null;  // null = todo a Rols (comportamiento default)
+  if (ref === '*') {
+    const { ok } = await mostrarConfirmacion({
+      titulo:   'Marcar mercancía recibida',
+      mensaje:  'Se cerrará el aviso de pedido. La calidad volverá a su estado natural según el stock.',
+      textoConfirmar: '✓ Marcar recibido',
+    });
+    if (!ok) return;
+  } else {
+    const r = await mostrarModalRecibido({ ref, kgTotal });
+    if (!r.ok) return;
+    kgARols = r.kg_a_rols;  // null o number
+  }
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/compras/pedido/${encodeURIComponent(ref)}/recibido`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        variante_id: vid,
+        ...(kgARols != null ? { kg_a_rols: kgARols } : {}),
+      }),
+    });
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(
+        `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
+      );
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    await cargarCompras();
+  } catch (err) {
+    mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+    btn.disabled = false;
+  }
+});
+
+// Click delegado en el board Kanban: botón "Anular pedido".
+// Pone el pedido en estado 'anulado' (queda en historico) y la variante
+// vuelve a su estado natural segun stock.
+document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-kb-anular]');
+  if (!btn) return;
+  const vid = btn.dataset.vid;
+  const ref = btn.dataset.ref || '*';
+  const {ok, motivo} = await mostrarConfirmacion({
+    titulo: 'Anular pedido',
+    mensaje: ref === '*'
+      ? 'Se anula este aviso de pedido. La calidad volverá a su estado natural según el stock.'
+      : `Se anula el pedido ${ref}. La calidad volverá a su estado natural según el stock.`,
+    conMotivo: true,
+    textoConfirmar: 'Anular pedido',
+    tipo: 'danger',
+  });
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/compras/pedido/${encodeURIComponent(ref)}/anular`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({variante_id: vid, motivo}),
+    });
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(
+        `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
+      );
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    await cargarCompras();
+  } catch (err) {
+    mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+    btn.disabled = false;
+  }
+});
+
+// Click delegado en el board Kanban: boton "Traer kg al almacen" en
+// las cards de la columna "En proveedor". Abre un prompt pidiendo los
+// kg a traer, luego POST al endpoint /trasladar con direccion=a-rols.
+document.querySelector('.kb-board')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-kb-traer]');
+  if (!btn) return;
+  const vid = btn.dataset.vid;
+  const partido = btn.dataset.partido;
+  const max = parseFloat(btn.dataset.max) || 0;
+  // Busca la variante en COMPRAS para sacar nombre/calidad para el titulo
+  const lana = COMPRAS.lanas.find(l => l.id === vid);
+  if (!lana) return;
+  const calidadId = lana.calidad_id || vid;
+  const { ok, valor } = await mostrarPrompt({
+    titulo: `Traer kg del almacén proveedor`,
+    mensaje: `Lote ${partido} — el proveedor te guarda ${fmtKgDisp(max)}. ` +
+             `¿Cuántos kg traes a tu almacén?`,
+    etiqueta: 'kg a traer',
+    placeholder: `máximo ${max}`,
+    tipoInput: 'number',
+    valorDefecto: String(max),
+    textoConfirmar: 'Traer al almacén →',
+    validador: (v) => {
+      const n = parseFloat(v);
+      if (isNaN(n) || n <= 0) return 'Introduce una cantidad mayor que 0';
+      if (n > max + 1e-6) return `Máximo disponible: ${max} kg`;
+      return null;
+    },
+  });
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch(
+      `/api/materias-primas/lanas/${encodeURIComponent(calidadId)}/lotes/${encodeURIComponent(partido)}/trasladar`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          kg: parseFloat(valor),
+          direccion: 'a-rols',
+          proveedor: lana.proveedor || '',
+        }),
+      }
+    );
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(
+        `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
+      );
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    await cargarCompras();
+  } catch (err) {
+    mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+    btn.disabled = false;
+  }
+});
+
+// Edicion inline de campos de pedido (ETA, partido previsto).
+// Cada input declara el campo + ref + vid en data attrs; este handler
+// los manda al endpoint generico /api/compras/pedido/<ref>/campo.
+async function _guardarCampoPedidoInline(inp, campo, vid, ref) {
+  if (!vid || !ref) return;
+  inp.classList.remove('saved-ok');
+  inp.classList.add('saving');
+  try {
+    const r = await fetch(`/api/compras/pedido/${encodeURIComponent(ref)}/campo`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({variante_id: vid, campo, valor: inp.value || null}),
+    });
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(
+        `El servidor no reconoce este endpoint (HTTP ${r.status}). ` +
+        `Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.`
+      );
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    // Actualizar el modelo local sin recargar entero
+    const lana = COMPRAS.lanas.find(l => l.id === vid);
+    if (lana) {
+      const pedido = (lana.pedidos || []).find(p => p.ref === ref);
+      if (pedido) pedido[campo] = inp.value || null;
+    }
+    inp.classList.remove('saving');
+    inp.classList.add('saved-ok');
+    setTimeout(() => inp.classList.remove('saved-ok'), 700);
+  } catch (err) {
+    inp.classList.remove('saving');
+    mostrarAlerta({titulo: 'Error guardando ' + campo, mensaje: err.message, tipo: 'danger'});
+  }
+}
+
+document.querySelector('.kb-board')?.addEventListener('change', (e) => {
+  const eta = e.target.closest('input.kb-eta-input');
+  if (eta) {
+    _guardarCampoPedidoInline(eta, 'fecha_estimada_llegada',
+                              eta.dataset.etaVid, eta.dataset.etaRef);
+    return;
+  }
+  const part = e.target.closest('input.kb-partido-input');
+  if (part) {
+    _guardarCampoPedidoInline(part, 'partido_previsto',
+                              part.dataset.partidoVid, part.dataset.partidoRef);
+    return;
+  }
+});
+
+// Sincroniza la UI de filtros entre las dos tabs (Compras + Kanban).
+// Ambas escriben en COMPRAS.* y leen los mismos datos; lo unico que
+// hay que sincronizar es el aspecto visual (pill activo, input value,
+// stats activos) para que al cambiar de tab no parezca que se pierde
+// el filtro. Idempotente — seguro llamarla muchas veces.
+function sincronizarFiltrosCompras() {
+  const setActivePill = (sel, datasetKey, valor) => {
+    document.querySelectorAll(`${sel} .cmp-pill`).forEach(b =>
+      b.classList.toggle('active', b.dataset[datasetKey] === valor));
+  };
+  setActivePill('#cmp-cats',  'cat',  COMPRAS.filtroCat);
+  setActivePill('#kbn-cats',  'cat',  COMPRAS.filtroCat);
+  setActivePill('#cmp-provs', 'prov', COMPRAS.filtroProv);
+  setActivePill('#kbn-provs', 'prov', COMPRAS.filtroProv);
+  const inpCmp = document.getElementById('cmp-buscar');
+  const inpKbn = document.getElementById('kbn-buscar');
+  if (inpCmp && inpCmp.value !== COMPRAS.buscar) inpCmp.value = COMPRAS.buscar;
+  if (inpKbn && inpKbn.value !== COMPRAS.buscar) inpKbn.value = COMPRAS.buscar;
+  // Stats: marcar activo el del filtroEstado (en ambos sets)
+  ['#cmp-stats', '#kbn-stats'].forEach(sel => {
+    document.querySelectorAll(`${sel} .cmp-stat[data-estado]`).forEach(b =>
+      b.classList.toggle('active', b.dataset.estado === COMPRAS.filtroEstado));
+  });
+}
+
+// Handler unificado de pill click — recibe el set ('cats' o 'provs')
+// y aplica el cambio a COMPRAS.*, sincroniza UI y vuelve a renderizar.
+function _onPillClick(grupo, btn) {
+  if (grupo === 'cats') COMPRAS.filtroCat = btn.dataset.cat;
+  else                  COMPRAS.filtroProv = btn.dataset.prov;
+  sincronizarFiltrosCompras();
+  renderCompras();
+}
+
+['cmp-cats', 'kbn-cats'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.cmp-pill');
+    if (btn) _onPillClick('cats', btn);
+  });
+});
+['cmp-provs', 'kbn-provs'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.cmp-pill');
+    if (btn) _onPillClick('provs', btn);
+  });
+});
+['cmp-buscar', 'kbn-buscar'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', (e) => {
+    COMPRAS.buscar = e.target.value;
+    sincronizarFiltrosCompras();
+    renderCompras();
+  });
+});
+
+// Stats clickables como filtro de estado (reemplaza el checkbox).
+// Click en un stat activo lo desactiva (toggle). Compartido entre las
+// dos tabs (cmp-stats y kbn-stats) — comparten estado COMPRAS.filtroEstado.
+function _onStatClick(e) {
+  const btn = e.target.closest('.cmp-stat[data-estado]');
+  if (!btn) return;
+  const estado = btn.dataset.estado;
+  if (COMPRAS.filtroEstado === estado) COMPRAS.filtroEstado = null;
+  else                                 COMPRAS.filtroEstado = estado;
+  sincronizarFiltrosCompras();
+  renderCompras();
+}
+document.getElementById('cmp-stats').addEventListener('click', _onStatClick);
+document.getElementById('kbn-stats')?.addEventListener('click', _onStatClick);
+
+// Ordenar al hacer click en headers.
+document.querySelector('.cmp-tabla thead').addEventListener('click', (e) => {
+  const th = e.target.closest('th.sortable');
+  if (!th) return;
+  const campo = th.dataset.sort;
+  if (COMPRAS.ordenCampo === campo) {
+    COMPRAS.ordenDir = COMPRAS.ordenDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    COMPRAS.ordenCampo = campo;
+    COMPRAS.ordenDir = 'asc';
+  }
+  renderCompras();
+});
+
+// Click en pill de proveedor → activar tab Proveedores sin recargar.
+// El link tiene href="#proveedores:<slug>" pero como ya estamos en
+// /materias-primas el navegador solo cambia el hash. Interceptamos y
+// llamamos al hook que ya tenemos para abrir la ficha del proveedor.
+document.getElementById('cmp-tbody').addEventListener('click', (e) => {
+  const a = e.target.closest('a.cmp-link-prov');
+  if (!a) return;
+  e.preventDefault();
+  const slug = a.dataset.provSlug;
+  if (!slug) return;
+  window.__pendingProveedorAbrir = slug;
+  activarTabMP('proveedores');
+});
+
+// Edicion inline: al salir del input (blur) guardamos al server.
+document.getElementById('cmp-tbody').addEventListener('change', async (e) => {
+  const inp = e.target.closest('input[data-campo]');
+  if (!inp) return;
+  const tr = inp.closest('tr');
+  const lid = tr.dataset.id;
+  const campo = inp.dataset.campo;
+  const valor = inp.value;
+  inp.disabled = true;
+  inp.classList.remove('saved-ok', 'saved-err');
+  inp.classList.add('saving');
+  try {
+    const r = await fetch(`/api/lanas-inventario/${encodeURIComponent(lid)}/campo`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({campo, valor}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    // Feedback visual de exito (verde, 500ms)
+    inp.classList.remove('saving');
+    inp.classList.add('saved-ok');
+    setTimeout(() => inp.classList.remove('saved-ok'), 600);
+    // Actualizar el modelo local + re-pintar stats (estado puede cambiar)
+    const idx = COMPRAS.lanas.findIndex(x => x.id === lid);
+    if (idx >= 0) COMPRAS.lanas[idx] = d.lana;
+    if (d.estadisticas) pintarComprasStats(d.estadisticas);
+    // Re-aplicar la clase fila-* segun el nuevo estado
+    const nuevoEstado = estadoDeFila(d.lana);
+    tr.classList.remove('fila-pedir', 'fila-en-camino', 'fila-bajo', 'fila-ok');
+    tr.classList.add('fila-' + nuevoEstado);
+    // Update chip
+    const chip = tr.querySelector('.estado-chip');
+    if (chip) {
+      chip.className = 'estado-chip estado-' + nuevoEstado;
+      chip.textContent = nuevoEstado;
+    }
+  } catch (err) {
+    inp.classList.remove('saving');
+    inp.classList.add('saved-err');
+    setTimeout(() => inp.classList.remove('saved-err'), 1500);
+    console.error('Error guardando:', err);
+    // Mensaje no bloqueante en consola; alert si quieres puedes descomentar:
+    // alert('Error guardando: ' + err.message);
+  } finally {
+    inp.disabled = false;
+  }
+});
+
+// ============================================================
+// Tab "Compras" — seleccion + generar pedido
+// ============================================================
+
+function actualizarBarraSeleccion() {
+  const ids = [...COMPRAS.seleccion];
+  const lanas = COMPRAS.lanas.filter(l => ids.includes(l.id));
+  const kg = lanas.reduce((s, l) => s + (Number(l.kg_a_pedir) || 0), 0);
+  const provs = new Set(lanas.map(l => (l.proveedor || '').split('/')[0].trim().toUpperCase()).filter(Boolean));
+  document.getElementById('cmp-sel-count').textContent = ids.length;
+  document.getElementById('cmp-sel-kg').textContent = fmtKgDisp(kg);
+  document.getElementById('cmp-sel-provs').textContent = provs.size ? [...provs].join(', ') : '—';
+  document.getElementById('btn-generar-pedido').disabled = ids.length === 0;
+  // Sincronizar checkbox maestro: marcado si TODAS las visibles estan seleccionadas
+  const masterEl = document.getElementById('cmp-check-master');
+  if (masterEl) {
+    const visibles = document.querySelectorAll('#cmp-tbody tr[data-id]');
+    const visiblesIds = [...visibles].map(tr => tr.dataset.id);
+    const todasMarcadas = visiblesIds.length > 0 && visiblesIds.every(id => COMPRAS.seleccion.has(id));
+    masterEl.checked = todasMarcadas;
+    masterEl.indeterminate = !todasMarcadas && visiblesIds.some(id => COMPRAS.seleccion.has(id));
+  }
+}
+
+// Pre-seleccion automatica al primer render: marca todas las "a pedir".
+function preseleccionarSiHaceFalta() {
+  if (COMPRAS.preseleccionado) return;
+  COMPRAS.preseleccionado = true;
+  COMPRAS.lanas.forEach(l => {
+    if (estadoDeFila(l) === 'pedir') COMPRAS.seleccion.add(l.id);
+  });
+}
+
+// Toggle checkbox individual
+document.getElementById('cmp-tbody').addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-cmp-check]');
+  if (!cb) return;
+  const tr = cb.closest('tr');
+  const id = tr.dataset.id;
+  if (cb.checked) {
+    COMPRAS.seleccion.add(id);
+    tr.classList.add('seleccionada');
+  } else {
+    COMPRAS.seleccion.delete(id);
+    tr.classList.remove('seleccionada');
+  }
+  actualizarBarraSeleccion();
+});
+
+// Checkbox maestro: marca/desmarca todas las visibles
+document.getElementById('cmp-check-master').addEventListener('change', (e) => {
+  const marcar = e.target.checked;
+  document.querySelectorAll('#cmp-tbody tr[data-id]').forEach(tr => {
+    const id = tr.dataset.id;
+    const cb = tr.querySelector('input[data-cmp-check]');
+    if (marcar) { COMPRAS.seleccion.add(id); tr.classList.add('seleccionada'); }
+    else        { COMPRAS.seleccion.delete(id); tr.classList.remove('seleccionada'); }
+    if (cb) cb.checked = marcar;
+  });
+  actualizarBarraSeleccion();
+});
+
+// Botones rapidos: marcar "a pedir" / limpiar
+document.getElementById('btn-marcar-pedir').addEventListener('click', () => {
+  COMPRAS.lanas.forEach(l => {
+    if (estadoDeFila(l) === 'pedir') COMPRAS.seleccion.add(l.id);
+  });
+  renderCompras();
+  actualizarBarraSeleccion();
+});
+document.getElementById('btn-limpiar-seleccion').addEventListener('click', () => {
+  COMPRAS.seleccion.clear();
+  renderCompras();
+  actualizarBarraSeleccion();
+});
+
+// Abrir modal de pedido — toda la logica vive en
+// static/modal-generar-pedido.js (compartido con la ficha). Aqui solo
+// preparamos las variantes seleccionadas y le pasamos las callbacks.
+function abrirModalPedido() {
+  const ids = [...COMPRAS.seleccion];
+  const variantes = COMPRAS.lanas.filter(l => ids.includes(l.id));
+  if (!variantes.length) return;
+  window.abrirModalPedidoGenerar({
+    variantes,
+    onCreated: async () => {
+      // Limpiar la seleccion y refrescar la tabla de Compras
+      COMPRAS.seleccion.clear();
+      await cargarCompras();
+    },
+  });
+}
+document.getElementById('btn-generar-pedido').addEventListener('click', abrirModalPedido);
+
+// ============================================================
+// Tab "Proveedores"
+// ============================================================
+const PROVS_STATE = { lista: [], abierto: null };
+
+async function cargarProveedores() {
+  const tb = document.getElementById('prov-tbody');
+  tb.innerHTML = '<tr><td colspan="8" class="mp-empty">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/proveedores');
+    if (r.status === 403) {
+      tb.innerHTML = '<tr><td colspan="8" class="mp-empty">Sin acceso para tu rol.</td></tr>';
+      return;
+    }
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      tb.innerHTML = `<tr><td colspan="8" class="mp-empty">El servidor no reconoce este endpoint (HTTP ${r.status}).<br/>Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" para cargar la última versión.</td></tr>`;
+      return;
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    PROVS_STATE.lista = d.proveedores || [];
+    document.getElementById('tc-proveedores').textContent = PROVS_STATE.lista.length;
+    document.getElementById('prov-count').textContent = PROVS_STATE.lista.length;
+    pintarProveedores();
+    // Si veniamos con hash #proveedores:<id>, auto-expandir esa ficha.
+    // El matching es tolerante: primero busca por id exacto, luego por
+    // alias o nombre normalizado (por si algun slug viejo no encaja).
+    if (window.__pendingProveedorAbrir) {
+      const target = window.__pendingProveedorAbrir;
+      delete window.__pendingProveedorAbrir;
+      const norm = s => (s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '')
+                            .toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '');
+      const targetNorm = norm(target);
+      const match = PROVS_STATE.lista.find(p =>
+        p.id === target ||
+        norm(p.alias) === targetNorm ||
+        norm(p.nombre) === targetNorm
+      );
+      if (match) {
+        const fila = document.querySelector(`tr.prov-row[data-id="${CSS.escape(match.id)}"]`);
+        if (fila) {
+          fila.click();
+          fila.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+      }
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch (err) {
+    tb.innerHTML = `<tr><td colspan="8" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function pintarProveedores() {
+  const tb = document.getElementById('prov-tbody');
+  if (!PROVS_STATE.lista.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="mp-empty">Aún no hay proveedores. Crea el primero con "+ Añadir proveedor".</td></tr>';
+    return;
+  }
+  let html = '';
+  PROVS_STATE.lista.forEach(p => {
+    const k = p._kpis || {};
+    const activo = p.activo !== false;
+    const aliasMostrar = p.alias || p.nombre || '';
+    const nombreSub = (p.nombre && p.alias && p.nombre.toUpperCase() !== p.alias.toUpperCase())
+      ? p.nombre : '';
+    html += `
+      <tr class="lana-row prov-row" data-id="${escapeHtml(p.id)}">
+        <td>
+          <strong>${escapeHtml(aliasMostrar)}</strong>
+          ${nombreSub ? `<div style="font-size:0.75rem; color:#7a7a7a; margin-top:0.1rem">${escapeHtml(nombreSub)}</div>` : ''}
+        </td>
+        <td>${escapeHtml(p.contacto_persona || '—')}</td>
+        <td style="font-size:0.84rem">${escapeHtml(p.contacto_email || '—')}</td>
+        <td style="text-align:right">${k.n_calidades || 0}</td>
+        <td style="text-align:right">${fmtNum(k.stock_total_kg || 0, 0)} kg</td>
+        <td style="text-align:right">${k.n_pedidos_abiertos || 0}</td>
+        <td style="text-align:center">
+          <span class="prov-chip-estado ${activo ? 'prov-chip-activo' : 'prov-chip-inactivo'}">
+            ${activo ? 'Activo' : 'Inactivo'}
+          </span>
+        </td>
+        <td style="text-align:right">
+          <button class="mp-btn-row" data-prov-toggle="${escapeHtml(p.id)}">
+            ${activo ? 'Desactivar' : 'Activar'}
+          </button>
+          <button class="mp-btn-row danger" data-prov-borrar="${escapeHtml(p.id)}"
+                  ${(k.n_calidades || 0) > 0 ? 'disabled title="Tiene calidades vinculadas — desactívalo en lugar de borrarlo"' : 'title="Borrar definitivamente este proveedor"'}>
+            Borrar
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+  tb.innerHTML = html;
+}
+
+function fichaProveedorHtml(p) {
+  const k = p._kpis || {};
+  // Filtrar variantes que pertenecen a este proveedor para listar calidades
+  const lanas = COMPRAS.lanas || [];
+  const nombre = (p.nombre || '').toUpperCase();
+  const variantes = lanas.filter(l => (l.proveedor || '').toUpperCase() === nombre);
+  const calidadesHtml = variantes.length
+    ? variantes.map(v => {
+        const est = estadoDeFila(v);
+        return `<a href="/materia-prima/${encodeURIComponent(v.calidad_id)}"
+                    class="prov-calidad-pill"
+                    title="Estado: ${est}">${escapeHtml(v.nombre || v.id)}
+                  <span class="pill-kg">${fmtKgDisp(v.total_kg)}</span>
+                </a>`;
+      }).join('')
+    : '<span style="color:#9a9a9a; font-size:0.85rem">Sin calidades vinculadas todavía. Para añadir, ve a la ficha de la materia prima y usa "+ Añadir proveedor".</span>';
+
+  const campo = (label, key, type='text', extra='') =>
+    `<div class="prov-campo">
+       <label>${label}</label>
+       <input type="${type}" data-prov-campo="${key}"
+              value="${escapeHtml(p[key] != null ? String(p[key]) : '')}"
+              ${extra} />
+     </div>`;
+
+  return `
+    <div class="prov-ficha-grid">
+      <div class="prov-ficha-bloque">
+        <h4>Identificador</h4>
+        ${campo('Alias interno', 'alias', 'text', 'placeholder="Nombre corto que aparece en tablas"')}
+        ${campo('Nombre comercial', 'nombre')}
+        ${campo('Razón social', 'razon_social')}
+        ${campo('CIF / NIF', 'cif')}
+      </div>
+      <div class="prov-ficha-bloque">
+        <h4>Dirección</h4>
+        ${campo('Dirección', 'direccion')}
+        ${campo('CP', 'cp')}
+        ${campo('Ciudad', 'ciudad')}
+        ${campo('Provincia', 'provincia')}
+        ${campo('País', 'pais')}
+      </div>
+      <div class="prov-ficha-bloque">
+        <h4>Contacto</h4>
+        ${campo('Persona', 'contacto_persona')}
+        ${campo('Email', 'contacto_email', 'email')}
+        ${campo('Teléfono', 'contacto_telefono')}
+      </div>
+      <div class="prov-ficha-bloque">
+        <h4>Comercial</h4>
+        ${campo('Plazo de entrega (días)', 'plazo_entrega_dias', 'number')}
+        ${campo('Pedido mínimo (kg)', 'pedido_minimo_kg', 'number')}
+        ${campo('Pedido mínimo (€)', 'pedido_minimo_eur', 'number')}
+      </div>
+      <div class="prov-ficha-bloque">
+        <h4>Pago y portes</h4>
+        ${campo('Condiciones de pago', 'condiciones_pago')}
+        ${campo('Portes', 'portes')}
+      </div>
+      <div class="prov-ficha-bloque">
+        <h4>Notas internas</h4>
+        <div class="prov-campo">
+          <label>Comentarios (solo internos)</label>
+          <textarea data-prov-campo="notas" placeholder="Notas para el equipo">${escapeHtml(p.notas || '')}</textarea>
+        </div>
+      </div>
+      <div class="prov-ficha-calidades">
+        <h4>Calidades suministradas (${variantes.length})</h4>
+        ${calidadesHtml}
+      </div>
+    </div>`;
+}
+
+// Click en fila de proveedor → expandir/contraer ficha. No re-encadenamos
+// con el handler de tabla-lanas; este es independiente.
+document.getElementById('prov-tbody').addEventListener('click', async (e) => {
+  // Boton Borrar proveedor (solo si no tiene calidades vinculadas)
+  const btnDel = e.target.closest('[data-prov-borrar]');
+  if (btnDel && !btnDel.disabled) {
+    e.stopPropagation();
+    const id = btnDel.dataset.provBorrar;
+    const p = PROVS_STATE.lista.find(x => x.id === id);
+    if (!p) return;
+    const {ok} = await mostrarConfirmacion({
+      titulo: 'Borrar proveedor',
+      mensaje: `Se borrará la ficha del proveedor "${p.alias || p.nombre}". Esta acción es definitiva. ` +
+               `Si más adelante vuelve a operar con él tendrás que crearlo de nuevo.`,
+      textoConfirmar: 'Borrar definitivamente',
+      tipo: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const r = await fetch(`/api/proveedor/${encodeURIComponent(id)}`, {method: 'DELETE'});
+      const d = await _parseJsonOrFail(r, 'DELETE /api/proveedor/' + id);
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      await cargarProveedores();
+    } catch (err) {
+      mostrarAlerta({titulo: 'No se pudo borrar', mensaje: err.message, tipo: 'danger'});
+    }
+    return;
+  }
+
+  // Boton toggle activo/inactivo
+  const btnTog = e.target.closest('[data-prov-toggle]');
+  if (btnTog) {
+    e.stopPropagation();
+    const id = btnTog.dataset.provToggle;
+    const p = PROVS_STATE.lista.find(x => x.id === id);
+    if (!p) return;
+    try {
+      const r = await fetch(`/api/proveedor/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({activo: !p.activo}),
+      });
+      const d = await _parseJsonOrFail(r, 'PUT /api/proveedor/' + id);
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      await cargarProveedores();
+    } catch (err) {
+      mostrarAlerta({titulo: 'Error', mensaje: err.message, tipo: 'danger'});
+    }
+    return;
+  }
+  // Click en la fila principal → navegar a la ficha dedicada del
+  // proveedor (/proveedor/<id>). Antes era una expansion inline pero
+  // no permitia mostrar los pedidos en camino con el contexto suficiente.
+  const tr = e.target.closest('tr.prov-row');
+  if (!tr) return;
+  if (e.target.closest('button')) return;  // ignorar clicks en botones
+  const id = tr.dataset.id;
+  if (id) window.location.href = '/proveedor/' + encodeURIComponent(id);
+});
+
+// Edicion inline de los campos de la ficha
+document.getElementById('prov-tbody').addEventListener('change', async (e) => {
+  const inp = e.target.closest('[data-prov-campo]');
+  if (!inp) return;
+  const tr = inp.closest('tr.prov-detalle-row');
+  if (!tr) return;
+  const id = tr.dataset.parent;
+  const campo = inp.dataset.provCampo;
+  let valor = inp.value;
+  if (inp.type === 'number') valor = valor === '' ? null : Number(valor);
+  inp.classList.remove('saved-ok');
+  inp.classList.add('saving');
+  try {
+    const r = await fetch(`/api/proveedor/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({[campo]: valor}),
+    });
+    const d = await _parseJsonOrFail(r, 'PUT /api/proveedor/' + id);
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    inp.classList.remove('saving');
+    inp.classList.add('saved-ok');
+    setTimeout(() => inp.classList.remove('saved-ok'), 700);
+    // Actualizar el modelo local
+    const idx = PROVS_STATE.lista.findIndex(x => x.id === id);
+    if (idx >= 0) PROVS_STATE.lista[idx] = {...PROVS_STATE.lista[idx], ...d.proveedor};
+  } catch (err) {
+    inp.classList.remove('saving');
+    mostrarAlerta({titulo: 'Error guardando ' + campo,
+                   mensaje: err.message, tipo: 'danger'});
+  }
+});
+
+// Helper: chequea que la respuesta sea JSON valido. Si el servidor
+// responde HTML (tipico 404 cuando el .bat lleva tiempo arrancado y
+// no tiene el endpoint nuevo), el mensaje sera claro.
+async function _parseJsonOrFail(r, ctxEndpoint = '') {
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error(
+      `El servidor no reconoce este endpoint${ctxEndpoint ? ' (' + ctxEndpoint + ')' : ''} ` +
+      `(HTTP ${r.status}). Cierra y vuelve a abrir "Iniciar ERP Produccion.bat" ` +
+      `para cargar la última versión.`
+    );
+  }
+  return r.json();
+}
+
+// Boton "+ Añadir proveedor"
+document.getElementById('btn-add-prov').addEventListener('click', async () => {
+  const {ok, valor} = await mostrarPrompt({
+    titulo: 'Añadir proveedor',
+    mensaje: 'Indica el nombre del proveedor. Después podrás rellenar el resto de datos haciendo click en su fila.',
+    etiqueta: 'Nombre',
+    placeholder: 'Ej. AQUAFIL',
+    textoConfirmar: 'Añadir',
+  });
+  if (!ok || !valor.trim()) return;
+  try {
+    const r = await fetch('/api/proveedores', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nombre: valor.trim().toUpperCase()}),
+    });
+    const d = await _parseJsonOrFail(r, 'POST /api/proveedores');
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    await cargarProveedores();
+  } catch (err) {
+    mostrarAlerta({titulo: 'No se pudo crear', mensaje: err.message, tipo: 'danger'});
+  }
+});
+
+// Iniciar tab desde hash — se llama al final del script para asegurar
+// que todas las variables (incluido `const COMPRAS`) ya estan inicializadas.
+if (typeof window.__initTabFromHash === 'function') window.__initTabFromHash();
