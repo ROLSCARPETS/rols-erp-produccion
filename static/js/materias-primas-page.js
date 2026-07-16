@@ -725,7 +725,7 @@ function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
     filasHtml = `<tr><td colspan="6" class="lotes-empty">${
       lotes.length === 0
         ? 'Aún no hay lotes. Añade el primero abajo ↓'
-        : `Sin lotes activos${nAgotados ? ` (${nAgotados} agotado${nAgotados === 1 ? '' : 's'} ocultos)` : ''}`
+        : `Sin lotes activos${nAgotados ? ` (${nAgotados} consumido${nAgotados === 1 ? '' : 's'} ocultos)` : ''}`
     }</td></tr>`;
   } else {
     filasHtml = visibles.map(l => {
@@ -754,7 +754,7 @@ function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
       ${nAgotados > 0 ? `
         <label class="lotes-show-agotados">
           <input type="checkbox" class="chk-agotados" ${mostrarAgotados ? 'checked' : ''} />
-          Mostrar agotados (${nAgotados})
+          Mostrar consumidos (${nAgotados})
         </label>` : ''}
     </div>
     <table class="lotes-tabla">

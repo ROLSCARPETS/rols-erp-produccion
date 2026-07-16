@@ -217,6 +217,9 @@
   .chip-agotado { background: #ececec; color: #707070; }
   .chip-en-almacen { background: #faf3e7; color: #8a6d3b; }
   .chip-en-camino  { background: #dbeafe; color: #1e40af; }
+  /* El proveedor aun esta creando el hilo: todo el stock vivo del partido
+     sigue en su almacen (0 kg en Rols). Derivado, no editable. */
+  .chip-en-fabricacion { background: #ede4f3; color: #4a2c6b; }
 
   /* Input observaciones inline */
   input.mpd-obs {

@@ -915,7 +915,13 @@ def api_materia_prima_detalle(calidad_id):
                 "estanteria":         p.get("estanteria"),
                 "observaciones":      p.get("observaciones"),
                 "estado_intrinseco":  "agotado" if (kg + float(p.get("kg_proveedor") or 0)) <= 0 else "activo",
-                "ubicacion":          "en-almacen",
+                # Ubicacion derivada de donde esta el stock: si TODO lo vivo
+                # sigue en el proveedor (0 kg en almacen Rols), el proveedor
+                # aun lo esta fabricando/guardando → "en-fabricacion". En
+                # cuanto entra algo al almacen pasa solo a "en-almacen".
+                "ubicacion":          ("en-fabricacion"
+                                       if (kg <= 0 and float(p.get("kg_proveedor") or 0) > 0)
+                                       else "en-almacen"),
                 "ref_pedido":         None,
                 "fecha_estimada":     None,
             })

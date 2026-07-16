@@ -746,12 +746,12 @@ function pintarLotes(lotes) {
   // Contador: lotes visibles + nota de agotados si los hay
   const cnt = document.getElementById('mpd-lotes-count');
   cnt.textContent = nAgotadosOcultos > 0
-    ? `${visibles.length} · ${nAgotadosOcultos} agotado${nAgotadosOcultos === 1 ? '' : 's'} oculto${nAgotadosOcultos === 1 ? '' : 's'}`
+    ? `${visibles.length} · ${nAgotadosOcultos} consumido${nAgotadosOcultos === 1 ? '' : 's'} oculto${nAgotadosOcultos === 1 ? '' : 's'}`
     : `${visibles.length}`;
   const tb = document.getElementById('mpd-lotes-tbody');
   if (!visibles.length) {
     tb.innerHTML = `<tr><td colspan="14" class="mpd-empty">${
-      lotes.length === 0 ? 'No hay partidos.' : 'Todos los partidos están agotados (desactiva el filtro para verlos).'
+      lotes.length === 0 ? 'No hay partidos.' : 'Todos los partidos están consumidos (desactiva el filtro para verlos).'
     }</td></tr>`;
     return;
   }
@@ -824,8 +824,11 @@ function pintarLotes(lotes) {
         <td class="num mpd-bloque-cant mpd-bloque-cant-inicio">${enProveedorHtml}</td>
         <td class="num mpd-bloque-cant mpd-bloque-cant-mas">${enRolsHtml}</td>
         <td class="num mpd-bloque-cant mpd-bloque-cant-igual mpd-bloque-cant-fin">${cantActualHtml}</td>
-        <td><span class="chip chip-${l.estado_intrinseco}">${l.estado_intrinseco}</span></td>
-        <td><span class="chip chip-${l.ubicacion}">${l.ubicacion === 'en-camino' ? 'en camino' : 'en almacén'}</span></td>
+        <td><span class="chip chip-${l.estado_intrinseco}">${l.estado_intrinseco === 'agotado' ? 'consumido' : l.estado_intrinseco}</span></td>
+        <td><span class="chip chip-${l.ubicacion}">${
+          l.ubicacion === 'en-camino' ? 'en camino'
+          : l.ubicacion === 'en-fabricacion' ? 'en fabricación'
+          : 'en almacén'}</span></td>
         <td>${l.tipo === 'fisico'
               ? `<input class="mpd-obs mpd-estanteria" type="text" maxlength="40"
                         data-vid="${escapeHtml(l.variante_id)}"
