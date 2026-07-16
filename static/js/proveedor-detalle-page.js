@@ -51,7 +51,9 @@ function pintarHero(d) {
   const alias = (p.alias || p.nombre || '').trim();
   const nombre = (p.nombre || '').trim();
   // H1: ALIAS  nombre comercial (si distinto)  CHIP
-  document.getElementById('pv-alias').textContent = alias || '—';
+  // Sin alias ni nombre aun (ficha recien creada), mostramos el identificador
+  // interno (PROV_ID) en vez de un guion: que siempre se sepa QUIEN es.
+  document.getElementById('pv-alias').textContent = alias || PROV_ID;
   document.getElementById('pv-nombre').textContent =
     (nombre && nombre.toUpperCase() !== alias.toUpperCase()) ? nombre : '';
   document.getElementById('pv-bread-alias').textContent = alias || PROV_ID;

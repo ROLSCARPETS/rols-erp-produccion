@@ -285,8 +285,9 @@
         <button class="cmp-stat" data-estado="en-camino" title="Filtrar solo las que tienen pedido cursado"><span class="dot dot-en-camino"></span><strong id="cmp-n-en-camino">0</strong> <small>en camino</small></button>
         <button class="cmp-stat" data-estado="bajo"      title="Filtrar solo las que están bajas"><span class="dot dot-bajo"></span><strong id="cmp-n-bajo">0</strong> <small>bajos</small></button>
         <button class="cmp-stat" data-estado="ok"        title="Filtrar solo las que están OK"><span class="dot dot-ok"></span><strong id="cmp-n-ok">0</strong> <small>ok</small></button>
-        <div class="cmp-stat" style="cursor:default"><span class="dot dot-total"></span><strong id="cmp-total-kg">0</strong> <small>kg total</small></div>
-        <div class="cmp-stat" style="cursor:default"><strong id="cmp-valor">0&nbsp;€</strong> <small>valor estimado</small></div>
+        <!-- Estadisticas informativas (NO filtran): separadas de los estados -->
+        <div class="cmp-stat cmp-stat-info cmp-stat-info-first"><strong id="cmp-total-kg">0</strong> <small>kg total</small></div>
+        <div class="cmp-stat cmp-stat-info"><strong id="cmp-valor">0&nbsp;€</strong> <small>valor estimado</small></div>
       </div>
 
       <!-- Filtros -->
@@ -386,8 +387,9 @@
         <button class="cmp-stat" data-estado="en-camino" title="Filtrar solo las que tienen pedido cursado"><span class="dot dot-en-camino"></span><strong id="kbn-n-en-camino">0</strong> <small>en camino</small></button>
         <button class="cmp-stat" data-estado="bajo"      title="Filtrar solo las que están bajas"><span class="dot dot-bajo"></span><strong id="kbn-n-bajo">0</strong> <small>bajos</small></button>
         <button class="cmp-stat" data-estado="ok"        title="Filtrar solo las que están OK"><span class="dot dot-ok"></span><strong id="kbn-n-ok">0</strong> <small>ok</small></button>
-        <div class="cmp-stat" style="cursor:default"><span class="dot dot-total"></span><strong id="kbn-total-kg">0</strong> <small>kg total</small></div>
-        <div class="cmp-stat" style="cursor:default"><strong id="kbn-valor">0&nbsp;€</strong> <small>valor estimado</small></div>
+        <!-- Estadisticas informativas (NO filtran): separadas de los estados -->
+        <div class="cmp-stat cmp-stat-info cmp-stat-info-first"><strong id="kbn-total-kg">0</strong> <small>kg total</small></div>
+        <div class="cmp-stat cmp-stat-info"><strong id="kbn-valor">0&nbsp;€</strong> <small>valor estimado</small></div>
       </div>
 
       <!-- Filtros: misma estructura que Compras pero IDs prefijados con kbn-

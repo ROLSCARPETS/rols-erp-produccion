@@ -321,6 +321,14 @@
   .cmp-stat:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
   .cmp-stat.active { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
 
+  /* Estadísticas informativas (kg total, valor estimado): NO son filtros.
+     Sin aspecto de botón/píldora y alineadas a la derecha, tras un separador,
+     para que no se confundan con los estados clicables. */
+  .cmp-stat.cmp-stat-info { background: transparent; border: none; cursor: default; padding: 0.5rem 0.7rem; }
+  .cmp-stat.cmp-stat-info:hover { transform: none; box-shadow: none; }
+  .cmp-stat.cmp-stat-info small { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
+  .cmp-stat-info-first { margin-left: auto; border-left: 1px solid var(--border) !important; border-radius: 0; padding-left: 1.2rem !important; }
+
   /* Subtotal por seccion (cuando ordenas por categoria) */
   tr.cmp-grupo td { background: #f4ede5; color: #4d4d4d; font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.4rem 0.7rem; }
   tr.cmp-grupo td small { font-weight: 400; color: #7a7a7a; margin-left: 0.5rem; }
