@@ -79,8 +79,8 @@ def _track_request_end(response):
 
 @app.route("/")
 def index():
-    """Raiz → modulo de Compras (materias primas)."""
-    return render_template("materias_primas.html")
+    """Raiz → inicio del ERP (grid de tarjetas, como el de Rols One)."""
+    return render_template("inicio.html")
 
 
 # ---- Ecosistema Rols One: URLs del IdP (rols-cuentas) y home ----

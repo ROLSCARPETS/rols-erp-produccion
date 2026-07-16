@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inicio — Rols ERP Producción</title>
+<link rel="icon" href="{{ url_for('static', filename='logo-rols.png') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<script src="/shared/sso-guard.js"></script>
+<script>
+// Guard de permiso 'compras'. Si el usuario no tiene acceso, lo
+// devolvemos al inicio de Rols One en cuanto el SSO traiga sus permisos.
+(function _checkPermisoCompras() {
+  function chequear(user) {
+    const rol = user?.rol;
+    const perm = user?.permisos?.compras;
+    const ok = (perm !== undefined)
+      ? !!perm
+      : (rol === 'admin' || rol === 'comercial');
+    if (!ok) location.replace('{{ rols_one_base }}/inicio');
+  }
+  if (window.__rolsUser) chequear(window.__rolsUser);
+  window.addEventListener('rols:sso-ok', (e) => chequear(e.detail));
+})();
+</script>
+<link rel="stylesheet" href="/shared/lang-switcher/lang-switcher.css">
+</head>
+<body class="min-h-screen">
+
+<div class="flex min-h-screen">
+
+  <!-- ======================== SIDEBAR ======================== -->
+  <aside class="sidebar w-64 flex-shrink-0 flex flex-col px-4 py-6">
+    <div class="px-2 mb-8">
+      <img src="{{ url_for('static', filename='logo-rols.png') }}" alt="Rols" class="rols-logo" />
+      <p class="sidebar-app-label">Producción</p>
+    </div>
+    <nav class="space-y-1">
+      <a href="/" class="active"><span class="check"></span><span data-i18n="sidebar.inicio">Inicio</span></a>
+      <a href="/materias-primas"><span class="check"></span><span data-i18n="materias.breadcrumb">Materias primas</span></a>
+      <a href="/materias-primas#proveedores"><span class="check"></span><span>Proveedores</span></a>
+    </nav>
+    <div class="space-y-1 pt-4 border-t border-stone-700/50">
+      <a href="{{ rols_one_base }}/inicio"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg><span>Rols One</span></a>
+      <a href="{{ cuentas_base }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
+    </div>
+  </aside>
+
+  <!-- ======================== MAIN ======================== -->
+  <main class="flex-grow px-10 py-8 overflow-x-hidden">
+
+    <!-- Top bar -->
+    <div class="flex justify-between items-start mb-6">
+      <div>
+        <p class="breadcrumb mb-1">
+          <span data-i18n="sidebar.inicio">Inicio</span>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div data-lang-switcher></div>
+      </div>
+    </div>
+
+    <!-- Title -->
+    <h1 class="text-3xl font-light text-stone-800 mb-2">
+      Bienvenido a
+      <span class="font-medium relative">
+        Rols Producción
+        <span class="absolute left-0 -bottom-1 w-full h-0.5 bg-stone-800"></span>
+      </span>
+    </h1>
+    <p class="text-stone-600 max-w-2xl mb-10">
+      Elige una herramienta para empezar.
+    </p>
+
+    <!-- ============ Grid de apps ============ -->
+    <div class="apps-grid">
+
+      <!-- Card: Materias primas -->
+      <a href="/materias-primas" class="app-card">
+        <div class="app-card-icon app-card-icon-materias">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 2 7l10 5 10-5-10-5Z"/>
+            <path d="m2 12 10 5 10-5"/>
+            <path d="m2 17 10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="app-card-body">
+          <h3 class="app-card-title">Materias primas</h3>
+          <p class="app-card-desc">
+            Inventario de lanas, tintes y otros materiales: partidos vivos, compras, kanban y lana en crudo.
+          </p>
+          <span class="app-card-cta">
+            <span data-i18n="inicio.open">Abrir</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+              <path d="M5 12h14"/><path d="M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Card: Proveedores -->
+      <a href="/materias-primas#proveedores" class="app-card">
+        <div class="app-card-icon app-card-icon-proveedores">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
+            <path d="M15 18h-5"/>
+            <path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-2"/>
+            <circle cx="7" cy="18" r="2"/>
+            <circle cx="17" cy="18" r="2"/>
+          </svg>
+        </div>
+        <div class="app-card-body">
+          <h3 class="app-card-title">Proveedores</h3>
+          <p class="app-card-desc">
+            Fichas de proveedores: datos comerciales, contacto, calidades suministradas y pedidos abiertos.
+          </p>
+          <span class="app-card-cta">
+            <span data-i18n="inicio.open">Abrir</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+              <path d="M5 12h14"/><path d="M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+    </div>
+
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='i18n.js') }}"></script>
+<script src="/shared/lang-switcher/lang-switcher.js" defer></script>
+</body>
+</html>
