@@ -187,7 +187,11 @@
   window.mostrarModalRecibido = function ({ ref, kgTotal }) {
     return new Promise((resolve) => {
       const MID = 'uim-recibido';
-      // Inyectar el modal una sola vez
+      // Reinyectar el modal LIMPIO en cada apertura: reutilizar el DOM
+      // acumulaba los listeners de radios/labels/input de aperturas
+      // anteriores, y el closure viejo (con el kgTotal del pedido previo)
+      // corria primero y rellenaba el split con un default equivocado.
+      document.getElementById(MID)?.remove();
       let back = document.getElementById(MID);
       if (!back) {
         document.body.insertAdjacentHTML('beforeend', `

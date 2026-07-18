@@ -62,6 +62,20 @@ import os
 
 import jsonstore  # BD SQLite transaccional (sustituye JSON+RLock; ver jsonstore.py)
 
+import logging
+_log = logging.getLogger("erp.lanas")
+
+
+def _float_finito(valor) -> float:
+    """float(valor) validando que sea un numero FINITO. NaN/Infinity pasan
+    los guards de negocio (`NaN <= 0` es False) y solo reventaban al
+    persistir (allow_nan=False en jsonstore) → 500 en vez de un 400 claro.
+    Lanza ValueError para que el try/except del caller lo convierta en error."""
+    v = float(valor)
+    if not math.isfinite(v):
+        raise ValueError("no finito")
+    return v
+
 # Ruta del JSON LEGACY: solo para la migración one-time a SQLite (se conserva de
 # backup). En prod ROLS_DATA_DIR lo fija FUERA del docroot; en local shared/data.
 DATA_PATH = Path(os.environ.get("ROLS_DATA_DIR") or Path(__file__).resolve().parent.parent / "data") / "lanas_inventario.json"
@@ -289,14 +303,17 @@ def actualizar_lana(lid: str, campo: str, valor) -> tuple[dict | None, str]:
     with jsonstore.store().tx():
         data = cargar()
         for i, l in enumerate(data.get("lanas", [])):
-            if lana_id(l) == lid:
+            # Aceptar id actual, id_legacy o el derivado, igual que
+            # buscar_lana (tras renombrar proveedor, el id viejo debe
+            # seguir resolviendo tambien aqui).
+            if l.get("id") == lid or l.get("id_legacy") == lid or lana_id(l) == lid:
                 # Normalizar valor: numericos como float, strings tal cual
                 if campo in ("limite_kg", "kg_a_pedir", "precio_2025", "precio_2026"):
                     if valor in (None, ""):
                         l[campo] = None
                     else:
                         try:
-                            l[campo] = float(valor)
+                            l[campo] = _float_finito(valor)
                         except (TypeError, ValueError):
                             return None, f"{campo} debe ser numerico"
                 elif campo == "tarifa_actual_eur_kg":
@@ -306,7 +323,7 @@ def actualizar_lana(lid: str, campo: str, valor) -> tuple[dict | None, str]:
                         l["tarifa_actual_fecha"] = None
                     else:
                         try:
-                            l["tarifa_actual_eur_kg"] = float(valor)
+                            l["tarifa_actual_eur_kg"] = _float_finito(valor)
                         except (TypeError, ValueError):
                             return None, "tarifa_actual_eur_kg debe ser numerico"
                         l["tarifa_actual_fecha"] = datetime.now().date().isoformat()
@@ -350,7 +367,7 @@ def actualizar_partidos(lid: str, partidos: list[dict]) -> tuple[dict | None, st
                     return None, "cada partido debe ser un objeto"
                 pid = (p.get("partido") or "").strip()
                 try:
-                    kg = float(p.get("kg") or 0)
+                    kg = _float_finito(p.get("kg") or 0)
                 except (TypeError, ValueError):
                     return None, "kg debe ser numerico"
                 if kg < 0:
@@ -362,7 +379,7 @@ def actualizar_partidos(lid: str, partidos: list[dict]) -> tuple[dict | None, st
                 coste = p.get("coste_kg", prev.get("coste_kg"))
                 if coste not in (None, ""):
                     try:
-                        coste = float(coste)
+                        coste = _float_finito(coste)
                     except (TypeError, ValueError):
                         return None, "coste_kg debe ser numerico"
                 else:
@@ -373,17 +390,30 @@ def actualizar_partidos(lid: str, partidos: list[dict]) -> tuple[dict | None, st
                 obs = p.get("observaciones", prev.get("observaciones"))
                 if isinstance(obs, str):
                     obs = obs.strip()[:300] or None
+                # kg_proveedor NO lo manda esta via (la edicion masiva solo
+                # toca kg de almacen): preservarlo SIEMPRE — perderlo aqui
+                # borraba en silencio los kg reservados en el proveedor.
+                kg_prov_prev = prev.get("kg_proveedor")
+                total_vivo = kg + float(kg_prov_prev or 0)
+                # fecha_agotado con el MISMO criterio que el resto de vias:
+                # consumido = sin stock vivo TOTAL (almacen + proveedor).
+                fecha_agotado = prev.get("fecha_agotado")
+                if total_vivo <= 0 and not fecha_agotado:
+                    fecha_agotado = datetime.now().date().isoformat()
+                elif total_vivo > 0:
+                    fecha_agotado = None
                 limpios.append({
                     "partido":       pid,
                     "kg":            round(kg, 2),
                     "kg_inicial":    prev.get("kg_inicial", round(kg, 2)),
+                    "kg_proveedor":  kg_prov_prev,
                     "coste_kg":      coste,
                     "fecha_entrada": fecha,
                     "observaciones": obs,
                     # Preservar siempre los nuevos metadatos del partido
                     "estanteria":    prev.get("estanteria"),
                     "fecha_compra":  prev.get("fecha_compra"),
-                    "fecha_agotado": prev.get("fecha_agotado"),
+                    "fecha_agotado": fecha_agotado,
                 })
                 total += kg
             l["partidos"] = limpios
@@ -558,8 +588,11 @@ def agregar_partido(lid: str, partido_ref: str, kg, coste_kg=None,
                          cantidad_kg=kg_f, saldo_anterior_kg=0,
                          saldo_nuevo_kg=kg_f, coste_kg=coste_f,
                          fecha_entrada=fecha or "", usuario=usuario)
-        except Exception:
-            pass
+        except Exception as _e:
+            # El inventario YA se guardo; que el historico falle no debe
+            # tumbar la operacion, pero el silencio total ocultaba la
+            # divergencia inventario↔movimientos. Al menos, dejar log.
+            _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return nuevo, ""
 
 
@@ -588,7 +621,7 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
         prev = partidos[pi]
         saldo_anterior = float(prev.get("kg") or 0)
         try:
-            kg_f = float(datos.get("kg", prev.get("kg") or 0))
+            kg_f = _float_finito(datos.get("kg", prev.get("kg") or 0))
         except (TypeError, ValueError):
             return None, "kg debe ser numerico"
         if kg_f < 0:
@@ -598,7 +631,7 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
             coste = None
         else:
             try:
-                coste = float(coste)
+                coste = _float_finito(coste)
             except (TypeError, ValueError):
                 return None, "coste_kg debe ser numerico"
         fecha = datos.get("fecha_entrada", prev.get("fecha_entrada"))
@@ -613,14 +646,10 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
         fecha_compra = datos.get("fecha_compra", prev.get("fecha_compra"))
         if isinstance(fecha_compra, str):
             fecha_compra = fecha_compra.strip() or None
-        # fecha_agotado se gestiona automaticamente: se setea al
-        # bajar kg a 0, se limpia si vuelve a entrar mercancia.
-        fecha_agotado = prev.get("fecha_agotado")
-        kg_prev = float(prev.get("kg") or 0)
-        if kg_prev > 0 and kg_f <= 0 and not fecha_agotado:
-            fecha_agotado = datetime.now().date().isoformat()
-        elif kg_f > 0:
-            fecha_agotado = None
+        # fecha_agotado se gestiona automaticamente con el criterio comun:
+        # consumido = sin stock vivo TOTAL (almacen Rols + proveedor). Antes
+        # solo miraba kg y marcaba "consumido" partidos que aun tenian kg
+        # reservados en el proveedor (estado "en fabricacion").
         # kg_proveedor: kg del partido que el proveedor guarda en su
         # almacen (reservados para Rols pero aun no traidos). Sale 0 / None
         # por defecto. NO entra en `kg` (que es lo fisicamente disponible
@@ -632,12 +661,18 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
             kg_proveedor_f = None
         else:
             try:
-                kg_proveedor_f = float(kg_proveedor)
+                kg_proveedor_f = _float_finito(kg_proveedor)
             except (TypeError, ValueError):
                 return None, "kg_proveedor debe ser numerico"
             if kg_proveedor_f < 0:
                 return None, "kg_proveedor no puede ser negativo"
             kg_proveedor_f = round(kg_proveedor_f, 2)
+        total_vivo = kg_f + float(kg_proveedor_f or 0)
+        fecha_agotado = prev.get("fecha_agotado")
+        if total_vivo <= 0 and not fecha_agotado:
+            fecha_agotado = datetime.now().date().isoformat()
+        elif total_vivo > 0:
+            fecha_agotado = None
         partidos[pi] = {"partido": nueva_ref, "kg": round(kg_f, 2),
                         # kg_inicial NO se sobreescribe — es inmutable
                         # (refleja la cantidad con la que entro el partido).
@@ -661,8 +696,11 @@ def actualizar_partido(lid: str, partido_ref: str, datos: dict,
                          fecha_entrada=fecha or "", usuario=usuario,
                          nota=f"renombrado desde {partido_ref!r}"
                               if nueva_ref != partido_ref else "")
-        except Exception:
-            pass
+        except Exception as _e:
+            # El inventario YA se guardo; que el historico falle no debe
+            # tumbar la operacion, pero el silencio total ocultaba la
+            # divergencia inventario↔movimientos. Al menos, dejar log.
+            _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return partido_actualizado, ""
 
 
@@ -694,8 +732,11 @@ def borrar_partido(lid: str, partido_ref: str, usuario: str = "") -> tuple[bool,
                          cantidad_kg=-saldo_previo, saldo_anterior_kg=saldo_previo,
                          saldo_nuevo_kg=0, coste_kg=coste_previo,
                          fecha_entrada=fecha_previa, usuario=usuario)
-        except Exception:
-            pass
+        except Exception as _e:
+            # El inventario YA se guardo; que el historico falle no debe
+            # tumbar la operacion, pero el silencio total ocultaba la
+            # divergencia inventario↔movimientos. Al menos, dejar log.
+            _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return True, ""
 
 
@@ -731,8 +772,11 @@ def consumir_partido(lid: str, partido_ref: str, kg, usuario: str = "",
         coste_actual = partidos[pi].get("coste_kg")
         fecha_actual = partidos[pi].get("fecha_entrada") or ""
         partidos[pi]["kg"] = nuevo_saldo
-        # Auto-marcar fecha_agotado si el saldo llega a 0
-        if nuevo_saldo <= 0 and not partidos[pi].get("fecha_agotado"):
+        # Auto-marcar fecha_agotado si NO queda stock vivo TOTAL (almacen +
+        # proveedor): un partido con kg reservados en el proveedor no esta
+        # consumido, esta "en fabricacion" (mismo criterio que el resto).
+        total_vivo = nuevo_saldo + float(partidos[pi].get("kg_proveedor") or 0)
+        if total_vivo <= 0 and not partidos[pi].get("fecha_agotado"):
             partidos[pi]["fecha_agotado"] = datetime.now().date().isoformat()
         item["total_kg"] = round(sum(p.get("kg") or 0 for p in partidos), 2)
         _guardar(data)
@@ -745,8 +789,11 @@ def consumir_partido(lid: str, partido_ref: str, kg, usuario: str = "",
                          cantidad_kg=-kg_f, saldo_anterior_kg=saldo_anterior,
                          saldo_nuevo_kg=nuevo_saldo, coste_kg=coste_actual,
                          fecha_entrada=fecha_actual, usuario=usuario, nota=nota)
-        except Exception:
-            pass
+        except Exception as _e:
+            # El inventario YA se guardo; que el historico falle no debe
+            # tumbar la operacion, pero el silencio total ocultaba la
+            # divergencia inventario↔movimientos. Al menos, dejar log.
+            _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return partido_actualizado, ""
 
 
@@ -774,7 +821,7 @@ def trasladar_kg_partido(lid: str, partido_ref: str, kg,
     if direccion not in ("a-proveedor", "a-rols"):
         return None, "direccion debe ser 'a-proveedor' o 'a-rols'"
     try:
-        kg_f = float(kg)
+        kg_f = _float_finito(kg)
     except (TypeError, ValueError):
         return None, "kg debe ser numerico"
     if kg_f <= 0:
@@ -843,8 +890,11 @@ def trasladar_kg_partido(lid: str, partido_ref: str, kg,
                          coste_kg=coste_actual,
                          fecha_entrada=fecha_actual,
                          usuario=usuario, nota=nota_final)
-        except Exception:
-            pass
+        except Exception as _e:
+            # El inventario YA se guardo; que el historico falle no debe
+            # tumbar la operacion, pero el silencio total ocultaba la
+            # divergencia inventario↔movimientos. Al menos, dejar log.
+            _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return partido_actualizado, ""
 
 
@@ -894,7 +944,7 @@ def registrar_pedido(lineas: list[dict], usuario: str = "",
             if not vid:
                 return None, "cada linea necesita variante_id"
             try:
-                kg = float(ln.get("kg") or 0)
+                kg = _float_finito(ln.get("kg") or 0)
             except (TypeError, ValueError):
                 return None, f"kg invalido para {vid!r}"
             if kg <= 0:
@@ -904,7 +954,7 @@ def registrar_pedido(lineas: list[dict], usuario: str = "",
                 eur = None
             else:
                 try:
-                    eur = float(eur)
+                    eur = _float_finito(eur)
                 except (TypeError, ValueError):
                     return None, f"eur_kg invalido para {vid!r}"
             # Partido (opcional): el proveedor a veces lo confirma al
@@ -1031,6 +1081,11 @@ def actualizar_titulo_calidad(calidad_id: str, titulo_nuevo: str
     titulo_nuevo = (titulo_nuevo or "").strip()
     if len(titulo_nuevo) > 80:
         return None, "titulo demasiado largo (max 80)"
+    # Sentinels de la UI ('__nuevo__', '__gestionar__'): jamas son un titulo
+    # real. Defensa en profundidad — un bug del select llego a renombrar
+    # una calidad a "__gestionar__".
+    if titulo_nuevo.startswith("__") and titulo_nuevo.endswith("__"):
+        return None, f"titulo invalido: {titulo_nuevo!r}"
     with jsonstore.store().tx():
         data = cargar()
         variantes = [v for v in data.get("lanas", [])
@@ -1113,11 +1168,19 @@ def renombrar_proveedor_en_variantes(alias_viejo: str,
                 # el nuevo alias. Guardamos el id viejo en id_legacy para
                 # que buscar_lana siga resolviendo referencias antiguas
                 # (escandallos, links guardados, movimientos historicos).
-                if v.get("id"):
-                    v.setdefault("id_legacy", v["id"])
                 cid = v.get("calidad_id") or ""
                 prov_slug = _slug(alias_nuevo)
-                v["id"] = f"{cid}__{prov_slug}" if cid else _slug(f"{v.get('titulo','')} {v.get('tipo','')}") + f"__{prov_slug}"
+                nuevo_id = f"{cid}__{prov_slug}" if cid else _slug(f"{v.get('titulo','')} {v.get('tipo','')}") + f"__{prov_slug}"
+                # No acunar ids DUPLICADOS: si otra variante ya tiene ese id
+                # (misma calidad con un proveedor de texto libre homonimo),
+                # conservamos el id actual — buscar_lana caeria siempre en
+                # la primera y las ediciones irian a la variante equivocada.
+                colision = any(o is not v and (o.get("id") == nuevo_id)
+                               for o in data.get("lanas", []))
+                if not colision:
+                    if v.get("id"):
+                        v.setdefault("id_legacy", v["id"])
+                    v["id"] = nuevo_id
                 n += 1
         if n:
             _guardar(data)
@@ -1157,7 +1220,7 @@ def actualizar_planificacion_calidad(calidad_id: str, campo: str,
     if campo not in ("limite_kg", "kg_a_pedir"):
         return None, f"campo no editable: {campo!r}"
     try:
-        nuevo = float(valor or 0)
+        nuevo = _float_finito(valor or 0)
     except (TypeError, ValueError):
         return None, f"{campo} debe ser numerico"
     if nuevo < 0:
@@ -1221,8 +1284,8 @@ def crear_calidad_placeholder(nombre: str, titulo: str = "",
         for l in lanas:
             if l.get("calidad_id") == cid_calculado:
                 return None, (f"ya existe una calidad con ese nombre "
-                              f"({titulo} {nombre}).strip(). Renombrala o usa "
-                              f"un nombre distinto.")
+                              f"({(titulo + ' ' + nombre).strip()}). Renombrala "
+                              f"o usa un nombre distinto.")
         # Variante placeholder: proveedor vacio, sin partidos, sin
         # planificacion. El usuario lo rellena todo desde la ficha.
         vid = f"{cid_calculado}__"  # placeholder; al anadir el primer
@@ -1487,8 +1550,8 @@ def borrar_calidad(calidad_id: str, forzar: bool = False,
                                  fecha_entrada=m["fecha_entrada"],
                                  usuario=usuario,
                                  nota="borrado por borrar_calidad")
-                except Exception:
-                    pass
+                except Exception as _e:
+                    _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
     return True, ""
 
 
@@ -1552,6 +1615,12 @@ def _cambiar_estado_pedido(variante_id: str, ref_pedido: str,
             if motivo and estado_nuevo == "anulado":
                 p["motivo_anulacion"] = motivo
             n_cerrados += 1
+        # Sin coincidencias: salir SIN guardar (antes se commiteaba igual
+        # la limpieza legacy aunque la llamada devolviera error).
+        if n_cerrados == 0:
+            return None, ("no habia pedidos abiertos para marcar como "
+                          f"{estado_nuevo}"
+                          + (f" (ref {ref_pedido!r})" if ref_pedido else ""))
         # Si ya no hay pedidos abiertos, limpiar la nota legacy
         sigue_abierto = any(
             (p.get("estado") or "").lower() == "abierto"
@@ -1561,10 +1630,6 @@ def _cambiar_estado_pedido(variante_id: str, ref_pedido: str,
             item["pedido_hecho_legacy"] = item["pedido_hecho"]
             item["pedido_hecho"] = ""
         _guardar(data)
-    if n_cerrados == 0:
-        return None, ("no habia pedidos abiertos para marcar como "
-                      f"{estado_nuevo}"
-                      + (f" (ref {ref_pedido!r})" if ref_pedido else ""))
     return {
         "variante_id": variante_id,
         "ref_pedido":  ref_pedido or None,
@@ -1618,7 +1683,7 @@ def marcar_pedido_recibido(variante_id: str, ref_pedido: str = "",
     # Normalizar kg_a_rols
     if kg_a_rols is not None:
         try:
-            kg_a_rols = float(kg_a_rols)
+            kg_a_rols = _float_finito(kg_a_rols)
         except (TypeError, ValueError):
             return None, "kg_a_rols debe ser numerico"
         if kg_a_rols < 0:
@@ -1689,6 +1754,11 @@ def marcar_pedido_recibido(variante_id: str, ref_pedido: str = "",
                 "kg_proveedor": kg_prov,
                 "fecha_compra": fecha_pedido or None,
             })
+        # Sin coincidencias: salir SIN guardar (antes se commiteaba igual
+        # la limpieza legacy + recalculo aunque la llamada devolviera error).
+        if n_cerrados == 0:
+            return None, ("no habia pedidos abiertos para marcar como recibido"
+                          + (f" (ref {ref_pedido!r})" if ref_pedido else ""))
         # Si ya no quedan pedidos abiertos, limpiar la nota legacy
         sigue_abierto = any(
             (p.get("estado") or "").lower() == "abierto"
@@ -1699,10 +1769,6 @@ def marcar_pedido_recibido(variante_id: str, ref_pedido: str = "",
             item["pedido_hecho"] = ""
         item["total_kg"] = round(sum(p.get("kg") or 0 for p in partidos), 2)
         _guardar(data)
-
-    if n_cerrados == 0:
-        return None, ("no habia pedidos abiertos para marcar como recibido"
-                      + (f" (ref {ref_pedido!r})" if ref_pedido else ""))
 
     # Registrar movimiento de entrada por cada partido creado
     mi = _movs()
@@ -1715,8 +1781,8 @@ def marcar_pedido_recibido(variante_id: str, ref_pedido: str = "",
                              coste_kg=None, fecha_entrada=fecha_hoy,
                              usuario=usuario,
                              nota=f"recibido pedido {pc['ref_pedido'] or ''}".strip())
-            except Exception:
-                pass
+            except Exception as _e:
+                _log.warning("inventario mutado pero movimiento NO registrado: %s", _e)
 
     return {
         "variante_id":      variante_id,

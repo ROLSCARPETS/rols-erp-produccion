@@ -258,13 +258,19 @@ def borrar(prov_id: str) -> tuple[bool, str]:
                     if (p.get("id") or "").lower() == prov_id.lower()), -1)
         if idx < 0:
             return False, f"proveedor {prov_id!r} no existe"
-        nombre = provs[idx].get("nombre") or ""
-        # Comprobar que no esta usado por ninguna variante
+        # Comprobar que no esta usado por ninguna variante. Las variantes
+        # guardan el ALIAS (la cascada de renombrado propaga alias, no
+        # nombre): comprobar solo el nombre dejaba borrar fichas con
+        # variantes vivas en cuanto alias y nombre divergian.
+        claves = {provs[idx].get("nombre") or "", provs[idx].get("alias") or ""}
+        claves.discard("")
         try:
             import sys
             sys.path.insert(0, str(Path(__file__).parent))
             import lanas_inventario as _li
-            en_uso = _li.variantes_con_proveedor(nombre)
+            en_uso = []
+            for clave in claves:
+                en_uso.extend(_li.variantes_con_proveedor(clave))
             if en_uso:
                 return False, (f"el proveedor esta vinculado a {len(en_uso)} "
                                f"variantes; desactivalo en lugar de borrarlo")
@@ -281,16 +287,24 @@ def borrar(prov_id: str) -> tuple[bool, str]:
 # Migracion inicial: extraer proveedores unicos de lanas_inventario
 # ---------------------------------------------------------------------------
 
+def _lanas_vivas() -> list[dict]:
+    """Variantes del inventario EN VIVO (jsonstore/erp.db, la fuente de
+    verdad). OJO: no leer lanas_inventario.json — desde la migracion a
+    SQLite ese fichero es un backup congelado y leerlo daba KPIs muertos."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        import lanas_inventario as _li
+        return _li.listar_lanas()
+    except Exception:
+        return []
+
+
 def migrar_desde_inventario() -> int:
-    """Crea un registro vacio para cada proveedor presente en
-    lanas_inventario.json que no exista todavia. Devuelve el numero
-    de proveedores nuevos creados."""
-    inv_path = DATA_PATH.parent / "lanas_inventario.json"
-    if not inv_path.exists():
-        return 0
-    inv = json.loads(inv_path.read_text(encoding="utf-8"))
+    """Crea un registro vacio para cada proveedor presente en el
+    inventario que no exista todavia. Devuelve el numero de nuevos."""
     nombres = sorted({(v.get("proveedor") or "").strip()
-                      for v in inv.get("lanas", [])
+                      for v in _lanas_vivas()
                       if (v.get("proveedor") or "").strip()})
     n = 0
     for nombre in nombres:
@@ -306,23 +320,23 @@ def migrar_desde_inventario() -> int:
 # ---------------------------------------------------------------------------
 
 def kpis_proveedor(prov_id: str) -> dict:
-    """Calcula KPIs en vivo desde lanas_inventario.json:
+    """Calcula KPIs en vivo desde el inventario (jsonstore):
     - n_calidades: nº de variantes distintas que suministra
     - stock_total_kg: suma de kg en stock de todas sus variantes
     - n_pedidos_abiertos: cuantos pedidos con estado='abierto'
     - n_pedidos_total: total de pedidos historicos (cualquier estado)
+
+    Matchea por ALIAS (lo que guardan las variantes por convencion) con
+    fallback al nombre — matchear solo por nombre daba KPIs a 0 en cuanto
+    alias y nombre divergian.
     """
     p = por_id(prov_id)
     if not p:
         return {"error": "proveedor no existe"}
-    nombre = (p.get("nombre") or "").upper()
-    inv_path = DATA_PATH.parent / "lanas_inventario.json"
-    if not inv_path.exists():
-        return {"n_calidades": 0, "stock_total_kg": 0,
-                "n_pedidos_abiertos": 0, "n_pedidos_total": 0}
-    inv = json.loads(inv_path.read_text(encoding="utf-8"))
-    variantes = [v for v in inv.get("lanas", [])
-                 if (v.get("proveedor") or "").upper() == nombre]
+    claves = {(p.get("alias") or "").upper(), (p.get("nombre") or "").upper()}
+    claves.discard("")
+    variantes = [v for v in _lanas_vivas()
+                 if (v.get("proveedor") or "").upper() in claves]
     stock = sum(float(v.get("total_kg") or 0) for v in variantes)
     n_abiertos = 0
     n_total = 0

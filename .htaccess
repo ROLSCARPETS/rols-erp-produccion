@@ -2,15 +2,24 @@
 # a Flask), pero por si alguna llegara a Apache como estático, se bloquea el
 # acceso directo a ficheros sensibles. La protección principal son las reglas
 # `deny` de nginx que se añaden en Plesk (Hosting y DNS → Apache y nginx).
-<FilesMatch "\.(env|py|pyc|db|sqlite|sqlite3|log|ini|bat|ps1|sh|txt)$">
+<FilesMatch "\.(env|py|pyc|db|db-wal|db-shm|sqlite|sqlite3|log|ini|bat|ps1|sh|txt|md)$">
     Require all denied
 </FilesMatch>
 
-# Ocultar dotfiles (.env, .git, ...) salvo el reto de Let's Encrypt.
+# Ocultar dotfiles (.env, ...) salvo el reto de Let's Encrypt.
+# OJO: FilesMatch evalua solo el BASENAME, asi que "^\." no cubre
+# /.git/config (basename "config") — el bloqueo de directorios va por
+# RewriteRule mas abajo.
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule "^\.well-known/" - [L]
+    # Directorios completos que jamas se sirven como estatico:
+    # - .git/ (descargaria el repo entero)
+    # - shared/data/ (JSON seed con contactos y costes; el runtime vive
+    #   fuera del docroot, pero el seed committeado tambien es sensible)
+    RewriteRule "^\.git(/|$)" - [F,L]
+    RewriteRule "^shared/data(/|$)" - [F,L]
 </IfModule>

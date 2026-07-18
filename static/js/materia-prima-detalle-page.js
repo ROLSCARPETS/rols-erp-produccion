@@ -594,8 +594,12 @@ const _selTitulo   = document.getElementById('mpd-titulo-select');
 _trackPrevValue(_selClasif);
 _trackPrevValue(_selMaterial);
 _trackPrevValue(_selTitulo);
+// Los DOS sentinels ('__nuevo__' y '__gestionar__') se desvian al handler
+// del catalogo: antes solo se desviaba '__nuevo__', y elegir "⚙ Gestionar
+// lista…" caia al guardado normal con el sentinel como valor (llegaba a
+// renombrar el titulo de la calidad a "__gestionar__").
 _selClasif.addEventListener('change', async (e) => {
-  if (e.target.value === '__nuevo__') {
+  if (e.target.value === '__nuevo__' || e.target.value === '__gestionar__') {
     await _onSelectCatalogoChange(e);
     return;
   }
@@ -604,7 +608,7 @@ _selClasif.addEventListener('change', async (e) => {
   _selClasif.dataset.prevValue = _selClasif.value;
 });
 _selMaterial.addEventListener('change', async (e) => {
-  if (e.target.value === '__nuevo__') {
+  if (e.target.value === '__nuevo__' || e.target.value === '__gestionar__') {
     await _onSelectCatalogoChange(e);
     return;
   }
@@ -612,7 +616,7 @@ _selMaterial.addEventListener('change', async (e) => {
   _selMaterial.dataset.prevValue = _selMaterial.value;
 });
 _selTitulo.addEventListener('change', async (e) => {
-  if (e.target.value === '__nuevo__') {
+  if (e.target.value === '__nuevo__' || e.target.value === '__gestionar__') {
     await _onSelectCatalogoChange(e);
     return;
   }
@@ -1221,6 +1225,9 @@ function abrirModalPedidoLocal() {
     proveedor:    v.proveedor || '(sin proveedor)',
     nombre:       `${nombre} (${v.proveedor || '?'})`,
     kg_a_pedir:   v.kg_a_pedir,
+    // El modal prioriza la tarifa oficial mantenida en la ficha del
+    // proveedor; sin este campo el €/kg sugerido caia al precio legacy.
+    tarifa_actual_eur_kg: v.tarifa_actual_eur_kg,
     precio_2026:  v.precio_2026,
     precio_2025:  v.precio_2025,
   }));

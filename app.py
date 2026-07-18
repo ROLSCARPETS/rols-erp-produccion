@@ -139,6 +139,13 @@ def _sso_user():
                 user = json.loads(resp.read().decode("utf-8"))
     except Exception:
         user = None  # 401 / cuentas caido / red -> sin sesion valida
+    # Purga: sin esto el dict crece sin limite (una entrada por valor de
+    # cookie que pase por aqui, incluidos valores invalidos aleatorios).
+    if len(_SSO_CACHE) > 512:
+        for k in [k for k, v in _SSO_CACHE.items() if (now - v[1]) >= _SSO_TTL]:
+            _SSO_CACHE.pop(k, None)
+        if len(_SSO_CACHE) > 512:
+            _SSO_CACHE.clear()   # todas vivas y aun asi enorme: reset
     _SSO_CACHE[val] = (user, now)
     g._sso_user = user
     return user
@@ -154,6 +161,16 @@ def _user_name() -> str | None:
     """Username segun la sesion validada en el servidor."""
     u = _sso_user()
     return ((u or {}).get("username") or "").strip().lower() or None
+
+
+def _int_or_none(valor) -> int | None:
+    """int(valor) o None si viene vacio o no es numerico (querystrings)."""
+    if valor in (None, ""):
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
 
 
 @app.context_processor
@@ -240,6 +257,8 @@ def api_v1_consumir():
     ref = (data.get("ref") or "").strip()
     try:
         m2 = float(data.get("m2") or 0)
+        if not math.isfinite(m2):
+            m2 = 0
     except (TypeError, ValueError):
         m2 = 0
     usuario = (data.get("usuario") or "").strip()
@@ -348,7 +367,11 @@ def proveedor_detalle(prov_id):
     Sustituye la antigua expansion inline del tab Proveedores."""
     bl = _bloquear_representante()
     if bl:
-        return bl
+        # Es una PAGINA, no una API: en vez de mostrar el JSON de error en
+        # el navegador (sesion caducada, p.ej.), devolvemos al inicio de la
+        # suite, igual que hace el guard JS de las demas pantallas.
+        from flask import redirect
+        return redirect(_rols_one_base() + "/inicio")
     return render_template("proveedor_detalle.html", prov_id=prov_id)
 
 
@@ -410,21 +433,25 @@ def api_proveedor_detalle(prov_id):
         # deltas. Los que no tengan fecha (datos legacy) tambien se muestran
         # pero al final, sin delta (no podemos saber su orden temporal).
         partidos_con_precio = []
-        for p in (v.get("partidos") or []):
-            coste = p.get("coste_kg")
+        # OJO: no llamar `p` a la variable del bucle — `p` es la ficha del
+        # proveedor (linea de arriba) y el jsonify final la devuelve; un
+        # shadowing aqui hacia que la API devolviera un PARTIDO como
+        # "proveedor" (ficha vacia/INACTIVO en la UI).
+        for pt in (v.get("partidos") or []):
+            coste = pt.get("coste_kg")
             if coste is None:
                 continue
             try:
                 coste_f = float(coste)
             except (TypeError, ValueError):
                 continue
-            fecha = p.get("fecha_entrada") or p.get("fecha_compra") or ""
+            fecha = pt.get("fecha_entrada") or pt.get("fecha_compra") or ""
             partidos_con_precio.append({
-                "partido":     p.get("partido"),
+                "partido":     pt.get("partido"),
                 "fecha":       fecha[:10] if isinstance(fecha, str) and fecha else "",
                 "fecha_iso":   fecha,
                 "coste_kg":    coste_f,
-                "kg_inicial":  float(p.get("kg_inicial") or p.get("kg") or 0),
+                "kg_inicial":  float(pt.get("kg_inicial") or pt.get("kg") or 0),
             })
         # Orden cronologico ascendente para calcular deltas. Los sin fecha
         # se quedan al principio (los consideramos "mas antiguos / desconocidos").
@@ -798,7 +825,7 @@ def api_materia_prima_anadir_proveedor(calidad_id):
     if not prov:
         return jsonify({"error": "falta proveedor"}), 400
     usuario = (body.get("usuario")
-               or request.headers.get("X-Rols-User") or "").strip()
+               or request.headers.get("X-Rols-User") or _user_name() or "").strip()
     li = _lanas_inv_module()
     nueva, err = li.anadir_proveedor_a_calidad(calidad_id, prov, usuario=usuario)
     if err:
@@ -823,7 +850,7 @@ def api_materia_prima_quitar_proveedor(calidad_id, proveedor):
               .strip().lower() in ("1", "true", "yes"))
     usuario = (body.get("usuario")
                or request.args.get("usuario")
-               or request.headers.get("X-Rols-User") or "").strip()
+               or request.headers.get("X-Rols-User") or _user_name() or "").strip()
     li = _lanas_inv_module()
     ok, err = li.quitar_proveedor_de_calidad(
         calidad_id, proveedor, forzar=forzar, usuario=usuario)
@@ -853,7 +880,7 @@ def api_materia_prima_borrar(calidad_id):
               .strip().lower() in ("1", "true", "yes"))
     usuario = (body.get("usuario")
                or request.args.get("usuario")
-               or request.headers.get("X-Rols-User") or "").strip()
+               or request.headers.get("X-Rols-User") or _user_name() or "").strip()
     li = _lanas_inv_module()
     ok, err = li.borrar_calidad(calidad_id, forzar=forzar, usuario=usuario)
     if not ok:
@@ -1432,7 +1459,7 @@ def api_movimientos():
         tipo=request.args.get("tipo") or None,
         desde=request.args.get("desde") or None,
         hasta=request.args.get("hasta") or None,
-        limit=int(request.args.get("limit")) if request.args.get("limit") else None,
+        limit=_int_or_none(request.args.get("limit")),
     )
     return jsonify({"movimientos": movs, "total": len(movs)})
 
@@ -1484,7 +1511,7 @@ def api_lana_cruda_crear_contenedor():
     if bl:
         return bl
     body = request.get_json(force=True, silent=True) or {}
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     lc = _lana_cruda_module()
     nuevo, err = lc.crear_contenedor(
         ref=                  body.get("ref") or "",
@@ -1520,7 +1547,7 @@ def api_lana_cruda_contenedor(cid):
             return jsonify({"error": f"contenedor {cid!r} no existe"}), 404
         ordenes = lc.listar_movimientos_hilado(contenedor_id=cid)
         return jsonify({"contenedor": c, "ordenes_hilado": ordenes})
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     if request.method == "PUT":
         body = request.get_json(force=True, silent=True) or {}
         actualizado, err = lc.actualizar_contenedor(cid, body, usuario=usuario)
@@ -1557,7 +1584,7 @@ def api_lana_cruda_apartar():
     if bl:
         return bl
     body = request.get_json(force=True, silent=True) or {}
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     lc = _lana_cruda_module()
     orden, err = lc.apartar_para_hilar(
         contenedores_consumo=  body.get("contenedores_consumo") or [],
@@ -1590,7 +1617,7 @@ def api_lana_cruda_cerrar_orden(oid):
     if bl:
         return bl
     body = request.get_json(force=True, silent=True) or {}
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     lc = _lana_cruda_module()
     orden, err = lc.cerrar_orden_hilado(
         orden_id=             oid,
@@ -1614,7 +1641,7 @@ def api_lana_cruda_anular_orden(oid):
     if bl:
         return bl
     body = request.get_json(force=True, silent=True) or {}
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     lc = _lana_cruda_module()
     orden, err = lc.anular_orden_hilado(
         orden_id=oid,
@@ -1689,7 +1716,7 @@ def api_compras_generar_pedido():
     body = request.get_json(force=True, silent=True) or {}
     lineas = body.get("lineas") or []
     nota = (body.get("nota") or "").strip()
-    usuario = (request.headers.get("X-Rols-User") or "").strip()
+    usuario = (request.headers.get("X-Rols-User") or _user_name() or "").strip()
     resultado, err = li.registrar_pedido(lineas, usuario=usuario, nota=nota)
     if err:
         return jsonify({"error": err}), 400
@@ -1747,7 +1774,7 @@ def api_compras_pedido_recibido(ref):
     if not vid:
         return jsonify({"error": "falta variante_id"}), 400
     usuario = (body.get("usuario")
-               or request.headers.get("X-Rols-User") or "").strip()
+               or request.headers.get("X-Rols-User") or _user_name() or "").strip()
     kg_a_rols = body.get("kg_a_rols")  # puede ser None, int o float
     li = _lanas_inv_module()
     real_ref = "" if ref in ("*", "all") else ref
@@ -1775,7 +1802,7 @@ def api_compras_pedido_anular(ref):
     if not vid:
         return jsonify({"error": "falta variante_id"}), 400
     usuario = (body.get("usuario")
-               or request.headers.get("X-Rols-User") or "").strip()
+               or request.headers.get("X-Rols-User") or _user_name() or "").strip()
     motivo = (body.get("motivo") or "").strip()
     li = _lanas_inv_module()
     real_ref = "" if ref in ("*", "all") else ref
@@ -1878,6 +1905,14 @@ def _no_cache_static_js_css(resp):
     return resp
 
 
+# Sincronizar el catalogo de titulos tambien al arrancar bajo Passenger:
+# el bloque __main__ de abajo solo corre en local, asi que en produccion
+# los titulos en uso no aparecian en los filtros hasta un POST /sync manual.
+# Idempotente y best-effort (no tumba el arranque si los datos aun no estan).
+try:
+    _sincronizar_catalogo_titulos()
+except Exception:
+    pass
 
 
 if __name__ == "__main__":

@@ -109,8 +109,20 @@ class _Store:
         else:
             self._local.depth = depth
             if depth == 0:
-                c.execute("COMMIT")
-                self._local.tx_docs = None
+                try:
+                    c.execute("COMMIT")
+                except BaseException:
+                    # Si el COMMIT falla (disco lleno, I/O...), dejar la
+                    # conexion y el hilo LIMPIOS: sin esto, tx_docs quedaba
+                    # poblado para siempre y todas las load() posteriores del
+                    # hilo servian el dict en memoria en vez de leer la BD.
+                    try:
+                        c.execute("ROLLBACK")
+                    except sqlite3.Error:
+                        pass
+                    raise
+                finally:
+                    self._local.tx_docs = None
 
     def load(self, key: str, default_factory, legacy_json=None) -> dict:
         """Devuelve el documento `key` (dict). Dentro de una transacción,
@@ -132,7 +144,10 @@ class _Store:
                     "documento %r ilegible en la BD; se usa el default", key)
                 data = default_factory()
         elif legacy_json:
-            # No hay fila: migración one-time desde el JSON legacy.
+            # No hay fila: migración one-time desde el JSON legacy. Con
+            # INSERT-si-no-existe: si otro worker migró (y quizá el usuario ya
+            # escribió encima) entre nuestro SELECT y este punto, NO pisamos
+            # su fila — releemos la que ganó.
             p = Path(legacy_json)
             if p.exists():
                 try:
@@ -140,13 +155,37 @@ class _Store:
                 except (OSError, ValueError):
                     d = None
                 if isinstance(d, dict):
-                    self.save(key, d)
-                    data = d
+                    if self._save_if_absent(key, d):
+                        data = d
+                    else:
+                        row = c.execute(
+                            "SELECT data FROM documents WHERE key=?",
+                            (key,)).fetchone()
+                        if row is not None:
+                            try:
+                                data = json.loads(row[0])
+                            except (ValueError, TypeError):
+                                data = d
+                        else:
+                            data = d
         if data is None:
             data = default_factory()
         if docs is not None:
             docs[key] = data
         return data
+
+    def _save_if_absent(self, key: str, data: dict) -> bool:
+        """Inserta el documento solo si la key NO existe (para la migración
+        legacy). Devuelve True si esta llamada insertó la fila."""
+        blob = json.dumps(data, ensure_ascii=False, allow_nan=False)
+        now = datetime.now().isoformat(timespec="seconds")
+        c = self._conn()
+        with self.tx():
+            cur = c.execute(
+                "INSERT INTO documents(key, data, updated_at) VALUES(?,?,?) "
+                "ON CONFLICT(key) DO NOTHING",
+                (key, blob, now))
+            return cur.rowcount > 0
 
     def save(self, key: str, data: dict) -> None:
         """Escribe el documento `key`. Dentro de una transacción (reentrante):

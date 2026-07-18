@@ -67,6 +67,18 @@ from functools import lru_cache
 from pathlib import Path
 
 import os
+import math
+import logging
+_log_lc = logging.getLogger("erp.lana_cruda")
+
+
+def _float_finito(valor) -> float:
+    """float(valor) validando que sea FINITO (NaN/inf pasan los guards de
+    negocio y solo revientan al persistir con un 500; mejor un error claro)."""
+    v = float(valor)
+    if not math.isfinite(v):
+        raise ValueError("no finito")
+    return v
 
 # Datos de runtime: en prod ROLS_DATA_DIR los fija FUERA del docroot (persisten,
 # los deploys no los pisan); en local cae a shared/data como siempre.
@@ -263,13 +275,13 @@ def crear_contenedor(ref: str, hilador_actual: str, kg_inicial,
     # hilador concreto todavia (se decide al ejecutar la orden de hilado).
     hil = (hilador_actual or "").strip()
     try:
-        kg_f = float(kg_inicial)
+        kg_f = _float_finito(kg_inicial)
     except (TypeError, ValueError):
         return None, "kg_inicial debe ser numerico"
     if kg_f <= 0:
         return None, "kg_inicial debe ser > 0"
     try:
-        coste_f = float(coste_kg)
+        coste_f = _float_finito(coste_kg)
     except (TypeError, ValueError):
         return None, "coste_kg debe ser numerico"
     if coste_f < 0:
@@ -374,6 +386,17 @@ def borrar_contenedor(cid: str, forzar: bool = False,
         if kg > 0 and not forzar:
             return False, (f"el contenedor tiene {kg:.0f} kg sin hilar. "
                            f"Hilalo o usa forzar=true.")
+        # Ordenes de hilado PENDIENTES que referencian este contenedor: si se
+        # borra y luego se anula la orden, los kg apartados no tienen a donde
+        # volver. Bloquear salvo forzado explicito.
+        pendientes = [m for m in (data.get("movimientos_hilado") or [])
+                      if (m.get("estado") == "pendiente")
+                      and any(co.get("contenedor_id") == cid
+                              for co in (m.get("contenedores_origen") or []))]
+        if pendientes and not forzar:
+            return False, (f"el contenedor tiene {len(pendientes)} orden(es) de "
+                           "hilado pendiente(s). Cierra o anula esas ordenes "
+                           "primero, o usa forzar=true.")
         if forzar and kg > 0:
             # Auditoria: dejamos rastro del borrado en movimientos_hilado.
             data.setdefault("movimientos_hilado", []).append({
@@ -445,12 +468,24 @@ def apartar_para_hilar(contenedores_consumo: list[dict],
     for it in contenedores_consumo:
         cid_ = (it.get("contenedor_id") or "").strip()
         try:
-            kg_c = float(it.get("kg") or 0)
+            kg_c = _float_finito(it.get("kg") or 0)
         except (TypeError, ValueError):
             return None, f"kg consumidos de {cid_!r} debe ser numerico"
         if not cid_ or kg_c <= 0:
             return None, "cada consumo necesita contenedor_id y kg > 0"
         consumos_norm.append({"contenedor_id": cid_, "kg": kg_c})
+    # Agrupar lineas duplicadas del mismo contenedor ANTES de validar: la
+    # comprobacion de saldo es por linea, y dos lineas de 80 kg sobre un
+    # contenedor de 100 pasaban ambas (80<=100) dejando stock NEGATIVO al
+    # descontar. Sumadas, la validacion las ve como lo que son: 160 kg.
+    _agrupados: dict[str, dict] = {}
+    for it in consumos_norm:
+        prev = _agrupados.get(it["contenedor_id"])
+        if prev:
+            prev["kg"] = round(prev["kg"] + it["kg"], 2)
+        else:
+            _agrupados[it["contenedor_id"]] = dict(it)
+    consumos_norm = list(_agrupados.values())
     kg_crudo_total = sum(it["kg"] for it in consumos_norm)
 
     # Verificar saldo + descontar + crear orden
@@ -535,13 +570,13 @@ def cerrar_orden_hilado(orden_id: str, kg_hilado, tarifa_hilado_eur_kg,
     """
     # Validar
     try:
-        kg_hilado_f = float(kg_hilado)
+        kg_hilado_f = _float_finito(kg_hilado)
     except (TypeError, ValueError):
         return None, "kg_hilado debe ser numerico"
     if kg_hilado_f <= 0:
         return None, "kg_hilado debe ser > 0"
     try:
-        tarifa_f = float(tarifa_hilado_eur_kg or 0)
+        tarifa_f = _float_finito(tarifa_hilado_eur_kg or 0)
     except (TypeError, ValueError):
         return None, "tarifa_hilado_eur_kg debe ser numerico"
     if tarifa_f < 0:
@@ -574,7 +609,30 @@ def cerrar_orden_hilado(orden_id: str, kg_hilado, tarifa_hilado_eur_kg,
         merma_kg = round(kg_crudo - kg_hilado_f, 2)
         merma_pct = round((merma_kg / kg_crudo) * 100, 2) if kg_crudo else 0.0
 
-        # Actualizar orden
+        # Crear el partido y cerrar la orden DENTRO de la misma transaccion,
+        # y en este orden: primero el partido (si su validacion falla, la
+        # orden ni se toca), despues el estado de la orden (dict puro, ya no
+        # puede fallar). Antes eran dos commits separados con compensacion
+        # best-effort: una excepcion o un reinicio del worker entre ambos
+        # dejaba la orden "recibido" sin partido creado y sin reintento
+        # posible. La tx anidada de agregar_partido se une a esta.
+        fecha_rec = (fecha_recibido or "").strip() or _now_iso()[:10]
+        li = _lanas_inv()
+        refs_origen = ", ".join(
+            (contenedor_por_id(c["contenedor_id"]) or {}).get("ref") or c["contenedor_id"]
+            for c in (orden.get("contenedores_origen") or [])
+        )
+        obs_partido = (f"Hilado de {refs_origen}" +
+                       (f" — merma {merma_pct:.1f}%" if merma_pct else ""))
+        _, err_part = li.agregar_partido(
+            orden["variante_destino_id"], partido_ref=partido_ref,
+            kg=kg_hilado_f, coste_kg=coste_kg_partido,
+            fecha_entrada=fecha_rec, usuario=usuario,
+            observaciones=obs_partido,
+        )
+        if err_part:
+            return None, f"no se pudo crear el partido hilado: {err_part}"
+
         orden["estado"] = "recibido"
         orden["kg_hilado"] = round(kg_hilado_f, 2)
         orden["merma_kg"] = merma_kg
@@ -583,43 +641,11 @@ def cerrar_orden_hilado(orden_id: str, kg_hilado, tarifa_hilado_eur_kg,
         orden["coste_hilado_eur"] = coste_hilado_eur
         orden["coste_total_eur"] = coste_total_eur
         orden["coste_kg_partido"] = coste_kg_partido
-        orden["fecha_recibido"] = (fecha_recibido or "").strip() or _now_iso()[:10]
+        orden["fecha_recibido"] = fecha_rec
         orden["partido_creado"] = partido_ref
         if usuario:
             orden["cerrado_por"] = usuario
         _guardar(data)
-
-    # Crear el partido en lanas_inventario (fuera del lock)
-    li = _lanas_inv()
-    refs_origen = ", ".join(
-        (contenedor_por_id(c["contenedor_id"]) or {}).get("ref") or c["contenedor_id"]
-        for c in (orden.get("contenedores_origen") or [])
-    )
-    obs_partido = (f"Hilado de {refs_origen}" +
-                   (f" — merma {merma_pct:.1f}%" if merma_pct else ""))
-    _, err_part = li.agregar_partido(
-        orden["variante_destino_id"], partido_ref=partido_ref,
-        kg=kg_hilado_f, coste_kg=coste_kg_partido,
-        fecha_entrada=orden["fecha_recibido"], usuario=usuario,
-        observaciones=obs_partido,
-    )
-    if err_part:
-        # Revertir el estado de la orden (los kg ya estan descontados
-        # del crudo desde el apartado — eso se mantiene).
-        with jsonstore.store().tx():
-            data = cargar()
-            movs = data.get("movimientos_hilado") or []
-            idx = next((i for i, m in enumerate(movs) if m.get("id") == orden_id), -1)
-            if idx >= 0:
-                o = movs[idx]
-                o["estado"] = "pendiente"
-                for k in ("kg_hilado", "merma_kg", "merma_pct",
-                          "tarifa_hilado_eur_kg", "coste_hilado_eur",
-                          "coste_total_eur", "coste_kg_partido",
-                          "fecha_recibido"):
-                    o[k] = None
-                _guardar(data)
-        return None, f"no se pudo crear el partido hilado: {err_part}"
     return orden, ""
 
 
@@ -643,7 +669,20 @@ def anular_orden_hilado(orden_id: str, motivo: str = "",
         for it in (orden.get("contenedores_origen") or []):
             ci = cid_to_idx.get(it.get("contenedor_id"))
             if ci is None:
-                continue   # contenedor ya borrado; no podemos devolver, dejamos rastro
+                # Contenedor ya borrado: los kg apartados no tienen a donde
+                # volver. Rastro REAL en el historico (antes el comentario
+                # prometia rastro pero no se escribia nada).
+                data.setdefault("movimientos_hilado", []).append({
+                    "id":            _id_orden_hilado(),
+                    "timestamp":     _now_iso(),
+                    "tipo":          "kg-no-devueltos",
+                    "orden_id":      orden_id,
+                    "contenedor_id": it.get("contenedor_id"),
+                    "kg":            round(float(it.get("kg") or 0), 2),
+                    "usuario":       usuario or "",
+                    "nota":          "anulacion: el contenedor de origen ya no existe",
+                })
+                continue
             contenedores[ci]["kg_actual"] = round(
                 float(contenedores[ci]["kg_actual"]) + float(it.get("kg") or 0), 2)
         orden["estado"] = "anulado"

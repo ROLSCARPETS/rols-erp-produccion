@@ -23,7 +23,11 @@ function escapeHtml(s) {
 function showFeedback(msg, ok) {
   feedback.textContent = msg;
   feedback.className = 'mp-feedback ' + (ok ? 'ok' : 'err');
-  setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+  // Limpiar el display:none inline que dejo el timeout anterior (las clases
+  // .ok/.err no pueden contra un estilo inline: el segundo aviso no se veia).
+  feedback.style.display = '';
+  clearTimeout(showFeedback._t);
+  showFeedback._t = setTimeout(() => { feedback.style.display = 'none'; }, 4000);
 }
 
 // Cache global: calidad_id -> {variantes, ...} para que cargarLotes
@@ -79,6 +83,7 @@ async function cargar() {
   try {
     const r = await fetch('/api/materias-primas/lanas');
     const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     LANAS_ALL = d.lanas || [];
     LANAS_ALL.forEach(l => { LANAS_POR_ID[l.id] = l; });
     poblarFiltros(LANAS_ALL);
@@ -613,26 +618,13 @@ tbody.addEventListener('click', async (e) => {
   }
 
   if (action === 'editar') {
-    const material = tr.cells[0].textContent;
-    const titulo = tr.cells[1].textContent.trim();
-    const tipo = tr.cells[2].textContent;
-    tr.classList.add('editando');
-    tr.innerHTML = `
-      <td><input type="text" class="mp-edit-material" value="${escapeHtml(material)}" maxlength="50" /></td>
-      <td><input type="text" class="mp-edit-titulo" value="${escapeHtml(titulo)}" maxlength="100" /></td>
-      <td><input type="text" class="mp-edit-tipo" value="${escapeHtml(tipo)}" maxlength="100" /></td>
-      <td colspan="3" style="text-align:center; color:#9a9a9a; font-size:0.78rem; font-style:italic">(editando)</td>
-      <td>
-        <div class="mp-row-actions">
-          <button class="mp-btn-row" data-action="guardar">Guardar</button>
-          <button class="mp-btn-row" data-action="cancelar">Cancelar</button>
-        </div>
-      </td>
-    `;
-    tr.querySelectorAll('input').forEach(i => {
-      i.style.cssText = 'border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.85rem; background:#FAF8F6; width:100%;';
-    });
-    tr.querySelector('.mp-edit-titulo').focus();
+    // La edicion inline estaba rota por partida doble: los indices de celda
+    // (cells[0..2]) ya no cuadran con las columnas configurables, y el
+    // backend rechaza el renombrado por esta via ("Renombrar calidad no
+    // soportado"). El editor real es la ficha: navegamos a ella, igual que
+    // el click en la fila.
+    window.location.href = '/materia-prima/' + encodeURIComponent(id);
+    return;
   }
 
   if (action === 'guardar') {
@@ -733,7 +725,9 @@ function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
       const prov = l.proveedor || '';
       const provKey = prov.split('/')[0].trim().toUpperCase();
       return `
-        <tr data-lote="${escapeHtml(l.lote)}" data-proveedor="${escapeHtml(prov)}" class="${agotado ? 'lote-agotado' : ''}">
+        <tr data-lote="${escapeHtml(l.lote)}" data-proveedor="${escapeHtml(prov)}"
+            data-kg="${l.cantidad_disponible_kg ?? ''}" data-coste="${l.coste_kg ?? ''}"
+            class="${agotado ? 'lote-agotado' : ''}">
           <td><strong>${escapeHtml(l.lote)}</strong></td>
           <td>${prov ? `<span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(prov)}</span>` : '—'}</td>
           <td style="text-align:right">${fmtKg(l.cantidad_disponible_kg)}</td>
@@ -793,11 +787,15 @@ function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
     const action = btn.dataset.loteAction;
 
     if (action === 'add') {
-      const lote = wrap.querySelector('.inp-lote').value.trim();
-      const kg = parseFloat(wrap.querySelector('.inp-kg').value);
-      const coste = parseFloat(wrap.querySelector('.inp-coste').value);
-      const fecha = wrap.querySelector('.inp-fecha').value;
-      let proveedor = (wrap.querySelector('.inp-proveedor')?.value || '').trim();
+      // Selectores anclados a la fila-formulario: una fila en modo edicion
+      // usa las mismas clases .inp-* y va ANTES en el DOM — sin el ancla,
+      // "+ Añadir lote" leia los valores de la fila editada.
+      const form = wrap.querySelector('.lote-form-row');
+      const lote = form.querySelector('.inp-lote').value.trim();
+      const kg = parseFloat(form.querySelector('.inp-kg').value);
+      const coste = parseFloat(form.querySelector('.inp-coste').value);
+      const fecha = form.querySelector('.inp-fecha').value;
+      let proveedor = (form.querySelector('.inp-proveedor')?.value || '').trim();
       if (proveedor === '__otro__') {
         proveedor = (prompt('Proveedor nuevo (mayúsculas, ej. COBO):') || '').trim().toUpperCase();
         if (!proveedor) return;
@@ -866,8 +864,10 @@ function pintarLotes(lanaId, wrap, lotes, mostrarAgotados) {
       // Inline edit: reemplazamos cells por inputs. La columna de
       // proveedor no es editable (cambiar proveedor seria mover el
       // lote a otra variante; se hace borrando y creando).
-      const kg = parseFloat(tr.cells[2].textContent) || 0;
-      const coste = parseFloat(tr.cells[3].textContent) || 0;
+      // Los valores salen de data-attrs CRUDOS, no del texto de la celda:
+      // parseFloat("1.234,56 kg") daba 1.234 y guardar corrompia el stock.
+      const kg = parseFloat(tr.dataset.kg) || 0;
+      const coste = parseFloat(tr.dataset.coste) || 0;
       const fecha = (tr.cells[4].textContent || '').trim();
       const provDisplay = tr.cells[1].innerHTML;
       tr.innerHTML = `
@@ -1333,10 +1333,11 @@ function fmtSigned(n) {
 }
 
 const TIPO_PILL = {
-  entrada: '<span class="pill-tipo pill-entrada">Entrada</span>',
-  ajuste:  '<span class="pill-tipo pill-ajuste">Ajuste</span>',
-  salida:  '<span class="pill-tipo pill-salida">Salida</span>',
-  borrado: '<span class="pill-tipo pill-borrado">Borrado</span>',
+  entrada:  '<span class="pill-tipo pill-entrada">Entrada</span>',
+  ajuste:   '<span class="pill-tipo pill-ajuste">Ajuste</span>',
+  salida:   '<span class="pill-tipo pill-salida">Salida</span>',
+  borrado:  '<span class="pill-tipo pill-borrado">Borrado</span>',
+  traslado: '<span class="pill-tipo pill-traslado">Traslado</span>',
 };
 
 function renderMovimientos() {
@@ -3748,3 +3749,9 @@ document.getElementById('btn-add-prov').addEventListener('click', async () => {
 // Iniciar tab desde hash — se llama al final del script para asegurar
 // que todas las variables (incluido `const COMPRAS`) ya estan inicializadas.
 if (typeof window.__initTabFromHash === 'function') window.__initTabFromHash();
+// Y tambien al cambiar el hash SIN recargar: los links de la sidebar a
+// /materias-primas#proveedores desde la propia pagina solo cambian el
+// fragment — sin este listener no movian la UI.
+window.addEventListener('hashchange', () => {
+  if (typeof window.__initTabFromHash === 'function') window.__initTabFromHash();
+});

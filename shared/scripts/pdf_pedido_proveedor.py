@@ -197,7 +197,10 @@ def generar_pdf_pedido(proveedor: str, lineas: list[dict],
             ] if p),
             proveedor_data.get("pais"),
         ]
-        dir_txt = "<br/>".join(p for p in partes_dir if p)
+        # _escape tambien aqui: una direccion con '&' o '<' ("C/ Mayor & Cia")
+        # rompia el mini-parser HTML del Paragraph de reportlab → 500 al
+        # generar el PDF (razon social/CIF/contacto ya se escapaban).
+        dir_txt = "<br/>".join(_escape(p) for p in partes_dir if p)
         contacto_partes = []
         if proveedor_data.get("contacto_persona"):
             contacto_partes.append("A/A " + proveedor_data["contacto_persona"])
