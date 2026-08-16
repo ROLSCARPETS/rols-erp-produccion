@@ -245,7 +245,7 @@
       const errBox = back.querySelector('#uim-rec-error');
       const btnCancelar = back.querySelector('#uim-rec-cancelar');
       const btnConfirmar = back.querySelector('#uim-rec-confirmar');
-      sub.textContent = `Pedido ${ref} · ${Number(kgTotal).toLocaleString('es-ES')} kg`;
+      sub.textContent = `Pedido ${ref} · ${Number(kgTotal).toLocaleString('es-ES', { useGrouping: 'always' })} kg`;
       opt1.checked = true;
       opt2.checked = false;
       splitBox.style.display = 'none';
@@ -267,7 +267,7 @@
           return;
         }
         const resto = kgTotal - v;
-        resumen.innerHTML = `→ <strong>${Number(v).toLocaleString('es-ES')} kg</strong> a Rols · <strong style="color:#6b46c1">${Number(resto).toLocaleString('es-ES')} kg</strong> quedan en proveedor`;
+        resumen.innerHTML = `→ <strong>${Number(v).toLocaleString('es-ES', { useGrouping: 'always' })} kg</strong> a Rols · <strong style="color:#6b46c1">${Number(resto).toLocaleString('es-ES', { useGrouping: 'always' })} kg</strong> quedan en proveedor`;
         resumen.style.color = '#4d4d4d';
       };
       const _onRadio = () => {

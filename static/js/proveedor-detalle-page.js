@@ -185,7 +185,7 @@ function pintarCalidades(variantes) {
     // manual (viene de precio_2026/precio_2025 legacy), mostramos hint.
     const tarifaVal = v.tarifa_eur_kg;
     const tarifaInput = tarifaVal != null
-      ? Number(tarifaVal).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+      ? Number(tarifaVal).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4, useGrouping: 'always' })
       : '';
     const tarifaFecha = v.tarifa_fecha || '';
     const tarifaFuente = v.tarifa_fuente || 'manual';

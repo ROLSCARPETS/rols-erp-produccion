@@ -318,7 +318,7 @@
   // Helper: formatea kg con separadores ES
   function _fmtKg(n) {
     if (n == null || isNaN(n)) return '— kg';
-    return Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' kg';
+    return Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2, useGrouping: 'always' }) + ' kg';
   }
 
   // Refresca el texto "Nuevo saldo" en tiempo real al cambiar

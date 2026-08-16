@@ -529,13 +529,15 @@ function pintarPopupColumnas() {
 pintarHeaderColumnas();
 pintarPopupColumnas();
 
+// useGrouping 'always': es-ES por defecto NO agrupa los numeros de 4 cifras
+// (4785 -> "4785" pero 34078 -> "34.078") y la tabla quedaba inconsistente.
 function fmtKg(n) {
   if (n == null) return '—';
-  return Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' kg';
+  return Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2, useGrouping: 'always' }) + ' kg';
 }
 function fmtEur(n) {
   if (n == null) return '—';
-  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €/kg';
+  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always' }) + ' €/kg';
 }
 
 function calcResumen(lana) {
@@ -1132,7 +1134,7 @@ async function cargarLotesGlobales() {
 
 function fmtEurTotal(n) {
   if (n == null) return '—';
-  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  return Number(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: 'always' }) + ' €';
 }
 
 // Pueblo los 4 selects de filtros con los valores DISTINTOS presentes
@@ -1419,7 +1421,7 @@ function fmtSigned(n) {
   const v = Number(n);
   if (v === 0) return '0';
   const sign = v > 0 ? '+' : '−';
-  return sign + Math.abs(v).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' kg';
+  return sign + Math.abs(v).toLocaleString('es-ES', { maximumFractionDigits: 2, useGrouping: 'always' }) + ' kg';
 }
 
 const TIPO_PILL = {
