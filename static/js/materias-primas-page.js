@@ -136,6 +136,7 @@ function aplicarFiltros(lanas) {
   const fM = document.getElementById('mp-f-material').value;
   const fT = document.getElementById('mp-f-titulo').value;
   const fK = document.getElementById('mp-f-calidad').value;
+  const fQ = (document.getElementById('mp-f-buscar')?.value || '').toLowerCase().trim();
   const filtradas = lanas.filter(l => {
     if (fC && (l.clasificacion || '') !== fC) return false;
     // Filtramos sobre material_felpa, que es lo que mostramos en la
@@ -143,6 +144,17 @@ function aplicarFiltros(lanas) {
     if (fM && (l.material_felpa || '') !== fM) return false;
     if (fT && (l.titulo || '') !== fT) return false;
     if (fK && (l.tipo || '') !== fK) return false;
+    if (fQ) {
+      // Busqueda libre sobre lo que se ve en la fila: titulo, calidad,
+      // material, clasificacion y refs de partido.
+      const blob = [
+        l.titulo, l.tipo, l.nombre,
+        MATERIAL_FELPA_LABELS[l.material_felpa] || l.material_felpa,
+        CLASIFICACION_LABELS[l.clasificacion] || l.clasificacion,
+        ...(l.lotes || []).map(x => x.lote),
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!blob.includes(fQ)) return false;
+    }
     return true;
   });
   // Pequeño contador a la derecha que indica cuantas pasan el filtro
@@ -160,12 +172,16 @@ function aplicarFiltros(lanas) {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', () => pintar(aplicarFiltros(LANAS_ALL)));
 });
+// Buscador de texto libre (evento input: filtra mientras escribes)
+const _inpBuscar = document.getElementById('mp-f-buscar');
+if (_inpBuscar) _inpBuscar.addEventListener('input', () => pintar(aplicarFiltros(LANAS_ALL)));
 const _btnReset = document.getElementById('mp-f-reset');
 if (_btnReset) _btnReset.addEventListener('click', () => {
   ['mp-f-clasificacion', 'mp-f-material', 'mp-f-titulo', 'mp-f-calidad'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  if (_inpBuscar) _inpBuscar.value = '';
   pintar(aplicarFiltros(LANAS_ALL));
 });
 
@@ -213,6 +229,12 @@ const MP_COLS_DEF = {
     tdAttrs: ' style="text-align:right"',
     cell: (l, ctx) => ctx.stockHtml,
   },
+  estado: {
+    label: 'Estado',
+    thAttrs: '',
+    tdAttrs: '',
+    cell: (l, ctx) => ctx.estadoHtml,
+  },
   coste: {
     label: 'Coste medio',
     thAttrs: ' style="text-align:right"',
@@ -254,23 +276,59 @@ const MP_COLS_DEF = {
     fixed: true,
     cell: () => `
       <div class="mp-row-actions">
-        <button class="mp-btn-row" data-action="editar">Editar</button>
-        <button class="mp-btn-row danger" data-action="borrar">Borrar</button>
+        <button class="mp-btn-row" data-action="editar" title="Abrir la ficha para editar">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          Editar
+        </button>
+        <button class="mp-btn-row danger" data-action="borrar" title="Borrar la materia prima y sus partidos">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Borrar
+        </button>
       </div>`,
   },
 };
 
 const MP_COLS_ORDEN_DEFAULT = [
   'clasificacion', 'material', 'titulo', 'calidad',
-  'stock', 'coste', 'min_seguridad', 'reposicion',
+  'stock', 'estado', 'coste', 'min_seguridad', 'reposicion',
   'partidos', 'acciones',
 ];
+
+// ===== Estado derivado de una materia prima (chip de la tabla) =====
+// sin stock -> rojo · por debajo del minimo de seguridad -> ambar · resto ok.
+function estadoMateria(l, resumen) {
+  if ((resumen.total_kg || 0) <= 0) {
+    return { rank: 0, dot: 'dot-pedir', label: 'Sin stock' };
+  }
+  const lim = Number(l.limite_kg) || 0;
+  if (lim > 0 && resumen.total_kg < lim) {
+    return { rank: 1, dot: 'dot-bajo', label: 'Bajo' };
+  }
+  return { rank: 2, dot: 'dot-ok', label: 'Óptimo' };
+}
+
+// ===== Orden por columna (click en la cabecera) =====
+// Accessor de valor ordenable por columna; las que no estan aqui no ordenan.
+const MP_SORT_VAL = {
+  clasificacion: l => (CLASIFICACION_LABELS[l.clasificacion] || l.clasificacion || '').toLowerCase(),
+  material:      l => (MATERIAL_FELPA_LABELS[l.material_felpa] || l.material_felpa || '').toLowerCase(),
+  titulo:        l => (l.titulo || '').toLowerCase(),
+  calidad:       l => (l.tipo || '').toLowerCase(),
+  stock:         l => calcResumen(l).total_kg,
+  estado:        l => estadoMateria(l, calcResumen(l)).rank,
+  coste:         l => { const c = calcResumen(l).coste_medio_kg; return c == null ? -1 : c; },
+  min_seguridad: l => Number(l.limite_kg) || 0,
+  reposicion:    l => Number(l.kg_a_pedir) || 0,
+};
+let MP_SORT = { key: null, dir: 1 };   // dir: 1 asc, -1 desc
 
 // localStorage v2: incluye order. v1 solo tenia visibles (array de keys).
 // La migracion no rompe nada: si encuentra v1 lo descarta y empieza
 // limpio (los defaults son razonables, el usuario perdera su selecccion
 // previa una sola vez).
-const MP_COLS_KEY = 'mp_lanas_cols_v2';
+// v3: se estrena la columna "estado" — bump para que el orden por defecto
+// (con estado junto a stock) aplique también a quien tenía estado guardado.
+const MP_COLS_KEY = 'mp_lanas_cols_v3';
 
 function _mpCargarColsState() {
   try {
@@ -309,15 +367,34 @@ function _mpKeysVisibles() {
   return MP_COLS_STATE.order.filter(k => !MP_COLS_STATE.hidden.has(k));
 }
 
-// Renderiza el <thead> en orden. Re-llamado al cambiar orden/visibilidad.
+// Renderiza el <thead> en orden. Re-llamado al cambiar orden/visibilidad
+// o el criterio de ordenacion (flechitas).
 function pintarHeaderColumnas() {
   const tr = document.getElementById('mp-tabla-head-row');
   if (!tr) return;
   tr.innerHTML = _mpKeysVisibles().map(k => {
     const def = MP_COLS_DEF[k];
-    return `<th data-col="${k}"${def.thAttrs}>${escapeHtml(def.label)}</th>`;
+    const sortable = !!MP_SORT_VAL[k];
+    const activa = MP_SORT.key === k;
+    const flecha = sortable
+      ? `<span class="mp-th-arrow">${activa ? (MP_SORT.dir === 1 ? '▲' : '▼') : '⇅'}</span>`
+      : '';
+    const cls = (sortable ? ' class="mp-th-sortable' + (activa ? ' sorted' : '') + '"' : '');
+    return `<th data-col="${k}"${cls}${def.thAttrs}>${escapeHtml(def.label)}${flecha}</th>`;
   }).join('');
 }
+
+// Click en una cabecera ordenable: alterna asc → desc → sin orden.
+document.getElementById('mp-tabla-head-row')?.addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-col]');
+  if (!th || !MP_SORT_VAL[th.dataset.col]) return;
+  const k = th.dataset.col;
+  if (MP_SORT.key !== k)          MP_SORT = { key: k, dir: 1 };
+  else if (MP_SORT.dir === 1)     MP_SORT = { key: k, dir: -1 };
+  else                            MP_SORT = { key: null, dir: 1 };
+  pintarHeaderColumnas();
+  pintar(aplicarFiltros(LANAS_ALL));
+});
 
 // Renderiza una fila <tr> entera, iterando las columnas visibles en
 // el orden configurado. `ctx` es un dict con HTMLs precomputados.
@@ -493,6 +570,17 @@ function pintar(lanas) {
     tbody.innerHTML = `<tr><td colspan="${nCols}" class="mp-empty">${vacio}</td></tr>`;
     return;
   }
+  // Orden por columna si el usuario clico una cabecera (copia: no mutar
+  // LANAS_ALL, que conserva el orden natural del backend).
+  if (MP_SORT.key && MP_SORT_VAL[MP_SORT.key]) {
+    const val = MP_SORT_VAL[MP_SORT.key];
+    lanas = [...lanas].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va < vb) return -MP_SORT.dir;
+      if (va > vb) return MP_SORT.dir;
+      return 0;
+    });
+  }
   let html = '';
   lanas.forEach((l, i) => {
     // Precalculamos los fragmentos de HTML que las columnas necesitan
@@ -526,7 +614,9 @@ function pintar(lanas) {
           <span class="chev">▾</span>
         </button>
       </div>`;
-    const ctx = {stockHtml, costeHtml, clasifHtml, materialHtml, lotesHtml};
+    const est = estadoMateria(l, r);
+    const estadoHtml = `<span class="mp-estado"><span class="dot ${est.dot}"></span>${est.label}</span>`;
+    const ctx = {stockHtml, costeHtml, clasifHtml, materialHtml, lotesHtml, estadoHtml};
     html += `
       <tr class="lana-row" data-id="${escapeHtml(l.id)}" data-titulo="${escapeHtml(l.titulo)}" data-tipo="${escapeHtml(l.tipo)}">
         ${pintarCeldasFila(l, ctx)}
@@ -3755,3 +3845,16 @@ if (typeof window.__initTabFromHash === 'function') window.__initTabFromHash();
 window.addEventListener('hashchange', () => {
   if (typeof window.__initTabFromHash === 'function') window.__initTabFromHash();
 });
+
+// ===== Chip del usuario logueado (barra superior) =====
+function _pintarUserChip(u) {
+  const chip = document.getElementById('mp-user-chip');
+  if (!chip || !u) return;
+  const nombre = (u.nombre || u.username || '').trim();
+  if (!nombre) return;
+  document.getElementById('mp-user-nombre').textContent = nombre;
+  document.getElementById('mp-user-avatar').textContent = nombre[0].toUpperCase();
+  chip.style.display = '';
+}
+if (window.__rolsUser) _pintarUserChip(window.__rolsUser);
+window.addEventListener('rols:sso-ok', (e) => _pintarUserChip(e.detail));

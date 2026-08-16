@@ -64,6 +64,11 @@
       </div>
       <div class="flex items-center gap-3">
         <div data-lang-switcher></div>
+        <!-- Chip del usuario logueado (lo rellena el JS desde __rolsUser) -->
+        <div class="user-chip" id="mp-user-chip" style="display:none">
+          <span class="user-chip-avatar" id="mp-user-avatar"></span>
+          <span id="mp-user-nombre"></span>
+        </div>
       </div>
     </div>
 
@@ -97,6 +102,9 @@
 
       <!-- Filtros (en una sola fila) + selector de columnas (vistas) -->
       <div class="mp-filtros-bar" id="mp-filtros">
+        <input type="search" id="mp-f-buscar" class="mp-buscar"
+               placeholder="Buscar…" autocomplete="off"
+               title="Buscar por título, calidad, material, clasificación o partido" />
         <select id="mp-f-clasificacion" class="input-line mp-filtro" title="Filtrar por clasificación">
           <option value="">Todas las clasificaciones</option>
         </select>

@@ -23,7 +23,16 @@
   details.mp-add-details[open] > summary { color: var(--accent); margin-bottom: 0.3rem; }
 
   table.mp-tabla { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.5rem; }
-  table.mp-tabla th { text-align: left; padding: 0.5rem 0.6rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #7a7a7a; border-bottom: 1px solid var(--border); }
+  table.mp-tabla th { text-align: left; padding: 0.5rem 0.6rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #7a7a7a; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; z-index: 2; }
+  /* Cabeceras ordenables (click alterna asc → desc → natural) */
+  th.mp-th-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.mp-th-sortable:hover { color: var(--accent-hover); }
+  .mp-th-arrow { margin-left: 0.25rem; font-size: 0.62rem; opacity: 0.35; }
+  th.mp-th-sortable.sorted { color: var(--accent-hover); }
+  th.mp-th-sortable.sorted .mp-th-arrow { opacity: 1; }
+  /* Chip de estado de la fila (Sin stock / Bajo / Óptimo) */
+  .mp-estado { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: #4d4d4d; white-space: nowrap; }
+  .mp-estado .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   table.mp-tabla td { padding: 0.7rem 0.6rem; border-bottom: 1px solid #f2ede6; color: #2a2a2a; }
   table.mp-tabla tr:last-child td { border-bottom: none; }
   table.mp-tabla tr.editando td { background: #faf6ee; }
@@ -33,7 +42,7 @@
   table.mp-tabla tr.lana-row.editando:hover td { background: #faf6ee; }
   .mp-completo { color: #7a7a7a; font-size: 0.78rem; font-style: italic; }
   .mp-row-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
-  .mp-btn-row { background: transparent; border: 1px solid var(--border); color: #7a7a7a; padding: 0.32rem 0.7rem; border-radius: 999px; font-size: 0.74rem; cursor: pointer; transition: color 0.12s, border-color 0.12s; font-family: inherit; }
+  .mp-btn-row { background: transparent; border: 1px solid var(--border); color: #7a7a7a; padding: 0.32rem 0.7rem; border-radius: 999px; font-size: 0.74rem; cursor: pointer; transition: color 0.12s, border-color 0.12s; font-family: inherit; display: inline-flex; align-items: center; gap: 0.3rem; vertical-align: middle; }
   .mp-btn-row:hover { color: var(--accent-hover); border-color: var(--accent); }
   .mp-btn-row.danger { color: #c25656; border-color: #e8c2c2; }
   .mp-btn-row.danger:hover { background: #fde2e2; color: #9b1c1c; }
@@ -49,6 +58,26 @@
      padding mas reducido para que entren los 4 filtros + el boton de
      columnas en la misma fila. */
   .mp-filtros-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+  /* Buscador de texto libre (mismo look que los selects de filtro) */
+  .mp-buscar {
+    width: 190px; padding: 0.35rem 0.7rem; font-size: 0.78rem;
+    border-radius: 8px; border: 1px solid var(--border);
+    background-color: #fff; color: #4d4d4d; font-family: inherit;
+  }
+  .mp-buscar:focus { outline: none; border-color: var(--accent); }
+  .mp-buscar::placeholder { color: #a8a29a; }
+  /* Chip del usuario logueado (barra superior) */
+  .user-chip {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: #fff; border: 1px solid var(--border); border-radius: 999px;
+    padding: 0.28rem 0.85rem 0.28rem 0.32rem; font-size: 0.82rem; color: #4d4d4d;
+  }
+  .user-chip-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.8rem;
+  }
   .mp-filtros-bar select.mp-filtro {
     width: auto !important;
     min-width: 0;
