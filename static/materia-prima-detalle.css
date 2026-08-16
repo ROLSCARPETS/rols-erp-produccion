@@ -108,8 +108,19 @@
   }
   .mpd-kpi-card {
     background: #fff; border: 1px solid var(--border); border-radius: 12px;
-    padding: 0.95rem 1.1rem; display: flex; flex-direction: column; gap: 0.4rem;
+    padding: 0.95rem 3.6rem 0.95rem 1.1rem;
+    display: flex; flex-direction: column; gap: 0.4rem;
+    position: relative;
   }
+  /* Icono decorativo de cada KPI (cuadradito redondeado, arriba-derecha) */
+  .mpd-kpi-ico {
+    position: absolute; top: 0.85rem; right: 0.9rem;
+    width: 38px; height: 38px; border-radius: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent-soft, #EFE2CD); color: #8a6d3b;
+  }
+  .mpd-kpi-ico svg { width: 19px; height: 19px; }
+  .mpd-kpi-card-encamino .mpd-kpi-ico { background: #dbeafe; color: #1e40af; }
   .mpd-kpi-card label { font-size: 0.7rem; font-weight: 600; color: #7a7a7a; text-transform: uppercase; letter-spacing: 0.05em; }
   .mpd-kpi-card .val { font-size: 1.45rem; font-weight: 600; color: #2a2a2a; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .mpd-kpi-card.mpd-kpi-card-editable { background: #fbf8f3; border-color: #ede7dc; }
@@ -240,6 +251,22 @@
   .mpd-empty { color: #9a9a9a; padding: 1.5rem; text-align: center; font-style: italic; }
 
   /* Mini-sparkline precios (cabecera) */
+  /* Pill "+N consumidos ocultos" junto al contador de partidos */
+  .mpd-pill-ocultos {
+    background: var(--accent-soft, #EFE2CD); color: #8a6d3b;
+    border-radius: 999px; padding: 0.14rem 0.6rem;
+    font-size: 0.7rem; font-weight: 600; white-space: nowrap;
+  }
+  /* Buscador de partidos (mismo look que los filtros de la tabla principal) */
+  .mpd-buscar {
+    width: 210px; padding: 0.35rem 0.7rem; font-size: 0.78rem;
+    border-radius: 8px; border: 1px solid var(--border);
+    background-color: #fff; color: #4d4d4d; font-family: inherit;
+    font-weight: 400;
+  }
+  .mpd-buscar:focus { outline: none; border-color: var(--accent); }
+  .mpd-buscar::placeholder { color: #a8a29a; }
+
   .mpd-spark { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #7a7a7a; }
   .mpd-spark-line { stroke: var(--accent); stroke-width: 1.6; fill: none; }
   .mpd-spark-dot { fill: var(--accent-hover); }

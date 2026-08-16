@@ -736,26 +736,41 @@ if (_inpTipo) {
   });
 })();
 
-// Filtro "Ocultar agotados": re-pinta la tabla de partidos al cambiar.
+// Filtro "Ocultar agotados" + buscador: re-pintan la tabla al cambiar.
 document.getElementById('mpd-ocultar-agotados').addEventListener('change', () => {
+  if (_DATOS) pintarLotes(_DATOS.lotes || []);
+});
+document.getElementById('mpd-buscar-lote')?.addEventListener('input', () => {
   if (_DATOS) pintarLotes(_DATOS.lotes || []);
 });
 
 function pintarLotes(lotes) {
   const ocultar = document.getElementById('mpd-ocultar-agotados')?.checked;
-  const visibles = ocultar
+  let visibles = ocultar
     ? lotes.filter(l => l.estado_intrinseco !== 'agotado')
     : lotes;
   const nAgotadosOcultos = lotes.length - visibles.length;
-  // Contador: lotes visibles + nota de agotados si los hay
+  // Buscador libre sobre partido / proveedor / observaciones / ref pedido
+  const q = (document.getElementById('mpd-buscar-lote')?.value || '').toLowerCase().trim();
+  if (q) {
+    visibles = visibles.filter(l =>
+      [l.partido, l.proveedor, l.observaciones, l.ref_pedido, l.estanteria]
+        .filter(Boolean).join(' ').toLowerCase().includes(q));
+  }
+  // Contador de visibles + pill aparte con los consumidos ocultos
   const cnt = document.getElementById('mpd-lotes-count');
-  cnt.textContent = nAgotadosOcultos > 0
-    ? `${visibles.length} · ${nAgotadosOcultos} consumido${nAgotadosOcultos === 1 ? '' : 's'} oculto${nAgotadosOcultos === 1 ? '' : 's'}`
-    : `${visibles.length}`;
+  cnt.textContent = `${visibles.length}`;
+  const pill = document.getElementById('mpd-ocultos-pill');
+  if (pill) {
+    pill.style.display = nAgotadosOcultos > 0 ? '' : 'none';
+    pill.textContent = `+${nAgotadosOcultos} consumido${nAgotadosOcultos === 1 ? '' : 's'} oculto${nAgotadosOcultos === 1 ? '' : 's'}`;
+  }
   const tb = document.getElementById('mpd-lotes-tbody');
   if (!visibles.length) {
-    tb.innerHTML = `<tr><td colspan="14" class="mpd-empty">${
-      lotes.length === 0 ? 'No hay partidos.' : 'Todos los partidos están consumidos (desactiva el filtro para verlos).'
+    tb.innerHTML = `<tr><td colspan="15" class="mpd-empty">${
+      lotes.length === 0 ? 'No hay partidos.'
+      : q ? 'Ningún partido coincide con la búsqueda.'
+      : 'Todos los partidos están consumidos (desactiva el filtro para verlos).'
     }</td></tr>`;
     return;
   }
@@ -779,7 +794,7 @@ function pintarLotes(lotes) {
         <div style="display:flex; gap:0.3rem; justify-content:flex-end; flex-wrap:wrap">
           <button class="mpd-btn-row" data-mpd-editar
                   data-vid="${escapeHtml(l.variante_id)}"
-                  data-partido="${escapeHtml(l.partido)}">Editar</button>
+                  data-partido="${escapeHtml(l.partido)}"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:2px"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Editar</button>
           ${tieneAlgoQueMover
             ? `<button class="mpd-btn-row" data-mpd-mover
                       data-vid="${escapeHtml(l.variante_id)}"
