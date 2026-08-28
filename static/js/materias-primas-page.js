@@ -2431,6 +2431,14 @@ function enScopeCompras(it) {
   const c = (it.clasificacion || '').trim();
   return !c || c === 'materia-felpa';
 }
+
+// Etiqueta de clasificacion para agrupar/ordenar en la vista General.
+// Sin clasificacion → "Materia felpa" (mismo criterio que enScopeCompras).
+function _clasifLabelCompra(it) {
+  const c = (it.clasificacion || '').trim();
+  if (!c) return CLASIFICACION_LABELS['materia-felpa'] || 'Materia felpa';
+  return CLASIFICACION_LABELS[c] || c;
+}
 function lanasEnScope() { return COMPRAS.lanas.filter(enScopeCompras); }
 
 // Stats de la barra superior calculadas sobre el ÁMBITO activo. Replica la
@@ -2564,6 +2572,12 @@ function renderCompras() {
     if (COMPRAS.ordenCampo === 'estado') {
       va = ESTADO_RANK[estadoDeFila(a)] ?? 99;
       vb = ESTADO_RANK[estadoDeFila(b)] ?? 99;
+    } else if (COMPRAS.ordenCampo === 'categoria' && COMPRAS.scope === 'todas') {
+      // Vista General: el orden natural es por CLASIFICACION (Materia
+      // felpa, Tintes...), no por titulo de felpa; dentro de cada
+      // clasificacion, por titulo y nombre.
+      va = _clasifLabelCompra(a) + '|' + (a.categoria || '') + '|' + (a.nombre || '');
+      vb = _clasifLabelCompra(b) + '|' + (b.categoria || '') + '|' + (b.nombre || '');
     } else {
       va = a[COMPRAS.ordenCampo];
       vb = b[COMPRAS.ordenCampo];
@@ -2600,16 +2614,21 @@ function renderCompras() {
     return;
   }
 
-  // 5) Si ordenamos por categoria, insertar separadores de grupo
+  // 5) Si ordenamos por categoria, insertar separadores de grupo.
+  // En la vista General el grupo es la CLASIFICACION (Materia felpa,
+  // Tintes...); en la de felpa, el titulo de siempre (LANA 100 2/C).
   const insertarGrupos = (COMPRAS.ordenCampo === 'categoria');
+  const grupoDe = (l) => COMPRAS.scope === 'todas' ? _clasifLabelCompra(l) : l.categoria;
   let htmlOut = '';
   let grupoActual = null;
   for (const l of visibles) {
-    if (insertarGrupos && l.categoria !== grupoActual) {
-      grupoActual = l.categoria;
-      const enGrupo = visibles.filter(x => x.categoria === grupoActual);
+    const g = grupoDe(l);
+    if (insertarGrupos && g !== grupoActual) {
+      grupoActual = g;
+      const enGrupo = visibles.filter(x => grupoDe(x) === grupoActual);
       const sumaGrupo = enGrupo.reduce((s, x) => s + (Number(x.total_kg) || 0), 0);
-      htmlOut += `<tr class="cmp-grupo"><td colspan="11">${escapeHtml(l.seccion || grupoActual)}<small>${enGrupo.length} calidades · ${fmtNum(sumaGrupo, 0)} kg</small></td></tr>`;
+      const etiqueta = COMPRAS.scope === 'todas' ? grupoActual : (l.seccion || grupoActual);
+      htmlOut += `<tr class="cmp-grupo"><td colspan="11">${escapeHtml(etiqueta)}<small>${enGrupo.length} calidades · ${fmtNum(sumaGrupo, 0)} kg</small></td></tr>`;
     }
     htmlOut += pintarFilaCompra(l);
   }
