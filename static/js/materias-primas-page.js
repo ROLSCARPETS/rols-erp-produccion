@@ -2402,6 +2402,15 @@ function fmtKgDisp(n) {
   return fmtNum(n, 0) + ' kg';
 }
 
+// Nombre visible de un item de compras. Las calidades recien creadas
+// (placeholder + proveedor) no traen `nombre` compuesto: caemos a
+// titulo + tipo (como hace la card agrupada del kanban).
+function nombreDeItem(l) {
+  return (l.nombre || '').trim()
+      || ((l.titulo || '') + ' ' + (l.tipo || '')).trim().toUpperCase()
+      || l.id || '';
+}
+
 function tienePedidoAbierto(it) {
   // Solo pedidos[] estructurados cuentan. El campo legacy pedido_hecho
   // queda como dato historico pero ya no afecta al estado (era ambiguo).
@@ -2561,7 +2570,7 @@ function renderCompras() {
         return false;
       }
     }
-    if (term && !(l.nombre || '').toLowerCase().includes(term) &&
+    if (term && !nombreDeItem(l).toLowerCase().includes(term) &&
                 !(l.proveedor || '').toLowerCase().includes(term)) return false;
     if (COMPRAS.filtroEstado && estadoDeFila(l) !== COMPRAS.filtroEstado) {
       return false;
@@ -2657,7 +2666,7 @@ function pintarFilaCompra(l) {
         <td class="calidad">
           <a href="/materia-prima/${encodeURIComponent(l.calidad_id || l.id)}"
              class="cmp-link-calidad"
-             title="Abrir ficha de la materia prima">${escapeHtml(l.nombre || '')}</a>
+             title="Abrir ficha de la materia prima">${escapeHtml(nombreDeItem(l))}</a>
         </td>
         <td style="text-align:center">
           <a href="/materias-primas#proveedores:${encodeURIComponent(slugFromProveedor(l.proveedor || ''))}"
@@ -2708,7 +2717,7 @@ function renderKanban() {
         return false;
       }
     }
-    if (term && !(l.nombre || '').toLowerCase().includes(term) &&
+    if (term && !nombreDeItem(l).toLowerCase().includes(term) &&
                 !(l.proveedor || '').toLowerCase().includes(term)) return false;
     return true;
   });
@@ -2926,7 +2935,7 @@ function kbCard(l) {
 
   return `<div class="kb-card" data-id="${escapeHtml(l.id)}">
     <div class="kb-card-hdr">
-      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <div class="kb-card-name">${escapeHtml(nombreDeItem(l))}</div>
       <span class="kb-card-cat">${escapeHtml(cat)}</span>
     </div>
     <div class="kb-card-prov"><span class="prov-pill prov-${escapeHtml(provKey)}">${escapeHtml(l.proveedor || '—')}</span></div>
@@ -2995,7 +3004,7 @@ function kbCardPedido({ variante: l, pedido, legacy }) {
   return `<div class="kb-card kb-card-pedido${isLegacy ? ' kb-card-legacy' : ''}"
               data-id="${escapeHtml(l.id)}" data-ref="${refAttr}">
     <div class="kb-card-hdr">
-      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <div class="kb-card-name">${escapeHtml(nombreDeItem(l))}</div>
       <span class="kb-card-cat">${escapeHtml(cat)}</span>
     </div>
     <div class="kb-card-prov">
@@ -3065,7 +3074,7 @@ function kbCardEnProveedor({ variante: l, partido: p }) {
               style="cursor:pointer"
               title="Abrir ficha de la materia prima">
     <div class="kb-card-hdr">
-      <div class="kb-card-name">${escapeHtml(l.nombre || '')}</div>
+      <div class="kb-card-name">${escapeHtml(nombreDeItem(l))}</div>
       <span class="kb-card-cat">${escapeHtml(cat)}</span>
     </div>
     <div class="kb-card-prov">
