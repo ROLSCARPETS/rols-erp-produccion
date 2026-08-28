@@ -2350,6 +2350,7 @@ $mc.confirmar.addEventListener('click', async () => {
 // ============================================================
 const COMPRAS = {
   lanas: [],
+  scope: 'felpa',           // 'felpa' (materia felpa, defecto) | 'todas' (vista general)
   filtroCat: 'all',
   filtroProv: 'all',
   filtroEstado: null,   // null | 'pedir' | 'bajo' | 'ok' (click en stats)
@@ -2418,6 +2419,42 @@ function estadoDeFila(it) {
   return 'ok';
 }
 
+// ===== Ámbito de la vista Compras/Kanban =====
+// 'felpa' (defecto): solo materia felpa — el grueso operativo, con sus chips
+// de título. 'todas': vista general con TODAS las materias primas (tintes,
+// químicos... cuando existan). Un item SIN clasificación se trata como felpa
+// para no "perder" de la vista los datos de antes del catálogo.
+try { if (localStorage.getItem('cmp_scope_v1') === 'todas') COMPRAS.scope = 'todas'; } catch {}
+
+function enScopeCompras(it) {
+  if (COMPRAS.scope !== 'felpa') return true;
+  const c = (it.clasificacion || '').trim();
+  return !c || c === 'materia-felpa';
+}
+function lanasEnScope() { return COMPRAS.lanas.filter(enScopeCompras); }
+
+// Stats de la barra superior calculadas sobre el ÁMBITO activo. Replica la
+// fórmula de lanas_inventario.estadisticas() del backend (que es global y
+// no sabe de ámbitos): estado por fila + kg + kg × precio 2026/2025.
+function calcularStatsCompras() {
+  const s = {n_pedir: 0, n_en_camino: 0, n_bajo: 0, n_ok: 0,
+             total_kg: 0, valor_total_eur: 0};
+  lanasEnScope().forEach(it => {
+    const e = estadoDeFila(it);
+    if (e === 'en-camino')  s.n_en_camino++;
+    else if (e === 'pedir') s.n_pedir++;
+    else if (e === 'bajo')  s.n_bajo++;
+    else                    s.n_ok++;
+    const t = Number(it.total_kg) || 0;
+    s.total_kg += t;
+    const p = it.precio_2026 || it.precio_2025 || 0;
+    if (typeof p === 'number') s.valor_total_eur += t * p;
+  });
+  s.total_kg = Math.round(s.total_kg * 10) / 10;
+  s.valor_total_eur = Math.round(s.valor_total_eur * 100) / 100;
+  return s;
+}
+
 async function cargarCompras() {
   const tb = document.getElementById('cmp-tbody');
   tb.innerHTML = '<tr><td colspan="11" class="mp-empty">Cargando…</td></tr>';
@@ -2430,11 +2467,13 @@ async function cargarCompras() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     COMPRAS.lanas = d.lanas || [];
-    pintarComprasStats(d.estadisticas || {});
+    // Stats calculadas en cliente sobre el ámbito activo (las del backend
+    // son globales y no distinguen felpa/general).
+    pintarComprasStats(calcularStatsCompras());
     preseleccionarSiHaceFalta();
     renderCompras();
     actualizarBarraSeleccion();
-    document.getElementById('tc-compras').textContent = COMPRAS.lanas.length;
+    document.getElementById('tc-compras').textContent = lanasEnScope().length;
     // Si veniamos con hash #pedido:<id>, __initTabFromHash dejo la
     // calidad en window.__pendingPedidoCalidad (antes de que activarTabMP
     // sobrescribiera el hash con #compras).
@@ -2498,6 +2537,7 @@ function renderCompras() {
 
   // 1) Filtrar
   let visibles = COMPRAS.lanas.filter(l => {
+    if (!enScopeCompras(l)) return false;
     if (COMPRAS.filtroCat !== 'all' && l.categoria !== COMPRAS.filtroCat) {
       return false;
     }
@@ -2635,6 +2675,7 @@ function pintarFilaCompra(l) {
 function renderKanban() {
   const term = (COMPRAS.buscar || '').toLowerCase().trim();
   let visibles = COMPRAS.lanas.filter(l => {
+    if (!enScopeCompras(l)) return false;
     if (COMPRAS.filtroCat !== 'all' && l.categoria !== COMPRAS.filtroCat) return false;
     if (COMPRAS.filtroProv !== 'all') {
       const prov = (l.proveedor || '').toUpperCase();
@@ -3364,6 +3405,33 @@ function _onStatClick(e) {
 document.getElementById('cmp-stats').addEventListener('click', _onStatClick);
 document.getElementById('kbn-stats')?.addEventListener('click', _onStatClick);
 
+// ===== Conmutador de ámbito (Materia felpa / General · todas) =====
+// Compartido entre Compras y Kanban, como el resto de filtros.
+function _syncScopeBtns() {
+  ['#cmp-scope', '#kbn-scope'].forEach(sel => {
+    document.querySelectorAll(`${sel} .cmp-scope-btn`).forEach(b =>
+      b.classList.toggle('active', b.dataset.scope === COMPRAS.scope));
+  });
+}
+function _onScopeClick(e) {
+  const btn = e.target.closest('.cmp-scope-btn');
+  if (!btn || btn.dataset.scope === COMPRAS.scope) return;
+  COMPRAS.scope = btn.dataset.scope;
+  try { localStorage.setItem('cmp_scope_v1', COMPRAS.scope); } catch {}
+  // La selección podría contener filas fuera del ámbito nuevo: se limpia
+  // para no arrastrar items invisibles a un pedido.
+  COMPRAS.seleccion.clear();
+  _syncScopeBtns();
+  pintarComprasStats(calcularStatsCompras());
+  const tc = document.getElementById('tc-compras');
+  if (tc) tc.textContent = lanasEnScope().length;
+  renderCompras();
+  actualizarBarraSeleccion();
+}
+document.getElementById('cmp-scope')?.addEventListener('click', _onScopeClick);
+document.getElementById('kbn-scope')?.addEventListener('click', _onScopeClick);
+_syncScopeBtns();
+
 // Ordenar al hacer click en headers.
 document.querySelector('.cmp-tabla thead').addEventListener('click', (e) => {
   const th = e.target.closest('th.sortable');
@@ -3469,7 +3537,7 @@ function actualizarBarraSeleccion() {
 function preseleccionarSiHaceFalta() {
   if (COMPRAS.preseleccionado) return;
   COMPRAS.preseleccionado = true;
-  COMPRAS.lanas.forEach(l => {
+  lanasEnScope().forEach(l => {
     if (estadoDeFila(l) === 'pedir') COMPRAS.seleccion.add(l.id);
   });
 }
@@ -3505,7 +3573,7 @@ document.getElementById('cmp-check-master').addEventListener('change', (e) => {
 
 // Botones rapidos: marcar "a pedir" / limpiar
 document.getElementById('btn-marcar-pedir').addEventListener('click', () => {
-  COMPRAS.lanas.forEach(l => {
+  lanasEnScope().forEach(l => {
     if (estadoDeFila(l) === 'pedir') COMPRAS.seleccion.add(l.id);
   });
   renderCompras();

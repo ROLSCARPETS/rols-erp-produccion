@@ -8,6 +8,21 @@
   .mp-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
   .mp-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
 
+  /* Conmutador de ámbito de Compras/Kanban (Materia felpa / General · todas) */
+  .cmp-scope {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: #f1ece4; border: 1px solid var(--border);
+    border-radius: 999px; padding: 2px;
+  }
+  .cmp-scope-btn {
+    border: none; background: transparent; color: #7a7a7a;
+    font-size: 0.76rem; font-weight: 600; font-family: inherit;
+    padding: 0.28rem 0.85rem; border-radius: 999px; cursor: pointer;
+    transition: background 0.12s, color 0.12s; white-space: nowrap;
+  }
+  .cmp-scope-btn:hover { color: #4d4d4d; }
+  .cmp-scope-btn.active { background: #fff; color: #2a2a2a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
   .mp-form-grid { display: grid; gap: 0.7rem; grid-template-columns: 1fr 1fr auto; align-items: end; }
   .mp-form-grid input { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.88rem; background: #FAF8F6; outline: none; transition: border-color 0.12s, background 0.12s; }
   .mp-form-grid input:focus { border-color: var(--accent); background: #fff; }

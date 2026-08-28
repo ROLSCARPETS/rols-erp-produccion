@@ -283,8 +283,15 @@
 
     <!-- ============ TAB "Compras" (inventario operativo) ============ -->
     <section class="mp-section tab-panel hidden" data-tab-panel="compras">
-      <div class="mp-section-title">
+      <div class="mp-section-title" style="justify-content:space-between">
         <span>Compras / inventario operativo</span>
+        <!-- Ámbito de la vista: Materia felpa (el grueso operativo, por
+             defecto) o General con TODAS las materias primas. Compartido
+             con el tab Kanban (mismo estado COMPRAS.scope). -->
+        <div class="cmp-scope" id="cmp-scope">
+          <button type="button" class="cmp-scope-btn active" data-scope="felpa">Materia felpa</button>
+          <button type="button" class="cmp-scope-btn" data-scope="todas">General · todas</button>
+        </div>
       </div>
       <p class="text-xs text-stone-500 mb-3">Vista por <strong>calidad + proveedor</strong> con partidos vivos, límites de reposición y observaciones manuales. Útil para decidir qué pedir y a quién. Los campos editables (límite, pedido sugerido, observaciones, precio 2026) se guardan al salir del campo.</p>
 
@@ -385,8 +392,12 @@
          / filtroProv / buscar (sincronizado entre ambos sets de pills
          por el handler de cambio). -->
     <section class="mp-section tab-panel hidden" data-tab-panel="kanban">
-      <div class="mp-section-title">
+      <div class="mp-section-title" style="justify-content:space-between">
         <span>Kanban de compras</span>
+        <div class="cmp-scope" id="kbn-scope">
+          <button type="button" class="cmp-scope-btn active" data-scope="felpa">Materia felpa</button>
+          <button type="button" class="cmp-scope-btn" data-scope="todas">General · todas</button>
+        </div>
       </div>
       <p class="text-xs text-stone-500 mb-3">Vista por <strong>estado de stock</strong>. Misma fuente que Compras: agrupa cada calidad en una columna según si hay que pedirla, está en camino, en almacén del proveedor, baja, ok o sin mínimo de seguridad definido.</p>
 
