@@ -68,7 +68,7 @@ def _default_data() -> dict:
         ],
         "materiales_felpa": [
             {"id": "lana-hilada", "label": "Lana hilada"},
-            {"id": "lana-bruto",  "label": "Lana en bruto"},
+            {"id": "lana-bruto",  "label": "Lana en crudo"},
             {"id": "pp",          "label": "Polipropileno (PP)"},
             {"id": "pes",         "label": "Poliéster (PES)"},
         ],
@@ -99,6 +99,14 @@ def cargar() -> dict:
         # para no romper la UI nueva. El usuario puede borrarlos despues.
         d["titulos"] = _default_data()["titulos"]
         _guardar(d)
+    # Migracion suave: renombrado de label "Lana en bruto" -> "Lana en crudo"
+    # (mismo termino que el tab de lana cruda; el slug lana-bruto NO cambia).
+    # Solo toca el label VIEJO exacto: si el usuario lo edito, se respeta.
+    for m in d.get("materiales_felpa") or []:
+        if m.get("id") == "lana-bruto" and m.get("label") == "Lana en bruto":
+            m["label"] = "Lana en crudo"
+            _guardar(d)
+            break
     return d
 
 

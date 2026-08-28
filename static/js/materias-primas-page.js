@@ -48,7 +48,7 @@ let CLASIFICACION_LABELS = {
 };
 let MATERIAL_FELPA_LABELS = {
   'lana-hilada': 'Lana hilada',
-  'lana-bruto':  'Lana en bruto',
+  'lana-bruto':  'Lana en crudo',
   'pp':          'Polipropileno (PP)',
   'pes':         'Poliéster (PES)',
 };

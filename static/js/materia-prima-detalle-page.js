@@ -34,7 +34,7 @@ async function cargarCatalogo() {
       ],
       materiales_felpa: [
         {id: 'lana-hilada', label: 'Lana hilada'},
-        {id: 'lana-bruto',  label: 'Lana en bruto'},
+        {id: 'lana-bruto',  label: 'Lana en crudo'},
         {id: 'pp',          label: 'Polipropileno (PP)'},
         {id: 'pes',         label: 'Poliéster (PES)'},
       ],
