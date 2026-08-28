@@ -60,15 +60,17 @@ def _default_data() -> dict:
     titulo es el grosor / numero de hilos: 65/2C = 65 lana 2 cabos, etc).
     Para basamentos y otros suele ir vacio."""
     return {
-        "_meta": {"version": 1, "creado": datetime.now().isoformat(timespec="seconds")},
+        "_meta": {"version": 2, "creado": datetime.now().isoformat(timespec="seconds")},
         "clasificaciones": [
             {"id": "materia-felpa", "label": "Materia felpa"},
+            # La lana en crudo es etapa PREVIA a la felpa (se compra sin
+            # hilar y se hila): clasificacion propia, no material de felpa.
+            {"id": "lana-en-crudo", "label": "Lana en crudo"},
             {"id": "basamentos",    "label": "Basamentos"},
             {"id": "otros",         "label": "Otros"},
         ],
         "materiales_felpa": [
-            {"id": "lana-hilada", "label": "Lana hilada"},
-            {"id": "lana-bruto",  "label": "Lana en crudo"},
+            {"id": "lana-hilada", "label": "Lana"},
             {"id": "pp",          "label": "Polipropileno (PP)"},
             {"id": "pes",         "label": "Poliéster (PES)"},
         ],
@@ -99,14 +101,38 @@ def cargar() -> dict:
         # para no romper la UI nueva. El usuario puede borrarlos despues.
         d["titulos"] = _default_data()["titulos"]
         _guardar(d)
-    # Migracion suave: renombrado de label "Lana en bruto" -> "Lana en crudo"
-    # (mismo termino que el tab de lana cruda; el slug lana-bruto NO cambia).
-    # Solo toca el label VIEJO exacto: si el usuario lo edito, se respeta.
-    for m in d.get("materiales_felpa") or []:
-        if m.get("id") == "lana-bruto" and m.get("label") == "Lana en bruto":
-            m["label"] = "Lana en crudo"
-            _guardar(d)
-            break
+    # ---- Migracion v2 (una sola vez, gated por _meta.version) ----
+    # La lana en crudo deja de ser un "material de felpa" (es la etapa
+    # previa: se compra sin hilar y pasa por limpieza + hilatura) y se
+    # estrena como CLASIFICACION propia. De paso, los materiales hilados
+    # pierden el apellido "hilada": sin el crudo en la lista ya no hay
+    # ambiguedad. Los slugs NO cambian; solo labels y colocacion.
+    meta = d.setdefault("_meta", {})
+    try:
+        version = int(meta.get("version") or 1)
+    except (TypeError, ValueError):
+        version = 1
+    if version < 2:
+        # 1) Fuera lana-bruto de materiales de felpa (verificado: sin uso).
+        d["materiales_felpa"] = [m for m in (d.get("materiales_felpa") or [])
+                                 if m.get("id") != "lana-bruto"]
+        # 2) Renombrados de label (solo el label viejo exacto: una edicion
+        #    manual del usuario se respeta).
+        renombres = {"lana-hilada": ("Lana hilada", "Lana"),
+                     "viscosa-hilada": ("Viscosa hilada", "Viscosa")}
+        for m in d.get("materiales_felpa") or []:
+            r = renombres.get(m.get("id"))
+            if r and m.get("label") == r[0]:
+                m["label"] = r[1]
+        # 3) Alta de la clasificacion "Lana en crudo" (tras materia-felpa).
+        clas = d.setdefault("clasificaciones", [])
+        if not any(c.get("id") == "lana-en-crudo" for c in clas):
+            idx = next((i for i, c in enumerate(clas)
+                        if c.get("id") == "materia-felpa"), -1)
+            clas.insert(idx + 1 if idx >= 0 else len(clas),
+                        {"id": "lana-en-crudo", "label": "Lana en crudo"})
+        meta["version"] = 2
+        _guardar(d)
     return d
 
 

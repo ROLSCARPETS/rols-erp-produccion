@@ -43,14 +43,18 @@ let LANAS_ALL = [];
 // si la red tarda — y luego se reemplazan al cargar el catalogo.
 let CLASIFICACION_LABELS = {
   'materia-felpa': 'Materia felpa',
+  'lana-en-crudo': 'Lana en crudo',
   'basamentos':    'Basamentos',
   'otros':         'Otros',
 };
 let MATERIAL_FELPA_LABELS = {
-  'lana-hilada': 'Lana hilada',
-  'lana-bruto':  'Lana en crudo',
-  'pp':          'Polipropileno (PP)',
-  'pes':         'Poliéster (PES)',
+  'lana-hilada':     'Lana',
+  'nylon-reciclado': 'Nylon reciclado',
+  'viscosa-hilada':  'Viscosa',
+  'pp':              'Polipropileno (PP)',
+  'pes':             'Poliéster (PES)',
+  // legacy: retirado del catálogo, pero por si algún dato antiguo lo trae
+  'lana-bruto':      'Lana en crudo',
 };
 
 // Carga el catalogo y reemplaza los dicts de labels. Se ejecuta antes

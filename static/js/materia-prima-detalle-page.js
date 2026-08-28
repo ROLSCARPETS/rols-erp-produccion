@@ -29,12 +29,12 @@ async function cargarCatalogo() {
     _CATALOGO = {
       clasificaciones: [
         {id: 'materia-felpa', label: 'Materia felpa'},
+        {id: 'lana-en-crudo', label: 'Lana en crudo'},
         {id: 'basamentos',    label: 'Basamentos'},
         {id: 'otros',         label: 'Otros'},
       ],
       materiales_felpa: [
-        {id: 'lana-hilada', label: 'Lana hilada'},
-        {id: 'lana-bruto',  label: 'Lana en crudo'},
+        {id: 'lana-hilada', label: 'Lana'},
         {id: 'pp',          label: 'Polipropileno (PP)'},
         {id: 'pes',         label: 'Poliéster (PES)'},
       ],
