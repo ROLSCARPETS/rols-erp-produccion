@@ -8,6 +8,13 @@
   .mp-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
   .mp-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
 
+  /* Chip de clasificación en la tabla de Proveedores (columna Suministra) */
+  .prov-clasif-chip {
+    display: inline-block; background: var(--accent-soft, #EFE2CD); color: #8a6d3b;
+    border-radius: 999px; padding: 0.12rem 0.55rem; font-size: 0.72rem;
+    font-weight: 600; margin: 0.06rem 0.25rem 0.06rem 0; white-space: nowrap;
+  }
+
   /* Conmutador de ámbito de Compras/Kanban (Materia felpa / General · todas) */
   .cmp-scope {
     display: inline-flex; align-items: center; gap: 2px;

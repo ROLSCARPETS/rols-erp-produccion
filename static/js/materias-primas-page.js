@@ -3685,14 +3685,14 @@ async function cargarProveedores() {
       history.replaceState(null, '', location.pathname);
     }
   } catch (err) {
-    tb.innerHTML = `<tr><td colspan="8" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="9" class="mp-empty">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
 function pintarProveedores() {
   const tb = document.getElementById('prov-tbody');
   if (!PROVS_STATE.lista.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="mp-empty">Aún no hay proveedores. Crea el primero con "+ Añadir proveedor".</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9" class="mp-empty">Aún no hay proveedores. Crea el primero con "+ Añadir proveedor".</td></tr>';
     return;
   }
   let html = '';
@@ -3710,6 +3710,10 @@ function pintarProveedores() {
         </td>
         <td>${escapeHtml(p.contacto_persona || '—')}</td>
         <td style="font-size:0.84rem">${escapeHtml(p.contacto_email || '—')}</td>
+        <td>${(k.clasificaciones || []).length
+              ? (k.clasificaciones || []).map(c =>
+                  `<span class="prov-clasif-chip">${escapeHtml(CLASIFICACION_LABELS[c] || c)}</span>`).join('')
+              : '<span style="color:#bbb">—</span>'}</td>
         <td style="text-align:right">${k.n_calidades || 0}</td>
         <td style="text-align:right">${fmtNum(k.stock_total_kg || 0, 0)} kg</td>
         <td style="text-align:right">${k.n_pedidos_abiertos || 0}</td>

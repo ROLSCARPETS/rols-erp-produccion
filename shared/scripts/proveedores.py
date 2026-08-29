@@ -337,6 +337,12 @@ def kpis_proveedor(prov_id: str) -> dict:
     claves.discard("")
     variantes = [v for v in _lanas_vivas()
                  if (v.get("proveedor") or "").upper() in claves]
+    # Clasificaciones distintas que suministra (slugs; sin clasificacion
+    # cuenta como materia-felpa, mismo criterio que la vista de Compras).
+    clasificaciones = sorted({
+        ((v.get("clasificacion") or "").strip() or "materia-felpa")
+        for v in variantes
+    })
     stock = sum(float(v.get("total_kg") or 0) for v in variantes)
     n_abiertos = 0
     n_total = 0
@@ -347,6 +353,7 @@ def kpis_proveedor(prov_id: str) -> dict:
                 n_abiertos += 1
     return {
         "n_calidades":         len(variantes),
+        "clasificaciones":     clasificaciones,
         "stock_total_kg":      round(stock, 2),
         "n_pedidos_abiertos":  n_abiertos,
         "n_pedidos_total":     n_total,
