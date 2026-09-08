@@ -40,7 +40,7 @@ def _seed_data_dir():
         return  # sin permisos: los modulos caen a shared/data
     runtime = (
         "lanas_inventario", "movimientos_inventario", "proveedores",
-        "lana_cruda", "catalogo_materias", "permisos",
+        "lana_cruda", "catalogo_materias", "permisos", "muestras_fabricadas",
     )
     for name in runtime:
         s, d = src / f"{name}.json", dst / f"{name}.json"

@@ -1325,17 +1325,20 @@ def _lanas_inv_module():
 # Fallback por rol cuando el modulo permisos no esta disponible o falla.
 # Refleja el comportamiento historico antes de permisos.json.
 _FALLBACK_POR_ROL = {
-    "admin": {"compras": True, "calcular_presupuestos": True,
+    "admin": {"compras": True, "muestras_fabricadas": True,
+              "calcular_presupuestos": True,
               "ver_presupuestos_todos": True,
               "editar_ficha_producto": True, "gestion_usuarios": True,
               "ver_stock_activo": True, "ver_productos_discontinuados": True,
               "ver_colecciones_cliente": True},
-    "comercial": {"compras": True, "calcular_presupuestos": True,
+    "comercial": {"compras": True, "muestras_fabricadas": True,
+                  "calcular_presupuestos": True,
                   "ver_presupuestos_todos": False,
                   "editar_ficha_producto": True, "gestion_usuarios": False,
                   "ver_stock_activo": True, "ver_productos_discontinuados": True,
                   "ver_colecciones_cliente": True},
-    "representante": {"compras": False, "calcular_presupuestos": True,
+    "representante": {"compras": False, "muestras_fabricadas": False,
+                      "calcular_presupuestos": True,
                       "ver_presupuestos_todos": False,
                       "editar_ficha_producto": False, "gestion_usuarios": False,
                       "ver_stock_activo": True, "ver_productos_discontinuados": False,
@@ -1864,6 +1867,201 @@ def api_compras_pedido_pdf(ref):
                 f'inline; filename="pedido_{ref}_{proveedor}.pdf"',
         },
     )
+
+
+# ============================================================
+# MUESTRAS FABRICADAS — seguimiento de prototipos y muestras del telar
+# ============================================================
+# Sustituye al "LIBRO DE MUESTRAS.xlsx" (registro de numeros de M +
+# seguimiento de fabricacion + archivo). Permiso propio (`muestras_fabricadas`,
+# seccion Rols Produccion en cuentas) para que el laboratorio pueda llevar las
+# muestras sin ver compras/costes.
+
+def _muestras_module():
+    rols_shared.ensure_shared_on_path()
+    import muestras_fabricadas as _mf
+    return _mf
+
+
+def _pagina_protegida(permiso: str):
+    """Guard de PAGINA (no API): sin sesion → al login de cuentas con
+    `next` de vuelta aqui; con sesion pero sin permiso → al inicio de la
+    suite. None si puede pasar."""
+    from flask import redirect
+    if not _sso_user():
+        from urllib.parse import quote
+        return redirect(_cuentas_base() + "/login?next=" + quote(request.url, safe=""))
+    if not _puede(permiso):
+        return redirect(_rols_one_base() + "/inicio")
+    return None
+
+
+@app.route("/muestras-fabricadas")
+def muestras_fabricadas_view():
+    """Listado: en curso, historico y analisis."""
+    bl = _pagina_protegida("muestras_fabricadas")
+    if bl:
+        return bl
+    return render_template("muestras_fabricadas.html")
+
+
+@app.route("/muestras-fabricadas/<mid>")
+def muestra_detalle_view(mid):
+    """Ficha de una muestra (M-5448-C): datos, estado, diario del laboratorio."""
+    bl = _pagina_protegida("muestras_fabricadas")
+    if bl:
+        return bl
+    return render_template("muestra_detalle.html", muestra_id=mid)
+
+
+@app.route("/api/muestras", methods=["GET", "POST"])
+def api_muestras():
+    """GET: listado compacto filtrado (+ resumen; + catalogos si
+    ?con_catalogos=1). POST: alta (el numero de M lo asigna el servidor)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    mf = _muestras_module()
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        nueva, err = mf.crear(data, usuario=_user_name())
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify({"muestra": nueva}), 201
+    a = request.args
+    vista = (a.get("vista") or "en-curso").strip().lower()
+    if vista not in ("en-curso", "historico", "todas"):
+        return jsonify({"error": "vista debe ser en-curso, historico o todas"}), 400
+    limite = _int_or_none(a.get("limite"))
+    if vista != "en-curso" and not limite:
+        limite = 400
+    out = mf.listar(vista=vista, q=a.get("q") or "", anio=a.get("anio"),
+                    estado=(a.get("estado") or "").strip(),
+                    telar=(a.get("telar") or "").strip(),
+                    persona=(a.get("persona") or "").strip(),
+                    prioridad=a.get("prioridad"), limite=limite)
+    out["limite"] = limite
+    out["resumen"] = mf.resumen()
+    if a.get("con_catalogos"):
+        out["catalogos"] = mf.catalogos()
+    return jsonify(out)
+
+
+@app.route("/api/muestras/analisis")
+def api_muestras_analisis():
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    return jsonify(_muestras_module().analisis(request.args.get("anio")))
+
+
+@app.route("/api/muestras/catalogos")
+def api_muestras_catalogos():
+    """Estados, prioridades, telares, personas y clientes conocidos (para
+    los selects de la ficha y del alta)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    return jsonify(_muestras_module().catalogos())
+
+
+@app.route("/api/muestras/catalogos/<tipo>", methods=["POST"])
+def api_muestras_catalogo(tipo):
+    """Anade un valor a un catalogo (telares | personas)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    data = request.get_json(force=True, silent=True) or {}
+    lista, err = _muestras_module().anadir_catalogo(tipo, data.get("valor") or "")
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({tipo: lista})
+
+
+@app.route("/api/muestras/<mid>", methods=["GET", "PUT", "DELETE"])
+def api_muestra(mid):
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    mf = _muestras_module()
+    if request.method == "GET":
+        m = mf.obtener(mid)
+        if not m:
+            return jsonify({"error": f"la muestra {mid!r} no existe"}), 404
+        return jsonify({"muestra": m})
+    if request.method == "DELETE":
+        # Borrar destruye historico: solo Completo. El resto cancela.
+        if _user_rol() != "admin":
+            return jsonify({"error": "solo el nivel Completo puede borrar una muestra; "
+                                     "cancelala en su lugar"}), 403
+        ok, err = mf.borrar(mid)
+        if not ok:
+            return jsonify({"error": err}), 404
+        return jsonify({"ok": True})
+    data = request.get_json(force=True, silent=True) or {}
+    m, err = mf.actualizar(mid, data, usuario=_user_name())
+    if err:
+        return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    return jsonify({"muestra": m})
+
+
+@app.route("/api/muestras/<mid>/estado", methods=["POST"])
+def api_muestra_estado(mid):
+    """Cambio de estado (+ nota opcional que va al diario)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    data = request.get_json(force=True, silent=True) or {}
+    m, err = _muestras_module().cambiar_estado(
+        mid, data.get("estado") or "", usuario=_user_name(),
+        nota=data.get("nota") or "", fecha=data.get("fecha"))
+    if err:
+        return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    return jsonify({"muestra": m})
+
+
+@app.route("/api/muestras/<mid>/archivar", methods=["POST"])
+def api_muestra_archivar(mid):
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    data = request.get_json(force=True, silent=True) or {}
+    m, err = _muestras_module().archivar(mid, usuario=_user_name(),
+                                         valor=bool(data.get("archivada", True)))
+    if err:
+        return jsonify({"error": err}), 404
+    return jsonify({"muestra": m})
+
+
+@app.route("/api/muestras/<mid>/apuntes", methods=["POST"])
+def api_muestra_apuntes(mid):
+    """Nuevo apunte del diario del laboratorio."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    data = request.get_json(force=True, silent=True) or {}
+    m, err = _muestras_module().anadir_apunte(
+        mid, data.get("texto") or "", usuario=_user_name(), fecha=data.get("fecha"))
+    if err:
+        return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    return jsonify({"muestra": m}), 201
+
+
+@app.route("/api/muestras/<mid>/apuntes/<aid>", methods=["PUT", "DELETE"])
+def api_muestra_apunte(mid, aid):
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    mf = _muestras_module()
+    if request.method == "DELETE":
+        m, err = mf.borrar_apunte(mid, aid, usuario=_user_name())
+    else:
+        data = request.get_json(force=True, silent=True) or {}
+        m, err = mf.editar_apunte(mid, aid, texto=data.get("texto"),
+                                  fecha=data.get("fecha"), usuario=_user_name())
+    if err:
+        return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    return jsonify({"muestra": m})
 
 
 # Cache busting: url_for('static', ...) añade ?v=<mtime> al final.

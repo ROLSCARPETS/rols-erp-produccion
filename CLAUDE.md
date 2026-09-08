@@ -29,7 +29,7 @@ app.py             ← rutas de Compras (extraídas de rols-calculadora/app.py)
 shared/scripts/    ← módulos de datos vendorizados (rols_shared, proveedores,
                      materias_primas, catalogo_materias, lanas_inventario,
                      movimientos_inventario, lana_cruda, pdf_pedido_proveedor,
-                     permisos)
+                     permisos, muestras_fabricadas)
 shared/data/       ← JSON seed (runtime → ROLS_DATA_DIR en prod)
 shared/static/     ← sso-guard.js, lang-switcher/ (servidos en /shared/)
 templates/ static/ ← UI de Compras
@@ -38,6 +38,27 @@ templates/ static/ ← UI de Compras
 Los módulos de `shared/scripts/` localizan sus datos en `shared/data/` (por
 `Path(__file__).parent.parent / "data"`) o en `ROLS_DATA_DIR` si está definido.
 Por eso `scripts/` y `data/` deben seguir siendo hermanos dentro de `shared/`.
+
+## Muestras fabricadas (`/muestras-fabricadas`)
+
+Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
+`LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
+`shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
+seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.343
+muestras desde 2014). Permiso propio **`muestras_fabricadas`** (sección
+"Rols Producción" en cuentas), separado de `compras` para que el
+laboratorio pueda llevar las muestras sin ver costes.
+
+- **Número de M** lo asigna el servidor (`_meta.ultimo_numero + 1`); las
+  variantes llevan sufijo (M-5448-C). Los ids NO cambian nunca.
+- **Estados** (slugs estables): por_empezar → en_diseno → en_hilatura →
+  en_tintoreria → bobinando → esperando_telar → en_telar → en_aprestos →
+  terminada; además cancelada y `sin_seguimiento` (solo histórico del
+  registro antiguo, no seleccionable).
+- `archivada` = fuera de "En curso" sin estar terminada (lo que en el Excel
+  era mover la fila a la hoja de terminadas).
+- El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
+  Excel se troceó por fechas (`parsear_diario`) sin pérdida.
 
 ## La costura con Rols One (pendiente, por API)
 

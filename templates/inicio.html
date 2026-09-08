@@ -10,16 +10,24 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 <script src="/shared/sso-guard.js"></script>
 <script>
-// Guard de permiso 'compras'. Si el usuario no tiene acceso, lo
-// devolvemos al inicio de Rols One en cuanto el SSO traiga sus permisos.
-(function _checkPermisoCompras() {
-  function chequear(user) {
+// Guard de acceso: hace falta 'compras' O 'muestras_fabricadas'. Sin
+// ninguno de los dos, al inicio de Rols One en cuanto el SSO traiga los
+// permisos. Ademas cada card/enlace lleva data-permiso y se oculta si el
+// usuario no tiene ese permiso (p.ej. laboratorio: solo muestras).
+(function _checkPermisos() {
+  function tiene(user, permiso) {
     const rol = user?.rol;
-    const perm = user?.permisos?.compras;
-    const ok = (perm !== undefined)
-      ? !!perm
-      : (rol === 'admin' || rol === 'comercial');
-    if (!ok) location.replace('{{ rols_one_base }}/inicio');
+    const perm = user?.permisos?.[permiso];
+    return (perm !== undefined) ? !!perm : (rol === 'admin' || rol === 'comercial');
+  }
+  function chequear(user) {
+    if (!tiene(user, 'compras') && !tiene(user, 'muestras_fabricadas')) {
+      location.replace('{{ rols_one_base }}/inicio');
+      return;
+    }
+    document.querySelectorAll('[data-permiso]').forEach(el => {
+      el.style.display = tiene(user, el.getAttribute('data-permiso')) ? '' : 'none';
+    });
   }
   if (window.__rolsUser) chequear(window.__rolsUser);
   window.addEventListener('rols:sso-ok', (e) => chequear(e.detail));
@@ -39,8 +47,9 @@
     </div>
     <nav class="space-y-1">
       <a href="/" class="active"><span class="check"></span><span data-i18n="sidebar.inicio">Inicio</span></a>
-      <a href="/materias-primas"><span class="check"></span><span data-i18n="materias.breadcrumb">Materias primas</span></a>
-      <a href="/materias-primas#proveedores"><span class="check"></span><span>Proveedores</span></a>
+      <a href="/materias-primas" data-permiso="compras"><span class="check"></span><span data-i18n="materias.breadcrumb">Materias primas</span></a>
+      <a href="/materias-primas#proveedores" data-permiso="compras"><span class="check"></span><span>Proveedores</span></a>
+      <a href="/muestras-fabricadas" data-permiso="muestras_fabricadas"><span class="check"></span><span>Muestras fabricadas</span></a>
     </nav>
     <div class="space-y-1 pt-4 border-t border-stone-700/50">
       <a href="{{ rols_one_base }}/inicio"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg><span>Rols One</span></a>
@@ -79,7 +88,7 @@
     <div class="apps-grid">
 
       <!-- Card: Materias primas -->
-      <a href="/materias-primas" class="app-card">
+      <a href="/materias-primas" class="app-card" data-permiso="compras">
         <div class="app-card-icon app-card-icon-materias">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                stroke-linecap="round" stroke-linejoin="round">
@@ -104,7 +113,7 @@
       </a>
 
       <!-- Card: Proveedores -->
-      <a href="/materias-primas#proveedores" class="app-card">
+      <a href="/materias-primas#proveedores" class="app-card" data-permiso="compras">
         <div class="app-card-icon app-card-icon-proveedores">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                stroke-linecap="round" stroke-linejoin="round">
@@ -119,6 +128,31 @@
           <h3 class="app-card-title">Proveedores</h3>
           <p class="app-card-desc">
             Fichas de proveedores: datos comerciales, contacto, calidades suministradas y pedidos abiertos.
+          </p>
+          <span class="app-card-cta">
+            <span>Abrir</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+              <path d="M5 12h14"/><path d="M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Card: Muestras fabricadas -->
+      <a href="/muestras-fabricadas" class="app-card" data-permiso="muestras_fabricadas">
+        <div class="app-card-icon app-card-icon-muestras">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3h6"/>
+            <path d="M10 3v6l-5.2 8.3A2 2 0 0 0 6.5 20h11a2 2 0 0 0 1.7-2.7L14 9V3"/>
+            <path d="M8.5 15h7"/>
+          </svg>
+        </div>
+        <div class="app-card-body">
+          <h3 class="app-card-title">Muestras fabricadas</h3>
+          <p class="app-card-desc">
+            Prototipos y muestras tejidas en fábrica: números de M, estado en el proceso, diario del laboratorio e histórico.
           </p>
           <span class="app-card-cta">
             <span>Abrir</span>

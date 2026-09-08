@@ -580,6 +580,7 @@ body {
 .app-card-icon-stock { background: #d6e4f3; color: #2c4a6b; }
 .app-card-icon-materias { background: #efe2cd; color: #8a6d3b; }
 .app-card-icon-proveedores { background: #dcecdc; color: #3d6b45; }
+.app-card-icon-muestras { background: #f3e1e6; color: #8a3d52; }
 .app-card-body { flex-grow: 1; min-width: 0; }
 .app-card-title {
   font-size: 1.05rem; font-weight: 600; color: #2a2a2a; margin-bottom: 0.35rem;

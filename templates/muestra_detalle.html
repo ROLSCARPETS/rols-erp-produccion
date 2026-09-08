@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Muestra M-{{ muestra_id }} — Rols ERP Producción</title>
+<link rel="icon" href="{{ url_for('static', filename='logo-rols.png') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='ui-modales.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='muestras.css') }}">
+<script src="/shared/sso-guard.js"></script>
+<script>
+// Guard de permiso 'muestras_fabricadas'. Sin acceso → inicio de Rols One.
+(function _checkPermisoMuestras() {
+  function chequear(user) {
+    const rol = user?.rol;
+    const perm = user?.permisos?.muestras_fabricadas;
+    const ok = (perm !== undefined) ? !!perm : (rol === 'admin' || rol === 'comercial');
+    if (!ok) location.replace('{{ rols_one_base }}/inicio');
+  }
+  if (window.__rolsUser) chequear(window.__rolsUser);
+  window.addEventListener('rols:sso-ok', (e) => chequear(e.detail));
+})();
+</script>
+<script src="{{ url_for('static', filename='ui-modales.js') }}"></script>
+<link rel="stylesheet" href="/shared/lang-switcher/lang-switcher.css">
+</head>
+<body class="min-h-screen">
+
+<div class="flex min-h-screen">
+
+  <!-- ======================== SIDEBAR ======================== -->
+  <aside class="sidebar w-64 flex-shrink-0 flex flex-col px-4 py-6">
+    <div class="px-2 mb-8">
+      <img src="{{ url_for('static', filename='logo-rols.png') }}" alt="Rols" class="rols-logo" />
+      <p class="sidebar-app-label">Producción</p>
+    </div>
+    <nav class="space-y-1">
+      <a href="/"><span class="check"></span><span data-i18n="sidebar.inicio">Inicio</span></a>
+      <a href="/materias-primas" data-permiso="compras"><span class="check"></span><span data-i18n="materias.breadcrumb">Materias primas</span></a>
+      <a href="/materias-primas#proveedores" data-permiso="compras"><span class="check"></span><span>Proveedores</span></a>
+      <a href="/muestras-fabricadas" class="active"><span class="check"></span><span>Muestras fabricadas</span></a>
+    </nav>
+    <div class="space-y-1 pt-4 border-t border-stone-700/50">
+      <a href="{{ rols_one_base }}/inicio"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg><span>Rols One</span></a>
+      <a href="{{ cuentas_base }}/logout"><span class="check"></span><span data-i18n="sidebar.logout">Cerrar sesión</span></a>
+    </div>
+  </aside>
+
+  <!-- ======================== MAIN ======================== -->
+  <main class="flex-grow px-10 py-8 overflow-x-hidden">
+    <div class="mb-6 flex justify-between items-start">
+      <div>
+        <p class="breadcrumb mb-1">
+          <span>Producción</span> · <a href="/muestras-fabricadas">Muestras fabricadas</a> · <span id="md-bread">M-{{ muestra_id }}</span>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div data-lang-switcher></div>
+        <div class="user-chip" id="ms-user-chip" style="display:none">
+          <span class="user-chip-avatar" id="ms-user-avatar"></span>
+          <span id="ms-user-nombre"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HERO: quién es, en qué estado está y qué se puede hacer -->
+    <div class="ms-hero">
+      <div class="ms-hero-top">
+        <div style="flex:1 1 auto; min-width:0">
+          <h1 class="ms-hero-title">
+            <span id="md-titulo">M-{{ muestra_id }}</span>
+            <span class="em" id="md-cliente">…</span>
+            <span id="md-chips"></span>
+          </h1>
+          <p class="ms-hero-sub" id="md-sub">Cargando…</p>
+        </div>
+        <div class="ms-hero-actions">
+          <a href="/muestras-fabricadas" class="ms-btn ms-btn-ghost">← Volver</a>
+          <button type="button" class="ms-btn ms-btn-ghost" id="md-btn-variante" title="Crea M-…-B/C/D con el mismo cliente y telar" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            Nueva variante
+          </button>
+          <button type="button" class="ms-btn ms-btn-ghost" id="md-btn-archivar" hidden>Archivar</button>
+          <button type="button" class="ms-btn ms-btn-danger" id="md-btn-borrar" hidden title="Solo para altas por error: borra la muestra y su diario">Borrar</button>
+        </div>
+      </div>
+
+      <!-- Etapas del proceso: pulsa una para mover la muestra -->
+      <div class="ms-stepper" id="md-stepper"></div>
+      <div class="ms-stepper-foot">
+        <span id="md-estado-txt"></span>
+        <span id="md-estado-acciones"></span>
+      </div>
+    </div>
+
+    <div class="ms-grid2">
+      <!-- ===== Columna izquierda: la ficha (autoguardado) ===== -->
+      <section class="ms-section">
+        <div class="ms-section-title"><span>Ficha</span><span class="ms-hint">los cambios se guardan solos</span></div>
+        <div class="ms-campo">
+          <label for="md-f-cliente">Cliente</label>
+          <input type="text" id="md-f-cliente" data-campo="cliente" list="md-clientes" maxlength="160" autocomplete="off" />
+          <datalist id="md-clientes"></datalist>
+        </div>
+        <div class="ms-campo-row">
+          <div class="ms-campo">
+            <label for="md-f-persona">Encargada por</label>
+            <select id="md-f-persona" data-campo="encargada_por" data-vacio="—"></select>
+          </div>
+          <div class="ms-campo">
+            <label for="md-f-prioridad">Prioridad</label>
+            <select id="md-f-prioridad" data-campo="prioridad">
+              <option value="1">1 · Alta</option><option value="2">2 · Normal</option><option value="3">3 · Baja</option>
+            </select>
+          </div>
+        </div>
+        <div class="ms-campo-row">
+          <div class="ms-campo">
+            <label for="md-f-telar">Telar / técnica</label>
+            <select id="md-f-telar" data-campo="telar" data-vacio="—"></select>
+          </div>
+          <div class="ms-campo">
+            <label for="md-f-fecha">Fecha de solicitud</label>
+            <input type="date" id="md-f-fecha" data-campo="fecha_solicitud" />
+          </div>
+        </div>
+        <div class="ms-campo">
+          <label for="md-f-lista">Fecha muestra lista</label>
+          <input type="date" id="md-f-lista" data-campo="fecha_lista" />
+        </div>
+        <div class="ms-campo">
+          <label for="md-f-desc">Descripción de la muestra</label>
+          <textarea id="md-f-desc" data-campo="descripcion" placeholder="Qué se teje: telar, dibujo, calidad, colores, cuerpos…"></textarea>
+        </div>
+        <div class="ms-campo" id="md-anotacion-wrap" hidden>
+          <label>Anotación del registro de números</label>
+          <div class="ms-readonly" id="md-anotacion"></div>
+        </div>
+        <div class="ms-campo">
+          <label for="md-f-resultado">Resultado (comercial)</label>
+          <textarea id="md-f-resultado" data-campo="resultado" placeholder="Qué pasó después: pedido confirmado, no la escogen, a la espera…" style="min-height:64px"></textarea>
+        </div>
+        <div class="ms-origen" id="md-origen"></div>
+      </section>
+
+      <!-- ===== Columna derecha: diario, variantes, historial ===== -->
+      <div>
+        <section class="ms-section">
+          <div class="ms-section-title">
+            <span>Diario del laboratorio</span>
+            <span class="ms-count" id="md-ap-count">0</span>
+            <span class="ms-hint">lo que antes iba en «Comentarios LABORATORIO», un apunte por fecha</span>
+          </div>
+          <div class="ms-ap-form">
+            <div class="ms-ap-form-row">
+              <input type="date" id="md-ap-fecha" title="Fecha del apunte" />
+              <textarea id="md-ap-texto" rows="1" placeholder="Ej. Se envía a tintar 4 colores lana 100 3/c…"></textarea>
+              <button type="button" class="ms-btn ms-btn-primary" id="md-ap-add">Añadir</button>
+            </div>
+            <div class="ayuda">Ctrl + Intro para añadir · pasa el ratón por un apunte para editarlo o borrarlo</div>
+          </div>
+          <div class="ms-diario" id="md-diario"></div>
+        </section>
+
+        <section class="ms-section" id="md-variantes-wrap" hidden>
+          <div class="ms-section-title"><span>Otras muestras con este número</span><span class="ms-count" id="md-var-count">0</span></div>
+          <div class="ms-variantes" id="md-variantes"></div>
+        </section>
+
+        <section class="ms-section">
+          <details class="ms-hist" id="md-hist">
+            <summary>Historial de cambios (<span id="md-hist-count">0</span>)</summary>
+            <ul class="ms-hist-lista" id="md-historial"></ul>
+          </details>
+        </section>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>window.MUESTRA_ID = {{ muestra_id | tojson }};</script>
+<script src="{{ url_for('static', filename='js/muestras-common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/muestra-detalle-page.js') }}"></script>
+<script src="{{ url_for('static', filename='i18n.js') }}"></script>
+<script src="/shared/lang-switcher/lang-switcher.js" defer></script>
+</body>
+</html>
