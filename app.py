@@ -1883,6 +1883,48 @@ def _muestras_module():
     return _mf
 
 
+# Quien encarga una muestra debe ser un usuario de Rols One: cuentas dice
+# quienes tienen el permiso (/api/usuarios/con-permiso). Cache de 5 min por
+# proceso; si cuentas no responde se sirve la ultima lista buena y, si no la
+# hay, el modulo cae a los usuarios que ya aparecen en las muestras.
+_USUARIOS_ONE_CACHE: dict = {}
+_USUARIOS_ONE_TTL = 300.0
+
+
+def _usuarios_one_con_permiso(permiso: str):
+    now = time.time()
+    hit = _USUARIOS_ONE_CACHE.get(permiso)
+    if hit and (now - hit[1]) < _USUARIOS_ONE_TTL:
+        return hit[0]
+    val = request.cookies.get(_SSO_COOKIE)
+    if val:
+        try:
+            import urllib.request
+            from urllib.parse import quote
+            req = urllib.request.Request(
+                _cuentas_base() + "/api/usuarios/con-permiso?permiso=" + quote(permiso),
+                headers={"Cookie": f"{_SSO_COOKIE}={val}"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                if resp.status == 200:
+                    lista = (json.loads(resp.read().decode("utf-8")) or {}).get("usuarios")
+                    if isinstance(lista, list):
+                        _USUARIOS_ONE_CACHE[permiso] = (lista, now)
+                        return lista
+        except Exception:
+            pass
+    return hit[0] if hit else None
+
+
+def _ctx_personas() -> dict:
+    """Argumentos de personas para el modulo de muestras (lista viva de One +
+    usuario de la sesion, que siempre puede encargar)."""
+    u = _sso_user() or {}
+    actual = ({"username": u.get("username"), "nombre": u.get("nombre")}
+              if u.get("username") else None)
+    return {"usuarios_one": _usuarios_one_con_permiso("muestras_fabricadas"),
+            "usuario_actual": actual}
+
+
 def _pagina_protegida(permiso: str):
     """Guard de PAGINA (no API): sin sesion → al login de cuentas con
     `next` de vuelta aqui; con sesion pero sin permiso → al inicio de la
@@ -1924,7 +1966,7 @@ def api_muestras():
     mf = _muestras_module()
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
-        nueva, err = mf.crear(data, usuario=_user_name())
+        nueva, err = mf.crear(data, usuario=_user_name(), **_ctx_personas())
         if err:
             return jsonify({"error": err}), 400
         return jsonify({"muestra": nueva}), 201
@@ -1944,7 +1986,7 @@ def api_muestras():
     out["limite"] = limite
     out["resumen"] = mf.resumen()
     if a.get("con_catalogos"):
-        out["catalogos"] = mf.catalogos()
+        out["catalogos"] = mf.catalogos(**_ctx_personas())
     return jsonify(out)
 
 
@@ -1963,12 +2005,12 @@ def api_muestras_catalogos():
     bl = _requiere("muestras_fabricadas")
     if bl:
         return bl
-    return jsonify(_muestras_module().catalogos())
+    return jsonify(_muestras_module().catalogos(**_ctx_personas()))
 
 
 @app.route("/api/muestras/catalogos/<tipo>", methods=["POST"])
 def api_muestras_catalogo(tipo):
-    """Anade un valor a un catalogo (telares | personas)."""
+    """Anade un valor a un catalogo (solo telares: las personas son usuarios de One)."""
     bl = _requiere("muestras_fabricadas")
     if bl:
         return bl
@@ -2000,7 +2042,7 @@ def api_muestra(mid):
             return jsonify({"error": err}), 404
         return jsonify({"ok": True})
     data = request.get_json(force=True, silent=True) or {}
-    m, err = mf.actualizar(mid, data, usuario=_user_name())
+    m, err = mf.actualizar(mid, data, usuario=_user_name(), **_ctx_personas())
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m})

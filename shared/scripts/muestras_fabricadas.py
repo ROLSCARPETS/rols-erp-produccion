@@ -91,14 +91,26 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 2
+_VERSION_SCHEMA = 3
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
 TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
                    "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
-PERSONAS_DEFAULT = ["Fernando", "Damián", "JM", "Carmen", "Paco", "Emilio",
-                    "Romu", "Victor", "Blanca", "Señor Gómez"]
+# Quien encarga la muestra debe ser un USUARIO DE ROLS ONE (cuentas): la lista
+# viva llega desde app.py (`usuarios_one`, endpoint de cuentas
+# /api/usuarios/con-permiso). Los nombres cortos del libro antiguo con usuario
+# se pasaron a su cuenta (v3); los que no tienen usuario (Paco, Emilio,
+# Blanca...) quedan como "antiguos": valen para filtrar el historico pero no
+# para muestras nuevas.
+_PERSONAS_LEGACY_A_ONE = {
+    "fernando": ("Fernando Ferrández", "fernando@rolscarpets.com"),
+    "jm":       ("Jose Manuel Sánchez", "jose manuel"),
+    "damian":   ("Damián Fuentes", "damian"),
+    "carmen":   ("Carmen Ferrández", "carmen"),
+    "romu":     ("Romu Más", "romu"),
+    "victor":   ("Víctor Penalva", "víctor"),
+}
 
 CAMPOS_EDITABLES = {
     "tipo", "cliente", "descripcion", "encargada_por", "prioridad", "telar",
@@ -114,8 +126,7 @@ _MAX_TEXTO = 6000
 def _default() -> dict:
     return {
         "_meta": {"version_schema": _VERSION_SCHEMA, "ultimo_numero": 0},
-        "catalogos": {"telares": list(TELARES_DEFAULT),
-                      "personas": list(PERSONAS_DEFAULT)},
+        "catalogos": {"telares": list(TELARES_DEFAULT), "personas_legacy": []},
         "muestras": [],
     }
 
@@ -125,7 +136,7 @@ def _cargar_sin_migrar() -> dict:
     data.setdefault("_meta", {}).setdefault("ultimo_numero", 0)
     cat = data.setdefault("catalogos", {})
     cat.setdefault("telares", list(TELARES_DEFAULT))
-    cat.setdefault("personas", list(PERSONAS_DEFAULT))
+    cat.setdefault("personas_legacy", [])
     data.setdefault("muestras", [])
     return data
 
@@ -144,8 +155,12 @@ def cargar() -> dict:
     if _version(data) < _VERSION_SCHEMA:
         with jsonstore.store().tx():
             data = _cargar_sin_migrar()
-            if _version(data) < _VERSION_SCHEMA:
-                _migrar_v2(data)
+            v = _version(data)
+            if v < _VERSION_SCHEMA:
+                if v < 2:
+                    _migrar_v2(data)
+                if v < 3:
+                    _migrar_v3(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -184,6 +199,73 @@ def _migrar_v2(data: dict) -> None:
                        texto="errata de fecha del libro, corregida con el registro de numeros")
         quedan.append(m)
     data["muestras"] = quedan
+
+
+def _migrar_v3(data: dict) -> None:
+    """v2 → v3 (sept 2026): quien encarga pasa a ser un usuario de Rols One.
+    Los nombres cortos del libro con cuenta se renombran (Fernando →
+    Fernando Ferrández...) y guardan `encargada_por_usuario`; el resto queda
+    como nombre antiguo en catalogos.personas_legacy. Idempotente."""
+    legacy = set()
+    for m in data.get("muestras", []):
+        nombre = (m.get("encargada_por") or "").strip()
+        if not nombre:
+            continue
+        ref = _PERSONAS_LEGACY_A_ONE.get(_clave(nombre))
+        if ref:
+            m["encargada_por"], m["encargada_por_usuario"] = ref
+        elif not m.get("encargada_por_usuario"):
+            legacy.add(nombre)
+    cat = data.setdefault("catalogos", {})
+    cat.pop("personas", None)
+    cat["personas_legacy"] = sorted(legacy, key=_clave)
+
+
+def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:
+    """Usuarios de One que pueden encargar muestras [{nombre, usuario}]: la
+    lista viva de cuentas si llega; si no (cuentas caido), los que ya aparecen
+    en las muestras con usuario. El usuario de la sesion siempre esta."""
+    out: list[dict] = []
+    vistos: set[str] = set()
+
+    def add(nombre, usuario):
+        nombre = (nombre or "").strip()
+        usuario = (usuario or "").strip().lower()
+        if not nombre or not usuario or usuario in vistos:
+            return
+        vistos.add(usuario)
+        out.append({"nombre": nombre, "usuario": usuario})
+
+    if usuarios_one:
+        for u in usuarios_one:
+            if isinstance(u, dict):
+                add(u.get("nombre"), u.get("username") or u.get("usuario"))
+    else:
+        for m in data.get("muestras", []):
+            if m.get("encargada_por_usuario"):
+                add(m.get("encargada_por"), m.get("encargada_por_usuario"))
+    if isinstance(usuario_actual, dict):
+        add(usuario_actual.get("nombre") or usuario_actual.get("username"),
+            usuario_actual.get("username") or usuario_actual.get("usuario"))
+    out.sort(key=lambda p: _clave(p["nombre"]))
+    return out
+
+
+def _resolver_persona(valor, personas: list[dict]) -> tuple[str, str | None, str]:
+    """(nombre, usuario, error). Acepta el usuario o el nombre de una persona
+    conocida; vacio = sin asignar. Sin lista (arranque vacio) no bloquea."""
+    v = normalizar_persona(valor)
+    if not v:
+        return "", None, ""
+    if len(v) > 80:
+        return "", None, "encargada_por demasiado largo"
+    k = _clave(v)
+    for p in personas:
+        if _clave(p["usuario"]) == k or _clave(p["nombre"]) == k:
+            return p["nombre"], p["usuario"], ""
+    if not personas:
+        return v, None, ""
+    return "", None, f"{v!r} no es un usuario de Rols One con acceso a muestras"
 
 
 def _guardar(data: dict) -> None:
@@ -462,7 +544,9 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "id": m.get("id"), "numero": m.get("numero"), "sufijo": m.get("sufijo") or "",
         "fecha_solicitud": m.get("fecha_solicitud"), "cliente": m.get("cliente") or "",
         "tipo": m.get("tipo") or "cliente",
-        "encargada_por": m.get("encargada_por") or "", "prioridad": m.get("prioridad"),
+        "encargada_por": m.get("encargada_por") or "",
+        "encargada_por_usuario": m.get("encargada_por_usuario"),
+        "prioridad": m.get("prioridad"),
         "telar": m.get("telar") or "", "estado": estado,
         "estado_label": ESTADOS_LABEL.get(estado, estado or "—"),
         "fecha_lista": m.get("fecha_lista"), "archivada": bool(m.get("archivada")),
@@ -516,7 +600,7 @@ def listar(vista: str = "en-curso", q: str = "", anio=None, estado: str = "",
             continue
         if telar and _clave(m.get("telar")) != _clave(telar):
             continue
-        if persona and _clave(m.get("encargada_por")) != _clave(persona):
+        if persona and _clave(persona) not in _clave(m.get("encargada_por")):
             continue
         if tipo in TIPOS and (m.get("tipo") or "cliente") != tipo:
             continue
@@ -572,25 +656,32 @@ def obtener(mid: str) -> dict | None:
     return out
 
 
-def catalogos() -> dict:
+def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
+    """`usuarios_one`: lista viva de cuentas [{username, nombre}] (None si no
+    llega); `usuario_actual`: {username, nombre} de la sesion."""
     data = cargar()
     cat = data.get("catalogos", {})
     clientes = sorted({(m.get("cliente") or "").strip() for m in data["muestras"]
                        if (m.get("cliente") or "").strip()
                        and (m.get("tipo") or "cliente") != "interna"},
                       key=lambda s: _clave(s))
-    personas = list(cat.get("personas") or [])
-    for m in data["muestras"]:
-        p = (m.get("encargada_por") or "").strip()
-        if p and en_curso(m) and not any(_clave(p) == _clave(x) for x in personas):
-            personas.append(p)
+    activas = _personas_conocidas(data, usuarios_one, usuario_actual)
+    nombres_activas = {_clave(p["nombre"]) for p in activas}
+    legacy = sorted({(m.get("encargada_por") or "").strip() for m in data["muestras"]
+                     if (m.get("encargada_por") or "").strip()
+                     and _clave(m.get("encargada_por")) not in nombres_activas},
+                    key=_clave)
     return {
         "estados": [{"slug": s, "label": l, "terminal": s in ESTADOS_TERMINALES,
                      "seleccionable": s in ESTADOS_SELECCIONABLES} for s, l in ESTADOS],
         "prioridades": [{"valor": k, "label": v} for k, v in PRIORIDADES.items()],
         "tipos": [{"valor": "cliente", "label": "Cliente"}, {"valor": "interna", "label": "Interna"}],
         "telares": list(cat.get("telares") or []),
-        "personas": personas,
+        # activas = pueden encargar muestras nuevas; legacy = solo para filtrar
+        "personas_activas": activas,
+        "personas_legacy": legacy,
+        "personas": [p["nombre"] for p in activas] + legacy,
+        "usuarios_one_disponibles": usuarios_one is not None,
         "clientes": clientes,
         "siguiente_numero": int(data["_meta"].get("ultimo_numero") or 0) + 1,
     }
@@ -758,7 +849,8 @@ def _anadir_a_catalogo(data: dict, tipo: str, valor: str) -> None:
         lista.append(valor)
 
 
-def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
+def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
+          usuario_actual=None) -> tuple[dict | None, str]:
     """Alta de una muestra. Asigna el numero de M en servidor:
     - `variante_de` (numero base) → siguiente sufijo (B, C, D...).
     - `numero_manual` → ese numero (unico), p.ej. si ya se apunto en el Excel.
@@ -779,9 +871,7 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
     resultado, err = _validar_texto(datos.get("resultado"), "resultado")
     if err:
         return None, err
-    persona = normalizar_persona(datos.get("encargada_por"))
-    if len(persona) > 60:
-        return None, "encargada_por demasiado largo"
+    persona_raw = datos.get("encargada_por")
     prioridad, err = _validar_prioridad(datos.get("prioridad", 2))
     if err:
         return None, err
@@ -797,6 +887,10 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
         telar = normalizar_telar(datos.get("telar"), data["catalogos"].get("telares"))
         if len(telar) > 60:
             return None, "telar demasiado largo"
+        persona, persona_usuario, err = _resolver_persona(
+            persona_raw, _personas_conocidas(data, usuarios_one, usuario_actual))
+        if err:
+            return None, err
         variante_de = datos.get("variante_de")
         numero_manual = datos.get("numero_manual")
         if variante_de not in (None, ""):
@@ -832,7 +926,8 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
         nueva = {
             "id": mid, "numero": numero, "sufijo": sufijo,
             "fecha_solicitud": fecha, "cliente": cliente, "tipo": tipo,
-            "encargada_por": persona, "prioridad": prioridad if prioridad is not None else 2,
+            "encargada_por": persona, "encargada_por_usuario": persona_usuario,
+            "prioridad": prioridad if prioridad is not None else 2,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "apuntes": [], "historial": [],
@@ -841,13 +936,13 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
         _historial(nueva, usuario, "creacion",
                    texto=(f"Variante de M-{numero}" if sufijo else "Alta de la muestra"))
         _anadir_a_catalogo(data, "telares", telar)
-        _anadir_a_catalogo(data, "personas", persona)
         data["muestras"].append(nueva)
         _guardar(data)
         return obtener(mid), ""
 
 
-def actualizar(mid: str, datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
+def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=None,
+               usuario_actual=None) -> tuple[dict | None, str]:
     """Edita campos de la ficha (solo los que vengan en `datos`)."""
     if not isinstance(datos, dict):
         return None, "datos debe ser un objeto"
@@ -890,10 +985,11 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None) -> tuple[dict 
                     return None, "telar demasiado largo"
                 _anadir_a_catalogo(data, "telares", v)
             elif k == "encargada_por":
-                v = normalizar_persona(v)
-                if len(v) > 60:
-                    return None, "encargada_por demasiado largo"
-                _anadir_a_catalogo(data, "personas", v)
+                v, v_usuario, err = _resolver_persona(
+                    v, _personas_conocidas(data, usuarios_one, usuario_actual))
+                if err:
+                    return None, err
+                m["encargada_por_usuario"] = v_usuario
             if m.get(k) != v:
                 cambios.append((k, m.get(k), v))
                 m[k] = v
@@ -1050,7 +1146,7 @@ def borrar(mid: str) -> tuple[bool, str]:
 
 
 def anadir_catalogo(tipo: str, valor: str) -> tuple[list | None, str]:
-    if tipo not in ("telares", "personas"):
+    if tipo != "telares":
         return None, "catalogo desconocido"
     valor, err = _validar_texto(valor, "valor", 60)
     if err:

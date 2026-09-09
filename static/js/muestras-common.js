@@ -137,6 +137,31 @@
     sel.value = actual || '';
   }
 
+  // Select de "encargada por": solo usuarios de One (value = usuario, texto = nombre).
+  // Si la muestra lleva un nombre antiguo sin usuario, se añade como opción
+  // "(antiguo)" para que se vea, pero no se puede elegir para otras.
+  function llenarSelectPersonas(sel, activas, opts) {
+    const o = opts || {};
+    const lista = activas || [];
+    const usuarioSel = (o.usuario || '').toLowerCase();
+    sel.innerHTML = '';
+    if (o.vacio !== undefined) sel.insertAdjacentHTML('beforeend', `<option value="">${esc(o.vacio)}</option>`);
+    lista.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${esc(p.usuario)}">${esc(p.nombre)}</option>`));
+    let valor = '';
+    const hit = usuarioSel ? lista.find(p => (p.usuario || '').toLowerCase() === usuarioSel) : null;
+    if (hit) {
+      valor = hit.usuario;
+    } else if (usuarioSel && o.nombre) {
+      // usuario de One que hoy no tiene acceso a muestras: se enseña igual
+      sel.insertAdjacentHTML('beforeend', `<option value="${esc(o.usuario)}">${esc(o.nombre)} (sin acceso a muestras)</option>`);
+      valor = o.usuario;
+    } else if (o.nombre) {
+      sel.insertAdjacentHTML('beforeend', `<option value="__legacy__">${esc(o.nombre)} (antiguo)</option>`);
+      valor = '__legacy__';
+    }
+    sel.value = valor;
+  }
+
   // Al elegir "Otro…" en un select de catálogo: pide el valor, lo guarda y lo selecciona.
   async function gestionarOtro(sel, tipo, etiqueta) {
     if (sel.value !== '__otro__') return true;
@@ -155,5 +180,5 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
-    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, gestionarOtro };
+    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro };
 })();

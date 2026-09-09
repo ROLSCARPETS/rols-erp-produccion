@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, colorearPrio, api,
-          ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, gestionarOtro } = window.MS;
+          ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -88,7 +88,8 @@
     if (!r.ok) return;
     try {
       const d = await api('/api/muestras', { method: 'POST', body: {
-        variante_de: M.numero, cliente: M.cliente, tipo: M.tipo || 'cliente', encargada_por: M.encargada_por,
+        variante_de: M.numero, cliente: M.cliente, tipo: M.tipo || 'cliente',
+        encargada_por: M.encargada_por_usuario || '',
         telar: M.telar, prioridad: M.prioridad || 2, descripcion: '',
       } });
       location.href = '/muestras-fabricadas/' + encodeURIComponent(d.muestra.id);
@@ -217,7 +218,7 @@
     $('md-f-cliente-lbl').textContent = esInterna ? 'Para quién / proyecto' : 'Cliente';
     $('md-f-cliente').placeholder = esInterna ? 'Ej. Marta · colección 2027' : 'Nombre del cliente';
     $('md-f-cliente').value = M.cliente || '';
-    llenarSelect($('md-f-persona'), CAT.personas, { vacio: '—', otro: true, valor: M.encargada_por || '' });
+    rellenarPersona();
     llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
     $('md-f-prioridad').value = String(M.prioridad || 2);
     colorearPrio($('md-f-prioridad'));
@@ -241,6 +242,11 @@
     $('md-origen').innerHTML = origen;
   }
 
+  function rellenarPersona() {
+    llenarSelectPersonas($('md-f-persona'), CAT.personas_activas,
+      { vacio: '—', usuario: M.encargada_por_usuario || '', nombre: M.encargada_por || '' });
+  }
+
   function marcar(el, cls) {
     el.classList.remove('saving', 'saved-ok', 'saved-err');
     if (cls) el.classList.add(cls);
@@ -250,7 +256,8 @@
   async function guardarCampo(el) {
     const campo = el.dataset.campo;
     let valor = el.value;
-    if (el.tagName === 'SELECT' && valor === '__otro__') return;
+    if (el.tagName === 'SELECT' && (valor === '__otro__' || valor === '__legacy__')) { marcar(el, null); return; }
+    if (campo === 'encargada_por' && valor === (M.encargada_por_usuario || '')) { marcar(el, null); return; }
     if (campo === 'prioridad') valor = Number(valor);
     if (typeof valor === 'string') valor = valor.trim();
     const actual = M[campo] == null ? '' : M[campo];
@@ -269,7 +276,8 @@
     } catch (e) {
       marcar(el, 'saved-err');
       await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
-      el.value = (campo === 'prioridad') ? String(M.prioridad || 2) : (M[campo] || '');
+      if (campo === 'encargada_por') rellenarPersona();
+      else el.value = (campo === 'prioridad') ? String(M.prioridad || 2) : (M[campo] || '');
       if (campo === 'prioridad') colorearPrio(el);
       marcar(el, null);
     }

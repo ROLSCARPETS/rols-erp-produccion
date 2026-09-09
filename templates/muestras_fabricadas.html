@@ -121,7 +121,7 @@
       <div class="ms-filtros">
         <input type="search" id="ec-q" placeholder="Buscar nº, cliente, descripción, apunte…" autocomplete="off" />
         <select id="ec-telar"><option value="">Todos los telares</option></select>
-        <select id="ec-persona"><option value="">Encargada por (todos)</option></select>
+        <input type="text" id="ec-persona" list="ms-personas-dl" placeholder="Encargada por…" autocomplete="off" style="width:190px" title="Escribe o elige quién la encarga" />
         <select id="ec-prio">
           <option value="">Cualquier prioridad</option>
           <option value="1">Alta</option><option value="2">Media</option><option value="3">Baja</option>
@@ -174,7 +174,7 @@
           <option value="sin_seguimiento">Sin seguimiento (solo registro)</option>
         </select>
         <select id="hi-telar"><option value="">Todos los telares</option></select>
-        <select id="hi-persona"><option value="">Encargada por (todos)</option></select>
+        <input type="text" id="hi-persona" list="ms-personas-dl" placeholder="Encargada por…" autocomplete="off" style="width:190px" title="Escribe o elige quién la encarga (también los nombres antiguos del libro)" />
         <select id="hi-tipo">
           <option value="">Clientes e internas</option>
           <option value="cliente">Solo clientes</option>
@@ -234,6 +234,8 @@
 </div>
 
 <!-- ============ Modal: nueva muestra ============ -->
+<datalist id="ms-personas-dl"></datalist>
+
 <div class="uim-backdrop" id="ms-modal-nueva">
   <div class="uim-modal" role="dialog" aria-modal="true" style="min-width:600px; max-width:680px">
     <h3>Nueva muestra</h3>
@@ -246,7 +248,7 @@
         </div>
       </div>
       <div class="full"><label id="ms-n-cliente-lbl">Cliente</label><input type="text" id="ms-n-cliente" list="ms-clientes" placeholder="Nombre del cliente" autocomplete="off" maxlength="160" /><datalist id="ms-clientes"></datalist></div>
-      <div><label>Encargada por</label><select id="ms-n-persona"></select></div>
+      <div><label>Encargada por <small style="font-weight:400;color:#9a9a9a">(usuario de Rols One)</small></label><select id="ms-n-persona"></select></div>
       <div><label>Telar / técnica</label><select id="ms-n-telar"></select></div>
       <div><label>Prioridad</label><select id="ms-n-prio"><option value="1">1 · Alta</option><option value="2" selected>2 · Media</option><option value="3">3 · Baja</option></select></div>
       <div><label>Fecha de solicitud</label><input type="date" id="ms-n-fecha" /></div>

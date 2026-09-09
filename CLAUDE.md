@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v2). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v3). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -65,6 +65,13 @@ laboratorio pueda llevar las muestras sin ver costes.
 - Migraciones de esquema en `cargar()` (version-gated, idempotentes). v2:
   tipo deducido, telares unificados (Escala→Rapier, Solo diseño→Print), dos
   erratas de fecha del libro corregidas y fuera las 6 M de dic-2014.
+- **Quien encarga** (`encargada_por` + `encargada_por_usuario`) debe ser un
+  usuario de Rols One: `app.py` pide a cuentas `/api/usuarios/con-permiso?permiso=muestras_fabricadas`
+  (cache 5 min; si cuentas no responde, se usan los usuarios ya vistos en
+  datos). v3 pasó los nombres cortos del libro a su cuenta (Fernando →
+  Fernando Ferrández, JM → Jose Manuel Sánchez, Damián, Carmen, Romu, Victor);
+  Paco, Emilio, Blanca, Señor Gómez, Tano y Alberto quedan como "antiguos"
+  (`catalogos.personas_legacy`): filtran el histórico, no valen para altas.
 
 ## La costura con Rols One (pendiente, por API)
 

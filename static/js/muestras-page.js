@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
-          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, gestionarOtro } = window.MS;
+          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, llenarSelectPersonas, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -39,8 +39,12 @@
     if (!c) return;
     llenarSelect($('ec-telar'), c.telares, { vacio: 'Todos los telares' });
     llenarSelect($('hi-telar'), c.telares, { vacio: 'Todos los telares' });
-    llenarSelect($('ec-persona'), c.personas, { vacio: 'Encargada por (todos)' });
-    llenarSelect($('hi-persona'), c.personas, { vacio: 'Encargada por (todos)' });
+    // Filtro "Encargada por": se escribe o se elige (usuarios de One primero,
+    // después los nombres antiguos del libro).
+    const activas = (c.personas_activas || []).map(p => p.nombre);
+    const legacy = (c.personas_legacy || []).filter(n => !activas.includes(n));
+    $('ms-personas-dl').innerHTML = activas.map(n => `<option value="${esc(n)}"></option>`).join('')
+      + legacy.map(n => `<option value="${esc(n)}">antiguo</option>`).join('');
     const dl = $('ms-clientes');
     dl.innerHTML = (c.clientes || []).map(x => `<option value="${esc(x)}"></option>`).join('');
   }
@@ -204,7 +208,8 @@
   // Filtros
   const recargarEC = debounce(() => cargarEnCurso(false), 250);
   $('ec-q').addEventListener('input', recargarEC);
-  ['ec-telar', 'ec-persona', 'ec-prio', 'ec-tipo'].forEach(id => $(id).addEventListener('change', () => cargarEnCurso(false)));
+  $('ec-persona').addEventListener('input', recargarEC);
+  ['ec-telar', 'ec-prio', 'ec-tipo'].forEach(id => $(id).addEventListener('change', () => cargarEnCurso(false)));
   $('ec-limpiar').addEventListener('click', () => {
     $('ec-q').value = ''; $('ec-telar').value = ''; $('ec-persona').value = ''; $('ec-prio').value = ''; $('ec-tipo').value = '';
     ST.ec.estados.clear();
@@ -328,7 +333,8 @@
   }
   const recargarHI = debounce(cargarHistorico, 250);
   $('hi-q').addEventListener('input', recargarHI);
-  ['hi-anio', 'hi-estado', 'hi-telar', 'hi-persona', 'hi-tipo'].forEach(id => $(id).addEventListener('change', cargarHistorico));
+  $('hi-persona').addEventListener('input', recargarHI);
+  ['hi-anio', 'hi-estado', 'hi-telar', 'hi-tipo'].forEach(id => $(id).addEventListener('change', cargarHistorico));
   $('hi-limpiar').addEventListener('click', () => {
     ['hi-q', 'hi-anio', 'hi-estado', 'hi-telar', 'hi-persona', 'hi-tipo'].forEach(id => { $(id).value = ''; });
     cargarHistorico();
@@ -404,12 +410,10 @@
   });
   function abrirNueva() {
     ponerTipoNuevo('cliente');
-    const c = ST.catalogos || { personas: [], telares: [] };
+    const c = ST.catalogos || { personas_activas: [], telares: [] };
     const u = window.__rolsUser || {};
-    const nombre = (u.nombre || '').trim().split(/\s+/)[0] || '';
-    const yo = (c.personas || []).find(p => p.toLowerCase() === nombre.toLowerCase()) || '';
-    llenarSelect($('ms-n-persona'), c.personas, { vacio: '— quién la encarga —', otro: true, valor: yo });
-    $('ms-n-persona').dataset.vacio = '— quién la encarga —';
+    // Por defecto, quien está logueado (si tiene acceso a muestras)
+    llenarSelectPersonas($('ms-n-persona'), c.personas_activas, { vacio: '— quién la encarga —', usuario: u.username || '' });
     llenarSelect($('ms-n-telar'), c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
@@ -427,7 +431,6 @@
   modal.addEventListener('click', (e) => { if (e.target === modal) cerrarNueva(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) cerrarNueva(); });
   $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
-  $('ms-n-persona').addEventListener('change', () => gestionarOtro($('ms-n-persona'), 'personas', 'nombre'));
   $('ms-n-telar').addEventListener('change', () => gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica'));
   // Escribir en un campo de número selecciona su opción
   $('ms-n-variante').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="variante"]').checked = true; });
@@ -442,7 +445,7 @@
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
     const body = {
       cliente, tipo: tipoNuevo, descripcion: $('ms-n-desc').value.trim(),
-      encargada_por: $('ms-n-persona').value === '__otro__' ? '' : $('ms-n-persona').value,
+      encargada_por: $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
     };
