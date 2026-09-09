@@ -12,7 +12,7 @@
   ];
   const ESTADOS_LABEL = Object.fromEntries(ESTADOS);
   const ESTADOS_FLUJO = ESTADOS.slice(0, 9).map(e => e[0]);
-  const PRIO_LABEL = { 1: 'Alta', 2: 'Normal', 3: 'Baja' };
+  const PRIO_LABEL = { 1: 'Alta', 2: 'Media', 3: 'Baja' };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -61,6 +61,18 @@
   function prioPill(p) {
     const v = [1, 2, 3].includes(Number(p)) ? Number(p) : 0;
     return `<span class="ms-prio ms-prio-${v}">${v ? esc(PRIO_LABEL[v]) : '—'}</span>`;
+  }
+
+  // Etiqueta "Interna" (desarrollo propio) delante del cliente.
+  function tipoTag(m) {
+    return (m && m.tipo === 'interna')
+      ? '<span class="ms-tag-interna" title="Muestra interna (desarrollo propio, no de un cliente)">Interna</span>' : '';
+  }
+  function clienteHtml(m) {
+    const tag = tipoTag(m);
+    const txt = esc((m && m.cliente) || '');
+    if (!txt) return tag || '<span class="ms-mudo">—</span>';
+    return tag + txt;
   }
 
   async function api(url, opts) {
@@ -136,5 +148,5 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
-    numeroHtml, estadoPill, prioPill, api, esAdmin, llenarSelect, gestionarOtro };
+    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, api, esAdmin, llenarSelect, gestionarOtro };
 })();

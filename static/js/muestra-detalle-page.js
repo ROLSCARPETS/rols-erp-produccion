@@ -5,7 +5,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, api,
+  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, api,
           ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
@@ -48,8 +48,9 @@
     document.title = `M-${M.id} · ${M.cliente || ''} — Rols ERP Producción`;
     $('md-bread').textContent = `M-${M.id}`;
     $('md-titulo').textContent = `M-${M.id}`;
-    $('md-cliente').textContent = M.cliente || '—';
-    let chips = estadoPill(M.estado, M.estado_label) + ' ' + prioPill(M.prioridad);
+    const esInterna = M.tipo === 'interna';
+    $('md-cliente').textContent = M.cliente || (esInterna ? 'Interna' : '—');
+    let chips = tipoTag(M) + estadoPill(M.estado, M.estado_label) + ' ' + prioPill(M.prioridad);
     if (M.telar) chips += ` <span class="ms-estado" style="background:#f1ece4;color:#6b5323">${esc(M.telar)}</span>`;
     if (M.archivada && !TERMINALES.includes(M.estado)) chips += ' <span class="ms-tag-archivada">archivada</span>';
     $('md-chips').innerHTML = chips;
@@ -87,7 +88,7 @@
     if (!r.ok) return;
     try {
       const d = await api('/api/muestras', { method: 'POST', body: {
-        variante_de: M.numero, cliente: M.cliente, encargada_por: M.encargada_por,
+        variante_de: M.numero, cliente: M.cliente, tipo: M.tipo || 'cliente', encargada_por: M.encargada_por,
         telar: M.telar, prioridad: M.prioridad || 2, descripcion: '',
       } });
       location.href = '/muestras-fabricadas/' + encodeURIComponent(d.muestra.id);
@@ -211,6 +212,10 @@
   // ------------------------------------------------------------
   function pintarFicha() {
     $('md-clientes').innerHTML = (CAT.clientes || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+    const esInterna = M.tipo === 'interna';
+    $('md-f-tipo').value = esInterna ? 'interna' : 'cliente';
+    $('md-f-cliente-lbl').textContent = esInterna ? 'Para quién / proyecto' : 'Cliente';
+    $('md-f-cliente').placeholder = esInterna ? 'Ej. Marta · colección 2027' : 'Nombre del cliente';
     $('md-f-cliente').value = M.cliente || '';
     llenarSelect($('md-f-persona'), CAT.personas, { vacio: '—', otro: true, valor: M.encargada_por || '' });
     llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
@@ -255,6 +260,7 @@
       M = d.muestra;
       marcar(el, 'saved-ok');
       pintarHero(); pintarStepper(); pintarHistorial();
+      if (campo === 'tipo') pintarFicha();
       if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar') {
         // catálogos pueden haber crecido (valor nuevo)
         CAT = await api('/api/muestras/catalogos');

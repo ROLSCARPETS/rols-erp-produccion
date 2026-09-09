@@ -44,8 +44,8 @@ Por eso `scripts/` y `data/` deben seguir siendo hermanos dentro de `shared/`.
 Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
-seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.343
-muestras desde 2014). Permiso propio **`muestras_fabricadas`** (sección
+seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
+muestras desde 2015, esquema v2). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -59,6 +59,12 @@ laboratorio pueda llevar las muestras sin ver costes.
   era mover la fila a la hoja de terminadas).
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida.
+- `tipo` = `cliente` | `interna` (desarrollo propio; en el libro era el cliente
+  "INTERNA ( NANDO )", "MOQUETAS ROLS"...). Las internas no necesitan cliente.
+  Prioridad 1 Alta (rojo) · 2 Media (azul) · 3 Baja (verde claro).
+- Migraciones de esquema en `cargar()` (version-gated, idempotentes). v2:
+  tipo deducido, telares unificados (Escala→Rapier, Solo diseño→Print), dos
+  erratas de fecha del libro corregidas y fuera las 6 M de dic-2014.
 
 ## La costura con Rols One (pendiente, por API)
 

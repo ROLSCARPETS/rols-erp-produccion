@@ -86,16 +86,22 @@ ESTADOS_FLUJO = tuple(s for s, _ in ESTADOS[:9])          # por_empezar … term
 ESTADOS_TERMINALES = {"terminada", "cancelada", "sin_seguimiento"}
 ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS[:10])  # todos menos sin_seguimiento
 
-PRIORIDADES = {1: "Alta", 2: "Normal", 3: "Baja"}
+PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 
+# Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
+# "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
+TIPOS = ("cliente", "interna")
+_VERSION_SCHEMA = 2
+
+# "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
+# (sept 2026); normalizar_telar los sigue reconociendo como alias.
 TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
-                   "Raschel", "Pompón", "Kibby", "Rapier", "Escala", "Festón",
-                   "Solo diseño"]
+                   "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
 PERSONAS_DEFAULT = ["Fernando", "Damián", "JM", "Carmen", "Paco", "Emilio",
                     "Romu", "Victor", "Blanca", "Señor Gómez"]
 
 CAMPOS_EDITABLES = {
-    "cliente", "descripcion", "encargada_por", "prioridad", "telar",
+    "tipo", "cliente", "descripcion", "encargada_por", "prioridad", "telar",
     "fecha_solicitud", "fecha_lista", "resultado", "anotacion_registro",
 }
 _MAX_TEXTO = 6000
@@ -107,14 +113,14 @@ _MAX_TEXTO = 6000
 
 def _default() -> dict:
     return {
-        "_meta": {"version_schema": 1, "ultimo_numero": 0},
+        "_meta": {"version_schema": _VERSION_SCHEMA, "ultimo_numero": 0},
         "catalogos": {"telares": list(TELARES_DEFAULT),
                       "personas": list(PERSONAS_DEFAULT)},
         "muestras": [],
     }
 
 
-def cargar() -> dict:
+def _cargar_sin_migrar() -> dict:
     data = jsonstore.store().load(_KEY, _default, DATA_PATH)
     data.setdefault("_meta", {}).setdefault("ultimo_numero", 0)
     cat = data.setdefault("catalogos", {})
@@ -122,6 +128,62 @@ def cargar() -> dict:
     cat.setdefault("personas", list(PERSONAS_DEFAULT))
     data.setdefault("muestras", [])
     return data
+
+
+def _version(data: dict) -> int:
+    try:
+        return int(data.get("_meta", {}).get("version_schema") or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def cargar() -> dict:
+    """Carga el documento aplicando (una sola vez, dentro de una transaccion)
+    las migraciones de esquema pendientes."""
+    data = _cargar_sin_migrar()
+    if _version(data) < _VERSION_SCHEMA:
+        with jsonstore.store().tx():
+            data = _cargar_sin_migrar()
+            if _version(data) < _VERSION_SCHEMA:
+                _migrar_v2(data)
+                data["_meta"]["version_schema"] = _VERSION_SCHEMA
+                _guardar(data)
+    return data
+
+
+# Erratas de fecha de solicitud del libro: (valor erroneo, valor del registro)
+_FECHAS_LIBRO_CORREGIDAS = {
+    "4202": ("2012-09-02", "2016-09-02"),
+    "5463": ("2005-05-14", "2025-05-14"),
+}
+
+
+def _migrar_v2(data: dict) -> None:
+    """v1 → v2 (sept 2026): `tipo` cliente/interna deducido del nombre del
+    cliente, telares unificados (Escala→Rapier, Solo diseño→Print), dos
+    erratas de fecha del libro y fuera las 6 M de dic-2014 (solo estaban en
+    el registro, sin seguimiento). Idempotente."""
+    cat = data.setdefault("catalogos", {})
+    telares: list[str] = []
+    for t in (cat.get("telares") or TELARES_DEFAULT):
+        t2 = normalizar_telar(t, TELARES_DEFAULT)
+        if t2 and not any(_clave(t2) == _clave(x) for x in telares):
+            telares.append(t2)
+    cat["telares"] = telares
+    quedan = []
+    for m in data.get("muestras", []):
+        if _anio(m.get("fecha_solicitud")) == 2014:
+            continue
+        m["telar"] = normalizar_telar(m.get("telar"), telares)
+        if m.get("tipo") not in TIPOS:
+            m["tipo"] = tipo_por_cliente(m.get("cliente"))
+        corr = _FECHAS_LIBRO_CORREGIDAS.get(m.get("id"))
+        if corr and m.get("fecha_solicitud") == corr[0]:
+            m["fecha_solicitud"] = corr[1]
+            _historial(m, None, "campo", campo="fecha_solicitud", de=corr[0], a=corr[1],
+                       texto="errata de fecha del libro, corregida con el registro de numeros")
+        quedan.append(m)
+    data["muestras"] = quedan
 
 
 def _guardar(data: dict) -> None:
@@ -223,6 +285,8 @@ def normalizar_estado(raw) -> str | None:
 _TELAR_ALIAS = {
     "pompon": "Pompón", "pompones": "Pompón", "pompon labor.(raschel)": "Pompón",
     "print": "Print", "prints": "Print", "feston": "Festón", "kibby": "Kibby",
+    # unificados en sept 2026
+    "solo diseno": "Print", "diseno": "Print", "escala": "Rapier",
 }
 
 
@@ -248,6 +312,25 @@ def normalizar_persona(raw) -> str:
         return ""
     s = re.sub(r"\s+", " ", str(raw)).strip()
     return "" if s.lower() == "[seleccionar]" else s
+
+
+_RE_INTERNA = re.compile(r"\b(interna|interno|internp|rols|moquetas rols)\b")
+
+
+def tipo_por_cliente(cliente) -> str:
+    """'interna' si el texto del cliente es de los que el libro usaba para los
+    desarrollos propios (INTERNA ( NANDO ), MOQUETAS ROLS, ROLS (PACO)...).
+    'ROLLS SUPPLY' o 'HERMANOS ROLDAN' no cuentan (palabra completa)."""
+    return "interna" if _RE_INTERNA.search(_clave(cliente)) else "cliente"
+
+
+def _validar_tipo(v, cliente) -> tuple[str, str]:
+    if v in (None, ""):
+        return (tipo_por_cliente(cliente) if cliente else "cliente"), ""
+    v = str(v).strip().lower()
+    if v not in TIPOS:
+        return "", "tipo debe ser 'cliente' o 'interna'"
+    return v, ""
 
 
 def iso_fecha(v) -> str | None:
@@ -361,7 +444,8 @@ def _texto_buscable(m: dict) -> str:
     partes = [m.get("id"), m.get("cliente"), m.get("descripcion"),
               m.get("anotacion_registro"), m.get("resultado"),
               m.get("encargada_por"), m.get("telar"),
-              ESTADOS_LABEL.get(m.get("estado") or "", "")]
+              ESTADOS_LABEL.get(m.get("estado") or "", ""),
+              "interna" if m.get("tipo") == "interna" else ""]
     partes += [a.get("texto") for a in (m.get("apuntes") or [])]
     return _clave(" ".join(p for p in partes if p))
 
@@ -377,6 +461,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
     return {
         "id": m.get("id"), "numero": m.get("numero"), "sufijo": m.get("sufijo") or "",
         "fecha_solicitud": m.get("fecha_solicitud"), "cliente": m.get("cliente") or "",
+        "tipo": m.get("tipo") or "cliente",
         "encargada_por": m.get("encargada_por") or "", "prioridad": m.get("prioridad"),
         "telar": m.get("telar") or "", "estado": estado,
         "estado_label": ESTADOS_LABEL.get(estado, estado or "—"),
@@ -396,7 +481,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
 
 def listar(vista: str = "en-curso", q: str = "", anio=None, estado: str = "",
            telar: str = "", persona: str = "", prioridad=None,
-           limite: int | None = None) -> dict:
+           limite: int | None = None, tipo: str = "") -> dict:
     """Listado compacto. vista: 'en-curso' (activas no archivadas, orden
     prioridad+antiguedad), 'historico' (el resto, mas recientes primero) o
     'todas'. `estado` admite el pseudo-valor 'activas_archivadas' (archivadas
@@ -433,6 +518,8 @@ def listar(vista: str = "en-curso", q: str = "", anio=None, estado: str = "",
             continue
         if persona and _clave(m.get("encargada_por")) != _clave(persona):
             continue
+        if tipo in TIPOS and (m.get("tipo") or "cliente") != tipo:
+            continue
         if prio_i is not None and m.get("prioridad") != prio_i:
             continue
         if anio_i is not None and _anio(m.get("fecha_solicitud")) != anio_i:
@@ -463,6 +550,7 @@ def obtener(mid: str) -> dict | None:
     if not m:
         return None
     out = dict(m)
+    out["tipo"] = out.get("tipo") or "cliente"
     out["estado_label"] = ESTADOS_LABEL.get(out.get("estado") or "", out.get("estado") or "—")
     out["prioridad_label"] = PRIORIDADES.get(out.get("prioridad") or 0, "")
     out["activa"] = es_activa(m)
@@ -488,7 +576,8 @@ def catalogos() -> dict:
     data = cargar()
     cat = data.get("catalogos", {})
     clientes = sorted({(m.get("cliente") or "").strip() for m in data["muestras"]
-                       if (m.get("cliente") or "").strip()},
+                       if (m.get("cliente") or "").strip()
+                       and (m.get("tipo") or "cliente") != "interna"},
                       key=lambda s: _clave(s))
     personas = list(cat.get("personas") or [])
     for m in data["muestras"]:
@@ -499,6 +588,7 @@ def catalogos() -> dict:
         "estados": [{"slug": s, "label": l, "terminal": s in ESTADOS_TERMINALES,
                      "seleccionable": s in ESTADOS_SELECCIONABLES} for s, l in ESTADOS],
         "prioridades": [{"valor": k, "label": v} for k, v in PRIORIDADES.items()],
+        "tipos": [{"valor": "cliente", "label": "Cliente"}, {"valor": "interna", "label": "Interna"}],
         "telares": list(cat.get("telares") or []),
         "personas": personas,
         "clientes": clientes,
@@ -678,8 +768,11 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
     cliente, err = _validar_texto(datos.get("cliente"), "cliente", 160)
     if err:
         return None, err
-    if not cliente:
-        return None, "el cliente es obligatorio"
+    tipo, err = _validar_tipo(datos.get("tipo"), cliente)
+    if err:
+        return None, err
+    if tipo == "cliente" and not cliente:
+        return None, "el cliente es obligatorio (o marca la muestra como interna)"
     descripcion, err = _validar_texto(datos.get("descripcion"), "descripcion")
     if err:
         return None, err
@@ -738,7 +831,7 @@ def crear(datos: dict, usuario: str | None = None) -> tuple[dict | None, str]:
         ahora = _ahora()
         nueva = {
             "id": mid, "numero": numero, "sufijo": sufijo,
-            "fecha_solicitud": fecha, "cliente": cliente,
+            "fecha_solicitud": fecha, "cliente": cliente, "tipo": tipo,
             "encargada_por": persona, "prioridad": prioridad if prioridad is not None else 2,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
@@ -766,14 +859,21 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None) -> tuple[dict 
         m = _buscar(data, mid)
         if not m:
             return None, f"la muestra {mid!r} no existe"
+        tipo_final = m.get("tipo") or "cliente"
+        if "tipo" in datos:
+            tipo_final, err = _validar_tipo(datos.get("tipo"), None)
+            if err:
+                return None, err
         cambios = []
         for k, v in datos.items():
-            if k in ("cliente", "descripcion", "resultado", "anotacion_registro"):
+            if k == "tipo":
+                v = tipo_final
+            elif k in ("cliente", "descripcion", "resultado", "anotacion_registro"):
                 v, err = _validar_texto(v, k, 160 if k == "cliente" else _MAX_TEXTO)
                 if err:
                     return None, err
-                if k == "cliente" and not v:
-                    return None, "el cliente no puede quedar vacio"
+                if k == "cliente" and not v and tipo_final == "cliente":
+                    return None, "el cliente no puede quedar vacio (o marca la muestra como interna)"
             elif k == "prioridad":
                 v, err = _validar_prioridad(v)
                 if err:
@@ -797,6 +897,8 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None) -> tuple[dict 
             if m.get(k) != v:
                 cambios.append((k, m.get(k), v))
                 m[k] = v
+        if tipo_final == "cliente" and not (m.get("cliente") or "").strip():
+            return None, "una muestra de cliente necesita el nombre del cliente"
         if cambios:
             for k, de, a in cambios:
                 _historial(m, usuario, "campo", campo=k,

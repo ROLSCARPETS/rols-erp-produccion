@@ -100,10 +100,19 @@
       <!-- ===== Columna izquierda: la ficha (autoguardado) ===== -->
       <section class="ms-section">
         <div class="ms-section-title"><span>Ficha</span><span class="ms-hint">los cambios se guardan solos</span></div>
-        <div class="ms-campo">
-          <label for="md-f-cliente">Cliente</label>
-          <input type="text" id="md-f-cliente" data-campo="cliente" list="md-clientes" maxlength="160" autocomplete="off" />
-          <datalist id="md-clientes"></datalist>
+        <div class="ms-campo-row" style="grid-template-columns: 150px 1fr">
+          <div class="ms-campo">
+            <label for="md-f-tipo">Tipo</label>
+            <select id="md-f-tipo" data-campo="tipo">
+              <option value="cliente">Cliente</option>
+              <option value="interna">Interna</option>
+            </select>
+          </div>
+          <div class="ms-campo">
+            <label for="md-f-cliente" id="md-f-cliente-lbl">Cliente</label>
+            <input type="text" id="md-f-cliente" data-campo="cliente" list="md-clientes" maxlength="160" autocomplete="off" />
+            <datalist id="md-clientes"></datalist>
+          </div>
         </div>
         <div class="ms-campo-row">
           <div class="ms-campo">
@@ -113,7 +122,7 @@
           <div class="ms-campo">
             <label for="md-f-prioridad">Prioridad</label>
             <select id="md-f-prioridad" data-campo="prioridad">
-              <option value="1">1 · Alta</option><option value="2">2 · Normal</option><option value="3">3 · Baja</option>
+              <option value="1">1 · Alta</option><option value="2">2 · Media</option><option value="3">3 · Baja</option>
             </select>
           </div>
         </div>

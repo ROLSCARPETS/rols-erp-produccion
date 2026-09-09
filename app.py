@@ -1939,7 +1939,8 @@ def api_muestras():
                     estado=(a.get("estado") or "").strip(),
                     telar=(a.get("telar") or "").strip(),
                     persona=(a.get("persona") or "").strip(),
-                    prioridad=a.get("prioridad"), limite=limite)
+                    prioridad=a.get("prioridad"), limite=limite,
+                    tipo=(a.get("tipo") or "").strip().lower())
     out["limite"] = limite
     out["resumen"] = mf.resumen()
     if a.get("con_catalogos"):

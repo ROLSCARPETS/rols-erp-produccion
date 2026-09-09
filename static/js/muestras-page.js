@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, api,
+  const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, api,
           ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -111,6 +111,7 @@
     if ($('ec-telar').value) p.set('telar', $('ec-telar').value);
     if ($('ec-persona').value) p.set('persona', $('ec-persona').value);
     if ($('ec-prio').value) p.set('prioridad', $('ec-prio').value);
+    if ($('ec-tipo').value) p.set('tipo', $('ec-tipo').value);
     return p;
   }
 
@@ -165,7 +166,7 @@
     return `<tr class="ms-fila" data-id="${esc(m.id)}">
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
-      <td class="ms-cliente">${esc(m.cliente) || mudo}</td>
+      <td class="ms-cliente">${clienteHtml(m)}</td>
       <td><div class="ms-desc" title="${esc(m.descripcion)}">${esc(m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${prioPill(m.prioridad)}</td>
@@ -203,9 +204,9 @@
   // Filtros
   const recargarEC = debounce(() => cargarEnCurso(false), 250);
   $('ec-q').addEventListener('input', recargarEC);
-  ['ec-telar', 'ec-persona', 'ec-prio'].forEach(id => $(id).addEventListener('change', () => cargarEnCurso(false)));
+  ['ec-telar', 'ec-persona', 'ec-prio', 'ec-tipo'].forEach(id => $(id).addEventListener('change', () => cargarEnCurso(false)));
   $('ec-limpiar').addEventListener('click', () => {
-    $('ec-q').value = ''; $('ec-telar').value = ''; $('ec-persona').value = ''; $('ec-prio').value = '';
+    $('ec-q').value = ''; $('ec-telar').value = ''; $('ec-persona').value = ''; $('ec-prio').value = ''; $('ec-tipo').value = '';
     ST.ec.estados.clear();
     cargarEnCurso(false);
   });
@@ -274,6 +275,7 @@
     else if (est) p.set('estado', est);
     if ($('hi-telar').value) p.set('telar', $('hi-telar').value);
     if ($('hi-persona').value) p.set('persona', $('hi-persona').value);
+    if ($('hi-tipo').value) p.set('tipo', $('hi-tipo').value);
     return p;
   }
 
@@ -301,7 +303,7 @@
     return `<tr class="ms-fila" data-id="${esc(m.id)}">
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
-      <td class="ms-cliente">${esc(m.cliente) || mudo}</td>
+      <td class="ms-cliente">${clienteHtml(m)}</td>
       <td><div class="ms-desc" title="${esc(m.descripcion)}">${esc(m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${esc(m.telar) || mudo}</td>
@@ -326,9 +328,9 @@
   }
   const recargarHI = debounce(cargarHistorico, 250);
   $('hi-q').addEventListener('input', recargarHI);
-  ['hi-anio', 'hi-estado', 'hi-telar', 'hi-persona'].forEach(id => $(id).addEventListener('change', cargarHistorico));
+  ['hi-anio', 'hi-estado', 'hi-telar', 'hi-persona', 'hi-tipo'].forEach(id => $(id).addEventListener('change', cargarHistorico));
   $('hi-limpiar').addEventListener('click', () => {
-    ['hi-q', 'hi-anio', 'hi-estado', 'hi-telar', 'hi-persona'].forEach(id => { $(id).value = ''; });
+    ['hi-q', 'hi-anio', 'hi-estado', 'hi-telar', 'hi-persona', 'hi-tipo'].forEach(id => { $(id).value = ''; });
     cargarHistorico();
   });
   $('hi-tbody').addEventListener('click', (e) => {
@@ -388,7 +390,20 @@
   // NUEVA MUESTRA (modal)
   // ------------------------------------------------------------
   const modal = $('ms-modal-nueva');
+  let tipoNuevo = 'cliente';
+  function ponerTipoNuevo(tipo) {
+    tipoNuevo = tipo === 'interna' ? 'interna' : 'cliente';
+    modal.querySelectorAll('#ms-n-tipo-seg .ms-seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tipo === tipoNuevo));
+    const interna = tipoNuevo === 'interna';
+    $('ms-n-cliente-lbl').textContent = interna ? 'Para quién / proyecto (opcional)' : 'Cliente';
+    $('ms-n-cliente').placeholder = interna ? 'Ej. Marta · colección 2027 · prueba de calidad' : 'Nombre del cliente';
+  }
+  $('ms-n-tipo-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('.ms-seg-btn');
+    if (b) ponerTipoNuevo(b.dataset.tipo);
+  });
   function abrirNueva() {
+    ponerTipoNuevo('cliente');
     const c = ST.catalogos || { personas: [], telares: [] };
     const u = window.__rolsUser || {};
     const nombre = (u.nombre || '').trim().split(/\s+/)[0] || '';
@@ -421,10 +436,10 @@
     const fallo = (msg) => { err.textContent = msg; err.classList.add('show'); };
     err.classList.remove('show');
     const cliente = $('ms-n-cliente').value.trim();
-    if (!cliente) return fallo('Indica el cliente (o INTERNA y quién).');
+    if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
     const body = {
-      cliente, descripcion: $('ms-n-desc').value.trim(),
+      cliente, tipo: tipoNuevo, descripcion: $('ms-n-desc').value.trim(),
       encargada_por: $('ms-n-persona').value === '__otro__' ? '' : $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,

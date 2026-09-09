@@ -124,7 +124,12 @@
         <select id="ec-persona"><option value="">Encargada por (todos)</option></select>
         <select id="ec-prio">
           <option value="">Cualquier prioridad</option>
-          <option value="1">Alta</option><option value="2">Normal</option><option value="3">Baja</option>
+          <option value="1">Alta</option><option value="2">Media</option><option value="3">Baja</option>
+        </select>
+        <select id="ec-tipo">
+          <option value="">Clientes e internas</option>
+          <option value="cliente">Solo clientes</option>
+          <option value="interna">Solo internas</option>
         </select>
         <button type="button" class="ms-limpiar" id="ec-limpiar" hidden>Quitar filtros</button>
         <span class="ms-f-counter" id="ec-counter"></span>
@@ -156,7 +161,7 @@
       <div class="ms-section-title">
         <span>Histórico de muestras</span>
         <span class="ms-count" id="hi-count">0</span>
-        <span class="ms-hint">terminadas, canceladas y archivadas · desde 2014</span>
+        <span class="ms-hint">terminadas, canceladas y archivadas · desde 2015</span>
       </div>
       <div class="ms-filtros">
         <input type="search" id="hi-q" placeholder="Buscar nº, cliente, descripción, resultado…" autocomplete="off" />
@@ -170,6 +175,11 @@
         </select>
         <select id="hi-telar"><option value="">Todos los telares</option></select>
         <select id="hi-persona"><option value="">Encargada por (todos)</option></select>
+        <select id="hi-tipo">
+          <option value="">Clientes e internas</option>
+          <option value="cliente">Solo clientes</option>
+          <option value="interna">Solo internas</option>
+        </select>
         <button type="button" class="ms-limpiar" id="hi-limpiar" hidden>Quitar filtros</button>
         <span class="ms-f-counter" id="hi-counter"></span>
       </div>
@@ -229,10 +239,16 @@
     <h3>Nueva muestra</h3>
     <p class="uim-sub">Lo que antes se apuntaba en el registro de números de M: el número lo asigna el sistema.</p>
     <div class="ms-form-grid">
-      <div class="full"><label>Cliente</label><input type="text" id="ms-n-cliente" list="ms-clientes" placeholder="Cliente o INTERNA ( NANDO )" autocomplete="off" maxlength="160" /><datalist id="ms-clientes"></datalist></div>
+      <div class="full">
+        <div class="ms-seg" id="ms-n-tipo-seg" role="radiogroup" aria-label="Tipo de muestra">
+          <button type="button" class="ms-seg-btn active" data-tipo="cliente">Para un cliente</button>
+          <button type="button" class="ms-seg-btn" data-tipo="interna">Interna (desarrollo propio)</button>
+        </div>
+      </div>
+      <div class="full"><label id="ms-n-cliente-lbl">Cliente</label><input type="text" id="ms-n-cliente" list="ms-clientes" placeholder="Nombre del cliente" autocomplete="off" maxlength="160" /><datalist id="ms-clientes"></datalist></div>
       <div><label>Encargada por</label><select id="ms-n-persona"></select></div>
       <div><label>Telar / técnica</label><select id="ms-n-telar"></select></div>
-      <div><label>Prioridad</label><select id="ms-n-prio"><option value="1">1 · Alta</option><option value="2" selected>2 · Normal</option><option value="3">3 · Baja</option></select></div>
+      <div><label>Prioridad</label><select id="ms-n-prio"><option value="1">1 · Alta</option><option value="2" selected>2 · Media</option><option value="3">3 · Baja</option></select></div>
       <div><label>Fecha de solicitud</label><input type="date" id="ms-n-fecha" /></div>
       <div class="full"><label>Descripción de la muestra</label><textarea id="ms-n-desc" rows="3" placeholder="Ej. 2 MUESTRAS TEJIDAS - WILTON 30 - Lana 100 2/c - 2 cuerpos…"></textarea></div>
       <div class="full ms-numero-opts">
