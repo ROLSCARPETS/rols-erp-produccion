@@ -5,7 +5,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, api,
+  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
@@ -220,6 +220,7 @@
     llenarSelect($('md-f-persona'), CAT.personas, { vacio: '—', otro: true, valor: M.encargada_por || '' });
     llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
     $('md-f-prioridad').value = String(M.prioridad || 2);
+    colorearPrio($('md-f-prioridad'));
     $('md-f-fecha').value = M.fecha_solicitud || '';
     $('md-f-lista').value = M.fecha_lista || '';
     $('md-f-desc').value = M.descripcion || '';
@@ -269,6 +270,7 @@
       marcar(el, 'saved-err');
       await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
       el.value = (campo === 'prioridad') ? String(M.prioridad || 2) : (M[campo] || '');
+      if (campo === 'prioridad') colorearPrio(el);
       marcar(el, null);
     }
   }
@@ -280,6 +282,7 @@
           const ok = await gestionarOtro(el, tipo, tipo === 'personas' ? 'nombre' : 'telar / técnica');
           if (!ok) { el.value = M[el.dataset.campo] || ''; return; }
         }
+        if (el.dataset.campo === 'prioridad') colorearPrio(el);
         guardarCampo(el);
       });
     } else if (el.tagName === 'TEXTAREA') {

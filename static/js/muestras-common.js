@@ -75,6 +75,13 @@
     return tag + txt;
   }
 
+  // El <select> de prioridad toma el color de su pill (1 rojo, 2 azul, 3 verde).
+  function colorearPrio(sel) {
+    if (!sel) return;
+    sel.classList.remove('ms-prio-sel-0', 'ms-prio-sel-1', 'ms-prio-sel-2', 'ms-prio-sel-3');
+    sel.classList.add('ms-prio-sel', 'ms-prio-sel-' + (['1', '2', '3'].includes(String(sel.value)) ? sel.value : '0'));
+  }
+
   async function api(url, opts) {
     const init = Object.assign({ headers: {} }, opts || {});
     if (init.body && typeof init.body !== 'string') {
@@ -148,5 +155,5 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
-    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, api, esAdmin, llenarSelect, gestionarOtro };
+    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, gestionarOtro };
 })();

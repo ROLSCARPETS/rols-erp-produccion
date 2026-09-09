@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, api,
+  const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, gestionarOtro } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -413,6 +413,7 @@
     llenarSelect($('ms-n-telar'), c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
+    colorearPrio($('ms-n-prio'));
     $('ms-n-fecha').value = hoyISO();
     $('ms-n-variante').value = ''; $('ms-n-manual').value = '';
     modal.querySelector('input[name="ms-n-tipo"][value="auto"]').checked = true;
@@ -425,6 +426,7 @@
   $('ms-n-cancelar').addEventListener('click', cerrarNueva);
   modal.addEventListener('click', (e) => { if (e.target === modal) cerrarNueva(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) cerrarNueva(); });
+  $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
   $('ms-n-persona').addEventListener('change', () => gestionarOtro($('ms-n-persona'), 'personas', 'nombre'));
   $('ms-n-telar').addEventListener('change', () => gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica'));
   // Escribir en un campo de número selecciona su opción

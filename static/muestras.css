@@ -210,20 +210,38 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-grid2 { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 1rem; align-items: start; }
 @media (max-width: 1100px) { .ms-grid2 { grid-template-columns: 1fr; } }
 .ms-campo { margin-bottom: 0.7rem; }
-.ms-campo label { display: block; font-size: 0.7rem; font-weight: 600; color: #7a7a7a; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.ms-campo label { display: block; font-size: 0.7rem; font-weight: 600; color: #6b6b6b; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+/* Campos con aspecto de campo (borde y fondo siempre visibles); el autoguardado
+   pinta el fondo al guardar. Solo background-color: el shorthand borraria la
+   flecha del select. */
 .ms-campo input, .ms-campo textarea, .ms-campo select {
-  width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 0.38rem 0.5rem;
-  font-size: 0.88rem; font-family: inherit; background: transparent; color: #2a2a2a;
-  transition: border-color 0.12s, background 0.12s;
+  width: 100%; border: 1px solid #d9cfc2; border-radius: 8px; padding: 0.48rem 0.65rem;
+  font-size: 0.9rem; font-family: inherit; background-color: #fff; color: #2a2a2a;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.035);
+  transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
-.ms-campo select { appearance: none; padding-right: 1.6rem;
+.ms-campo select { appearance: none; padding-right: 1.9rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%237A7A7A' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 14px 14px; cursor: pointer; }
-.ms-campo input:hover, .ms-campo textarea:hover, .ms-campo select:hover { background: #fbf8f3; border-color: #ede7dc; }
-.ms-campo input:focus, .ms-campo textarea:focus, .ms-campo select:focus { background: #fff; border-color: var(--accent); outline: none; }
-.ms-campo .saving { background: #fff8e1 !important; }
-.ms-campo .saved-ok { background: #e8f3e1 !important; border-color: #2f6b29 !important; }
-.ms-campo .saved-err { background: #fde2e2 !important; border-color: #9b1c1c !important; }
+  background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 14px 14px; cursor: pointer; }
+.ms-campo input:hover, .ms-campo textarea:hover, .ms-campo select:hover { border-color: #c4b394; }
+.ms-campo input:focus, .ms-campo textarea:focus, .ms-campo select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(213,179,140,0.22); outline: none; }
+.ms-campo input::placeholder, .ms-campo textarea::placeholder { color: #b5b0a8; }
+.ms-campo .saving { background-color: #fff8e1 !important; }
+.ms-campo .saved-ok { background-color: #e8f3e1 !important; border-color: #2f6b29 !important; }
+.ms-campo .saved-err { background-color: #fde2e2 !important; border-color: #9b1c1c !important; }
+
+/* Select de prioridad con el color de su pill (ficha y modal de alta) */
+.ms-campo select.ms-prio-sel, .ms-form-grid select.ms-prio-sel {
+  appearance: none; font-weight: 700; letter-spacing: 0.04em; padding-right: 1.9rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%237A7A7A' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat;
+  background-position: right 0.6rem center; background-size: 14px 14px;
+}
+.ms-campo select.ms-prio-sel-1, .ms-form-grid select.ms-prio-sel-1 { background-color: #c9302c; color: #fff; border-color: #c9302c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ffffff' stroke-width='2.2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); }
+.ms-campo select.ms-prio-sel-2, .ms-form-grid select.ms-prio-sel-2 { background-color: #2f6fd6; color: #fff; border-color: #2f6fd6; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ffffff' stroke-width='2.2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); }
+.ms-campo select.ms-prio-sel-3, .ms-form-grid select.ms-prio-sel-3 { background-color: #d6efcf; color: #256b1f; border-color: #b9dcae; }
+.ms-campo select.ms-prio-sel-1:hover, .ms-form-grid select.ms-prio-sel-1:hover { border-color: #a52622; }
+.ms-campo select.ms-prio-sel-2:hover, .ms-form-grid select.ms-prio-sel-2:hover { border-color: #2559ad; }
+select.ms-prio-sel option { background: #fff; color: #2a2a2a; font-weight: 500; }
 .ms-campo textarea { resize: vertical; min-height: 84px; line-height: 1.4; }
 .ms-campo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .ms-readonly { font-size: 0.84rem; color: #4d4d4d; background: #faf8f5; border-radius: 6px; padding: 0.45rem 0.55rem; line-height: 1.4; }
