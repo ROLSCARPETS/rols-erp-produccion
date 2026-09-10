@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, esVarilla, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
-          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, esPrint, flujoDe, etiquetaEstado,
+          ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado,
           llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -148,12 +148,12 @@
   }
 
   // Opciones del select de estado de una fila: el flujo que toca a SU técnica
-  // (el corto de Print o el textil), más cancelada y el estado actual. Igual
-  // que la ficha, una Print parada en una etapa textil sigue su flujo textil.
+  // (el corto de Print, el de Varilla o el textil), más cancelada y el estado
+  // actual. Igual que la ficha, una Print parada en una etapa textil sigue su
+  // flujo textil.
   function opcionesEstado(m) {
     const actual = m.estado;
-    let flujo = flujoDe(m.telar);
-    if (!flujo.includes(actual) && ESTADOS_FLUJO.includes(actual)) flujo = ESTADOS_FLUJO;
+    const flujo = flujoQueContiene(m.telar, actual);
     return ESTADOS.filter(e => {
       const s = e[0];
       if (s === actual) return true;

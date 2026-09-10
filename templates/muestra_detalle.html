@@ -141,12 +141,9 @@
         <!-- Datos técnicos: solo cuando el telar es de varilla -->
         <div class="ms-tecnica" id="md-tecnica" hidden>
           <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
-          <div class="ms-campo">
-            <label for="md-f-material">Material</label>
-            <input type="text" id="md-f-material" data-campo="material" maxlength="200" placeholder="Ej. Lana 100 3/c CREMA + Lana 100 5/c CARAMEL" autocomplete="off" list="md-materiales" />
-            <datalist id="md-materiales"></datalist>
-          </div>
-          <div class="ms-campo-row">
+          <!-- Tejeduría: cómo se teje -->
+          <div class="ms-tecnica-sub">Datos de tejeduría</div>
+          <div class="ms-campo-row tres">
             <div class="ms-campo">
               <label for="md-f-pasadas">Pasadas</label>
               <input type="text" id="md-f-pasadas" data-campo="pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" />
@@ -155,15 +152,9 @@
               <label for="md-f-altura">Altura felpa</label>
               <input type="text" id="md-f-altura" data-campo="altura_felpa" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" />
             </div>
-          </div>
-          <div class="ms-campo-row">
             <div class="ms-campo">
               <label for="md-f-cuerpos">Nº de cuerpos</label>
               <input type="text" id="md-f-cuerpos" data-campo="n_cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" />
-            </div>
-            <div class="ms-campo">
-              <label for="md-f-hilos">Hilos púa</label>
-              <input type="text" id="md-f-hilos" data-campo="hilos_pua" maxlength="40" placeholder="Ej. 3" inputmode="decimal" autocomplete="off" />
             </div>
           </div>
           <div class="ms-campo-row">
@@ -176,8 +167,21 @@
             <div class="ms-campo">
               <label for="md-f-acabado">Acabado</label>
               <select id="md-f-acabado" data-campo="acabado">
-                <option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option>
+                <option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option>
               </select>
+            </div>
+          </div>
+          <!-- Materias: con qué se teje -->
+          <div class="ms-tecnica-sub">Datos de materias</div>
+          <div class="ms-campo">
+            <label for="md-f-material">Material</label>
+            <input type="text" id="md-f-material" data-campo="material" maxlength="200" placeholder="Ej. Lana 100 3/c CREMA + Lana 100 5/c CARAMEL" autocomplete="off" list="md-materiales" />
+            <datalist id="md-materiales"></datalist>
+          </div>
+          <div class="ms-campo-row">
+            <div class="ms-campo">
+              <label for="md-f-hilos">Hilos púa</label>
+              <input type="text" id="md-f-hilos" data-campo="hilos_pua" maxlength="40" placeholder="Ej. 3" inputmode="decimal" autocomplete="off" />
             </div>
           </div>
         </div>

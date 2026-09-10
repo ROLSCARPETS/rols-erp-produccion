@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla, estadoPill, prioPill, tipoTag, colorearPrio, api,
-          ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, flujoDe, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
+          ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
           gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
@@ -148,18 +148,11 @@
   // ------------------------------------------------------------
   // Stepper de estado
   // ------------------------------------------------------------
-  // Flujo de etapas de ESTA muestra: el corto de Print o el textil completo.
-  // Si la etapa actual no está en el flujo de su técnica (una Print histórica
-  // parada en etapa textil, o datos que quedaron en revisión de diseño con
-  // otro telar), se enseña el flujo que SÍ contiene esa etapa.
-  function flujoActual() {
-    const flujo = flujoDe(M.telar);
-    if (!flujo.includes(M.estado)) {
-      if (ESTADOS_FLUJO.includes(M.estado)) return ESTADOS_FLUJO;
-      if (FLUJO_PRINT.includes(M.estado)) return FLUJO_PRINT;
-    }
-    return flujo;
-  }
+  // Flujo de etapas de ESTA muestra: el corto de Print, el de Varilla (con
+  // las etapas de diseño por delante) o el textil. Si la etapa actual no está
+  // en el flujo de su técnica (una Print histórica parada en etapa textil, o
+  // una etapa de diseño con otro telar), se enseña el flujo que SÍ la contiene.
+  function flujoActual() { return flujoQueContiene(M.telar, M.estado); }
   const etiqueta = (s) => etiquetaEstado(s, M.telar);
 
   function pintarStepper() {
@@ -386,7 +379,7 @@
   // Datos técnicos (solo telar de varilla)
   // ------------------------------------------------------------
   const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado' };
-  const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar' };
+  const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina' };
   function pintarTecnica() {
     // Los valores se conservan aunque cambie el telar; solo se esconden
     $('md-tecnica').hidden = !esVarilla(M.telar);

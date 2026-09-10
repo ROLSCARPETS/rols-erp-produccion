@@ -70,8 +70,10 @@ _KEY = "muestras_fabricadas"
 # (slug, label). El orden es el del proceso de fabricacion.
 ESTADOS: tuple[tuple[str, str], ...] = (
     ("por_empezar",      "Por empezar"),
+    ("listo_diseno",     "Listo para empezar diseño"),    # solo Varilla (en Print es la etiqueta de por_empezar)
     ("en_diseno",        "En diseño"),
-    ("revision_diseno",  "Listo para revisión diseño"),   # solo muestras de Print
+    ("revision_diseno",  "Listo para revisión diseño"),   # Print y Varilla
+    ("diseno_listo",     "Diseño listo"),                 # solo Varilla
     ("en_hilatura",      "En hilatura"),
     ("en_tintoreria",    "En tintorería"),
     ("bobinando",        "Bobinando"),
@@ -89,14 +91,22 @@ ESTADOS_FLUJO = ("por_empezar", "en_diseno", "en_hilatura", "en_tintoreria",
                  "terminada")
 ESTADOS_TERMINALES = {"terminada", "cancelada", "sin_seguimiento"}
 ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS if s != "sin_seguimiento")
-_FLUJO_IDX = {s: i for i, s in enumerate(ESTADOS_FLUJO)}
 
 # Las muestras de PRINT no pasan por fabrica: su flujo es solo el del diseno
 # (y "por_empezar" se lee "Listo para empezar diseño"). El slug de cada etapa
 # sigue siendo unico y estable; cambia que etapas se recorren y una etiqueta.
 FLUJO_PRINT = ("por_empezar", "en_diseno", "revision_diseno", "terminada")
 ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
-_FLUJO_IDX_PRINT = {s: i for i, s in enumerate(FLUJO_PRINT)}
+# Las de VARILLA llevan el diseno por delante del flujo textil: por_empezar →
+# listo_diseno («Listo para empezar diseño») → en_diseno → revision_diseno →
+# diseno_listo («Diseño listo») → en_hilatura → ... → terminada.
+FLUJO_VARILLA = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "diseno_listo",
+                 "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
+                 "en_aprestos", "terminada")
+FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA}
+# Etapas que solo existen en un flujo propio (no en el textil): el backend las
+# rechaza para las tecnicas cuyo flujo no las recorre.
+ESTADOS_EXCLUSIVOS = frozenset(s for f in FLUJOS_PROPIOS.values() for s in f if s not in ESTADOS_FLUJO)
 
 
 def es_print(telar) -> bool:
@@ -104,8 +114,45 @@ def es_print(telar) -> bool:
     return normalizar_telar(telar) == "Print"
 
 
+def es_varilla(telar) -> bool:
+    """Telar de varilla: lleva datos tecnicos y el flujo con etapas de diseno."""
+    return (telar or "").strip().lower().startswith("varilla")
+
+
 def flujo_de(telar) -> tuple[str, ...]:
-    return FLUJO_PRINT if es_print(telar) else ESTADOS_FLUJO
+    if es_print(telar):
+        return FLUJO_PRINT
+    if es_varilla(telar):
+        return FLUJO_VARILLA
+    return ESTADOS_FLUJO
+
+
+def flujo_que_contiene(telar, estado) -> tuple[str, ...]:
+    """Flujo con el que se pinta/ordena una muestra: el de su tecnica y, si la
+    etapa actual no esta en el (una Print historica parada en etapa textil, o
+    una etapa de diseno con otro telar), el primero que SI la contiene."""
+    propio = flujo_de(telar)
+    if estado in propio:
+        return propio
+    for f in (ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA):
+        if estado in f:
+            return f
+    return propio
+
+
+def tecnicas_de_etapa(estado) -> list[str]:
+    """Tecnicas cuyo flujo propio recorre esa etapa (para los mensajes)."""
+    return [n for n, f in FLUJOS_PROPIOS.items() if estado in f]
+
+
+def etapa_permitida(estado, telar) -> bool:
+    """False si la etapa es exclusiva de un flujo propio que el telar no lleva."""
+    return estado not in ESTADOS_EXCLUSIVOS or estado in flujo_de(telar)
+
+
+def _msg_etapa_no_permitida(estado) -> str:
+    return (f"«{ESTADOS_LABEL.get(estado, estado)}» es una etapa solo de las muestras de "
+            + " o ".join(tecnicas_de_etapa(estado)))
 
 
 def etiqueta_estado(estado, telar=None) -> str:
@@ -120,13 +167,13 @@ def etiqueta_estado(estado, telar=None) -> str:
 
 def es_retroceso(anterior, nuevo, telar=None) -> bool:
     """True si el cambio de etapa va hacia atras DENTRO del flujo que toca
-    (el de Print o el textil); entre flujos distintos no hay orden."""
-    idx = _FLUJO_IDX
-    if telar is not None and es_print(telar) \
-            and anterior in _FLUJO_IDX_PRINT and nuevo in _FLUJO_IDX_PRINT:
-        idx = _FLUJO_IDX_PRINT
-    ia, ib = idx.get(anterior), idx.get(nuevo)
-    return ia is not None and ib is not None and ib < ia
+    (el de la tecnica o, si no las contiene, el primero que recorra las dos
+    etapas); entre flujos distintos no hay orden."""
+    candidatos = ((flujo_de(telar),) if telar is not None else ()) + (ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA)
+    for f in candidatos:
+        if anterior in f and nuevo in f:
+            return f.index(nuevo) < f.index(anterior)
+    return False
 
 PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 
@@ -140,13 +187,15 @@ _VERSION_SCHEMA = 5
 TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
                    "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
 
-# Datos tecnicos de la muestra cuando el telar es Varilla: material, pasadas,
-# altura de felpa, pelo (corte / bucle / corte y bucle) y acabado (latex /
-# sin aprestar). Van planos en la muestra y la UI los ensena solo con telar
-# de varilla (si cambia de telar se conservan, no se borran).
+# Datos tecnicos de la muestra cuando el telar es Varilla. En la UI van en dos
+# bloques: TEJEDURIA (pasadas, altura de felpa, n de cuerpos, construccion =
+# `pelo`, acabado) y MATERIAS (material, hilos por pua). Van planos en la
+# muestra y solo se ensenan con telar de varilla (si cambia de telar se
+# conservan, no se borran).
 PELOS: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
                                       ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"))
-ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"))
+ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"),
+                                         ("resina", "Resina"), ("latex_resina", "Látex + resina"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
 CAMPOS_TECNICOS = ("material", "pasadas", "altura_felpa", "n_cuerpos", "hilos_pua", "pelo", "acabado")
@@ -454,8 +503,9 @@ def normalizar_numero(raw) -> tuple[str | None, int | None, str]:
 
 _ESTADO_POR_CLAVE = {
     "por empezar": "por_empezar",
-    "listo para empezar diseno": "por_empezar",       # etiqueta del flujo Print
-    "listo para revision diseno": "revision_diseno",  # etiqueta del flujo Print
+    "listo para empezar diseno": "listo_diseno",      # etapa de Varilla (en Print es la etiqueta de por_empezar)
+    "listo para revision diseno": "revision_diseno",  # Print y Varilla
+    "diseno listo": "diseno_listo",                   # etapa de Varilla
     "en diseno": "en_diseno",
     "diseno": "en_diseno",
     "print": "en_diseno",
@@ -842,6 +892,7 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
     return {
         "estados": [{"slug": s, "label": l, "terminal": s in ESTADOS_TERMINALES,
                      "seleccionable": s in ESTADOS_SELECCIONABLES} for s, l in ESTADOS],
+        "flujos": {"textil": list(ESTADOS_FLUJO), "print": list(FLUJO_PRINT), "varilla": list(FLUJO_VARILLA)},
         "prioridades": [{"valor": k, "label": v} for k, v in PRIORIDADES.items()],
         "tipos": [{"valor": "cliente", "label": "Cliente"}, {"valor": "interna", "label": "Interna"}],
         "telares": list(cat.get("telares") or []),
@@ -1057,7 +1108,7 @@ def _validar_tecnico(k: str, v) -> tuple[str, str]:
 
 
 def _es_telar_tecnico(telar) -> bool:
-    return (telar or "").strip().lower().startswith("varilla")
+    return es_varilla(telar)
 
 
 def resumen_tecnico(m: dict) -> str:
@@ -1176,8 +1227,8 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         telar = normalizar_telar(datos.get("telar"), data["catalogos"].get("telares"))
         if len(telar) > 60:
             return None, "telar demasiado largo"
-        if estado == "revision_diseno" and not es_print(telar):
-            return None, "«Listo para revisión diseño» es una etapa solo de las muestras de Print"
+        if not etapa_permitida(estado, telar):
+            return None, _msg_etapa_no_permitida(estado)
         persona, persona_usuario, err = _resolver_persona(
             persona_raw, _personas_conocidas(data, usuarios_one, usuario_actual))
         if err:
@@ -1309,12 +1360,13 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v = normalizar_telar(v, data["catalogos"].get("telares"))
                 if len(v) > 60:
                     return None, "telar demasiado largo"
-                if m.get("estado") == "revision_diseno" and not es_print(v):
-                    # Etapa exclusiva de Print: sacarla de Print la dejaria
-                    # varada en un estado que el resto del backend prohibe.
-                    return None, ("la muestra está en «Listo para revisión diseño» "
-                                  "(etapa de Print): cámbiala antes de etapa para "
-                                  "pasarla a otra técnica")
+                if not etapa_permitida(m.get("estado"), v):
+                    # Etapa exclusiva de un flujo propio (Print / Varilla):
+                    # sacarla de esa tecnica la dejaria varada en una etapa
+                    # que el resto del backend prohibe.
+                    return None, (f"la muestra está en «{etiqueta_estado(m.get('estado'), m.get('telar'))}» "
+                                  f"(etapa de {' o '.join(tecnicas_de_etapa(m.get('estado')))}): "
+                                  "cámbiala antes de etapa para pasarla a otra técnica")
                 _anadir_a_catalogo(data, "telares", v)
             elif k == "encargada_por":
                 v, v_usuario, err = _resolver_persona(
@@ -1361,9 +1413,10 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
             return None, f"la muestra {mid!r} no existe"
         anterior = m.get("estado") or ""
         # Guard de ENTRADA: quedarse donde ya está (p.ej. para apuntar una
-        # nota) siempre se permite; lo que se veta es mover una no-Print aquí.
-        if slug == "revision_diseno" and anterior != slug and not es_print(m.get("telar")):
-            return None, "«Listo para revisión diseño» es una etapa solo de las muestras de Print"
+        # nota) siempre se permite; lo que se veta es mover aquí una muestra
+        # cuya técnica no recorre esta etapa (las de diseño: Print / Varilla).
+        if anterior != slug and not etapa_permitida(slug, m.get("telar")):
+            return None, _msg_etapa_no_permitida(slug)
         if anterior != slug:
             m["estado"] = slug
             if slug == "terminada":

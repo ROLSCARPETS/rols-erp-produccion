@@ -5,8 +5,11 @@
   'use strict';
 
   const ESTADOS = [
-    ['por_empezar', 'Por empezar'], ['en_diseno', 'En diseño'],
-    ['revision_diseno', 'Listo para revisión diseño'],   // solo muestras de Print
+    ['por_empezar', 'Por empezar'],
+    ['listo_diseno', 'Listo para empezar diseño'],       // solo Varilla (en Print es la etiqueta de por_empezar)
+    ['en_diseno', 'En diseño'],
+    ['revision_diseno', 'Listo para revisión diseño'],   // Print y Varilla
+    ['diseno_listo', 'Diseño listo'],                    // solo Varilla
     ['en_hilatura', 'En hilatura'],
     ['en_tintoreria', 'En tintorería'], ['bobinando', 'Bobinando'], ['esperando_telar', 'Esperando a telar'],
     ['en_telar', 'En telar'], ['en_aprestos', 'En aprestos'], ['terminada', 'Terminada'],
@@ -14,13 +17,24 @@
   ];
   const ESTADOS_LABEL = Object.fromEntries(ESTADOS);
   // Flujo textil completo; las muestras de Print (solo diseño) llevan el suyo,
-  // más corto, y su "por_empezar" se lee "Listo para empezar diseño".
+  // más corto (su "por_empezar" se lee "Listo para empezar diseño"), y las de
+  // Varilla el textil con las etapas de diseño por delante.
   const ESTADOS_FLUJO = ['por_empezar', 'en_diseno', 'en_hilatura', 'en_tintoreria',
     'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
   const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
+  const FLUJO_VARILLA = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
+    'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
   const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
   const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';
-  const flujoDe = (telar) => esPrint(telar) ? FLUJO_PRINT : ESTADOS_FLUJO;
+  const flujoDe = (telar) => esPrint(telar) ? FLUJO_PRINT : esVarilla(telar) ? FLUJO_VARILLA : ESTADOS_FLUJO;
+  // Flujo con el que se pinta una muestra: el de su técnica y, si la etapa
+  // actual no está en él (una Print histórica parada en etapa textil, o una
+  // etapa de diseño con otro telar), el primero que SÍ la contiene.
+  function flujoQueContiene(telar, estado) {
+    const propio = flujoDe(telar);
+    if (propio.includes(estado)) return propio;
+    return [ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA].find(f => f.includes(estado)) || propio;
+  }
   const etiquetaEstado = (slug, telar) =>
     (esPrint(telar) && ETIQUETAS_PRINT[slug]) || ESTADOS_LABEL[slug] || slug || '—';
   const PRIO_LABEL = { 1: 'Alta', 2: 'Media', 3: 'Baja' };
@@ -272,7 +286,7 @@
     }
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, esPrint, flujoDe, etiquetaEstado,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente };
 })();

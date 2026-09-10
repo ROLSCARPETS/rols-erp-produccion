@@ -56,11 +56,19 @@ laboratorio pueda llevar las muestras sin ver costes.
   terminada; además cancelada y `sin_seguimiento` (solo histórico del
   registro antiguo, no seleccionable). Las muestras de **Print** llevan su
   flujo corto (`FLUJO_PRINT`): por_empezar («Listo para empezar diseño») →
-  en_diseno → `revision_diseno` («Listo para revisión diseño», etapa solo de
-  Print, rechazada en backend para otras técnicas) → terminada;
+  en_diseno → `revision_diseno` («Listo para revisión diseño») → terminada.
+  Las de **Varilla** llevan el diseño por delante del textil (`FLUJO_VARILLA`):
+  por_empezar → `listo_diseno` («Listo para empezar diseño») → en_diseno →
+  `revision_diseno` → `diseno_listo` («Diseño listo») → en_hilatura → … →
+  terminada. Las etapas que solo existen en un flujo propio
+  (`ESTADOS_EXCLUSIVOS`: listo_diseno, revision_diseno, diseno_listo) se
+  rechazan en backend para las técnicas que no las recorren
+  (`etapa_permitida`), también al cambiar de telar estando en una de ellas.
   `etiqueta_estado(estado, telar)` / `MS.etiquetaEstado` dan el label que
-  toca y `flujo_de`/`MS.flujoDe` el flujo (una Print histórica parada en una
-  etapa textil se sigue pintando con el flujo completo).
+  toca, `flujo_de`/`MS.flujoDe` el flujo de la técnica y
+  `flujo_que_contiene`/`MS.flujoQueContiene` el flujo con el que se pinta (si
+  la etapa actual no está en el de su técnica, el primero que la contenga:
+  una Print histórica parada en una etapa textil sigue el flujo completo).
 - `archivada` = fuera de "En curso" sin estar terminada (lo que en el Excel
   era mover la fila a la hoja de terminadas).
 - `fecha_estimada` = "Fecha estimada muestra lista": previsión que mantiene
@@ -72,11 +80,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   `descripcion` sigue siendo el texto largo (el listado la enseña si no hay
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
-- **Datos técnicos** (solo con telar **Varilla**): `material`, `pasadas`,
-  `altura_felpa`, `n_cuerpos`, `hilos_pua` (textos cortos), `pelo` (etiqueta
-  "Construcción": corte | bucle | corte_bucle | estructurado) y
-  `acabado` (latex | sin_aprestar). Van planos en la muestra; la ficha y el
-  alta los enseñan solo si el telar es de varilla (si cambia, se conservan).
+- **Datos técnicos** (solo con telar **Varilla**), en dos bloques en la UI:
+  *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
+  cortos —, `pelo` con etiqueta "Construcción": corte | bucle | corte_bucle |
+  estructurado, y `acabado`: latex | sin_aprestar | resina | latex_resina) y
+  *Datos de materias* (`material`, `hilos_pua`). Van planos en la muestra; la
+  ficha y el alta los enseñan solo si el telar es de varilla (si cambia, se
+  conservan).
   `resumen_tecnico()` los junta para el hero y los correos.
 - **Diseño adjunto** (`adjuntos[]`): ficheros en
   `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
