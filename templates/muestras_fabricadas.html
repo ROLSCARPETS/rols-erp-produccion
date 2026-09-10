@@ -284,6 +284,8 @@
       <div><label>Telar / técnica</label><select id="ms-n-telar"></select></div>
       <div><label>Prioridad</label><select id="ms-n-prio"><option value="1">1 · Alta</option><option value="2" selected>2 · Media</option><option value="3">3 · Baja</option></select></div>
       <div><label>Fecha de solicitud</label><input type="date" id="ms-n-fecha" /></div>
+      <div class="full"><label>Referencia muestra <small style="font-weight:400;color:#9a9a9a">(resumen corto: es lo que sale en el listado)</small></label><input type="text" id="ms-n-ref" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" /></div>
+      <div class="full"><label>Descripción de la muestra</label><textarea id="ms-n-desc" rows="3" placeholder="Ej. 2 MUESTRAS TEJIDAS - WILTON 30 - Lana 100 2/c - 2 cuerpos…"></textarea></div>
       <div class="full ms-n-tecnica" id="ms-n-tecnica" hidden>
         <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
         <div class="ms-form-grid ms-form-grid-inner">
@@ -299,8 +301,6 @@
           <datalist id="ms-coloridos"></datalist>
         </div>
       </div>
-      <div class="full"><label>Referencia muestra <small style="font-weight:400;color:#9a9a9a">(resumen corto: es lo que sale en el listado)</small></label><input type="text" id="ms-n-ref" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" /></div>
-      <div class="full"><label>Descripción de la muestra</label><textarea id="ms-n-desc" rows="3" placeholder="Ej. 2 MUESTRAS TEJIDAS - WILTON 30 - Lana 100 2/c - 2 cuerpos…"></textarea></div>
       <div class="full ms-numero-opts">
         <label><input type="radio" name="ms-n-tipo" value="auto" checked /> Nuevo número: <b id="ms-n-siguiente">M-…</b></label>
         <label><input type="radio" name="ms-n-tipo" value="variante" /> Variante de M- <input type="text" id="ms-n-variante" placeholder="5448" /> <small>(se le pone la siguiente letra: B, C, D…)</small></label>

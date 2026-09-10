@@ -140,6 +140,15 @@
             <input type="date" id="md-f-fecha" data-campo="fecha_solicitud" />
           </div>
         </div>
+        <!-- Qué es la muestra (va antes de los datos técnicos) -->
+        <div class="ms-campo">
+          <label for="md-f-ref">Referencia muestra <span class="ms-hint">resumen corto: es lo que sale en el listado</span></label>
+          <input type="text" id="md-f-ref" data-campo="referencia" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" />
+        </div>
+        <div class="ms-campo">
+          <label for="md-f-desc">Descripción de la muestra</label>
+          <textarea id="md-f-desc" data-campo="descripcion" placeholder="Qué se teje: telar, dibujo, calidad, colores, cuerpos…"></textarea>
+        </div>
         <!-- Datos técnicos: solo cuando el telar es de varilla -->
         <div class="ms-tecnica" id="md-tecnica" hidden>
           <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
@@ -178,14 +187,6 @@
           <div id="md-materias"></div>
           <datalist id="md-materiales"></datalist>
           <datalist id="md-coloridos"></datalist>
-        </div>
-        <div class="ms-campo">
-          <label for="md-f-ref">Referencia muestra <span class="ms-hint">resumen corto: es lo que sale en el listado</span></label>
-          <input type="text" id="md-f-ref" data-campo="referencia" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" />
-        </div>
-        <div class="ms-campo">
-          <label for="md-f-desc">Descripción de la muestra</label>
-          <textarea id="md-f-desc" data-campo="descripcion" placeholder="Qué se teje: telar, dibujo, calidad, colores, cuerpos…"></textarea>
         </div>
         <!-- Diseño adjunto (ficheros) -->
         <div class="ms-campo" id="md-adjuntos-wrap">
