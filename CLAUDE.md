@@ -62,7 +62,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   el paso a `terminada` y es la que usan plazos y análisis; en la ficha solo
   se enseña cuando la muestra está terminada.
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
-  Excel se troceó por fechas (`parsear_diario`) sin pérdida.
+  Excel se troceó por fechas (`parsear_diario`) sin pérdida. Cada cambio de
+  etapa deja además un apunte automático (`tipo: "estado"`, "Pasa a «…»",
+  "Muestra terminada."…) con la nota opcional a continuación.
 - `tipo` = `cliente` | `interna` (desarrollo propio; en el libro era el cliente
   "INTERNA ( NANDO )", "MOQUETAS ROLS"...). Las internas no necesitan cliente.
   Prioridad 1 Alta (rojo) · 2 Media (azul) · 3 Baja (verde claro).

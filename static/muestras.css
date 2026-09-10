@@ -329,6 +329,9 @@ select.ms-prio-sel option { background: #fff; color: #2a2a2a; font-weight: 500; 
 .ms-ap-quien.libro { color: #b5b0a8; font-style: italic; font-weight: 400; }
 .ms-ap-texto { font-size: 0.86rem; color: #2a2a2a; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 .ms-ap-meta { font-size: 0.68rem; color: #9a9a9a; margin-top: 0.15rem; }
+/* Apunte automatico por cambio de etapa (lo escribe el servidor) */
+.ms-ap-cambio .ms-ap-texto { color: #4d4d4d; }
+.ms-ap-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-hover); margin-right: 0.4rem; vertical-align: 1px; }
 .ms-ap-acciones { display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.12s; }
 .ms-ap:hover .ms-ap-acciones { opacity: 1; }
 .ms-ico-btn { border: 1px solid transparent; background: none; color: #9a9a9a; cursor: pointer; border-radius: 6px; padding: 0.15rem 0.3rem; line-height: 1; font-size: 0.85rem; }

@@ -85,6 +85,7 @@ ESTADOS_LABEL = dict(ESTADOS)
 ESTADOS_FLUJO = tuple(s for s, _ in ESTADOS[:9])          # por_empezar … terminada
 ESTADOS_TERMINALES = {"terminada", "cancelada", "sin_seguimiento"}
 ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS[:10])  # todos menos sin_seguimiento
+_FLUJO_IDX = {s: i for i, s in enumerate(ESTADOS_FLUJO)}
 
 PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 
@@ -1097,7 +1098,9 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
                    nota: str = "", fecha: str | None = None) -> tuple[dict | None, str]:
     """Mueve la muestra de estado. Al pasar a 'terminada' fija fecha_lista
     (si no la tenia) y al reabrir una terminada/cancelada la limpia y la
-    desarchiva. `nota` (opcional) se guarda ademas como apunte del diario."""
+    desarchiva. Cada cambio de etapa queda tambien como apunte del diario
+    del laboratorio (`tipo: "estado"`, con la `nota` opcional a continuacion);
+    si el estado no cambia, la nota se guarda como apunte normal."""
     slug = normalizar_estado(estado)
     if not slug or slug not in ESTADOS_SELECCIONABLES:
         return None, f"estado no valido: {estado!r}"
@@ -1127,13 +1130,34 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
                 m["archivada"] = False
             _historial(m, usuario, "estado", de=anterior, a=slug,
                        nota=nota or "", fecha_efecto=fecha)
-        if nota:
+            # El cambio de etapa se apunta tambien en el diario del laboratorio
+            m.setdefault("apuntes", []).append(
+                {"id": _nuevo_id_apunte(), "fecha": fecha,
+                 "texto": _texto_cambio_estado(anterior, slug, nota),
+                 "tipo": "estado", "estado_de": anterior, "estado": slug,
+                 "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
+        elif nota:
             m.setdefault("apuntes", []).append(
                 {"id": _nuevo_id_apunte(), "fecha": fecha, "texto": nota,
                  "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
         m["actualizado_en"] = _ahora()
         _guardar(data)
         return obtener(mid), ""
+
+
+def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "") -> str:
+    """Frase del apunte automatico del diario al cambiar de etapa."""
+    a = ESTADOS_LABEL.get(nuevo, nuevo)
+    if nuevo == "terminada":
+        frase = "Muestra terminada."
+    elif nuevo == "cancelada":
+        frase = "Muestra cancelada."
+    elif anterior in ESTADOS_TERMINALES:
+        frase = f"Se reabre la muestra: vuelve a «{a}»."
+    else:
+        ia, ib = _FLUJO_IDX.get(anterior), _FLUJO_IDX.get(nuevo)
+        frase = f"Vuelve a «{a}»." if (ia is not None and ib is not None and ib < ia) else f"Pasa a «{a}»."
+    return f"{frase} {nota.strip()}" if nota and nota.strip() else frase
 
 
 def archivar(mid: str, usuario: str | None = None, valor: bool = True) -> tuple[dict | None, str]:

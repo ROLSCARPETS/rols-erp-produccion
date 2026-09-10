@@ -156,7 +156,7 @@
     } else if (M.estado === 'sin_seguimiento') {
       txt = 'Sin seguimiento (venía solo del registro de números). Pulsa una etapa si quieres empezar a seguirla.';
     } else {
-      txt = `Ahora en <b>${esc(M.estado_label)}</b> · pulsa la siguiente etapa cuando avance.`;
+      txt = `Ahora en <b>${esc(M.estado_label)}</b> · pulsa la siguiente etapa cuando avance (queda apuntado en el diario).`;
       acciones = '<button type="button" class="ms-link danger" id="md-btn-cancelar">Cancelar muestra</button>';
     }
     $('md-estado-txt').innerHTML = txt;
@@ -375,9 +375,10 @@
       const quien = autor
         ? `<div class="ms-ap-quien" title="${esc(a.usuario || '')}">${esc(autor)}</div>`
         : '<div class="ms-ap-quien libro" title="Importado del Libro de muestras (Excel)">del libro</div>';
-      return `<div class="ms-ap" data-aid="${esc(a.id)}">
+      const cambio = a.tipo === 'estado';   // apunte automatico al cambiar de etapa
+      return `<div class="ms-ap${cambio ? ' ms-ap-cambio' : ''}" data-aid="${esc(a.id)}">
         <div class="ms-ap-fecha ${a.fecha ? '' : 'sin'}">${a.fecha ? fmtFecha(a.fecha) : 'sin fecha'}${quien}</div>
-        <div><div class="ms-ap-texto">${esc(a.texto)}</div>${meta.length ? `<div class="ms-ap-meta">${meta.join(' · ')}</div>` : ''}</div>
+        <div><div class="ms-ap-texto">${cambio ? '<span class="ms-ap-dot" title="Cambio de etapa"></span>' : ''}${esc(a.texto)}</div>${meta.length ? `<div class="ms-ap-meta">${meta.join(' · ')}</div>` : ''}</div>
         <div class="ms-ap-acciones">
           <button type="button" class="ms-ico-btn" data-accion="editar" title="Editar el apunte">✎</button>
           <button type="button" class="ms-ico-btn danger" data-accion="borrar" title="Borrar el apunte">✕</button>
