@@ -293,9 +293,10 @@
           <div class="c2"><label>Nº de cuerpos</label><input type="text" id="ms-n-cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></div>
           <div class="c3"><label>Construcción</label><select id="ms-n-pelo"><option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option><option value="estructurado">Estructurado</option></select></div>
           <div class="c3"><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option></select></div>
-          <div class="full ms-tecnica-sub">Datos de materias</div>
-          <div class="full"><label>Material</label><input type="text" id="ms-n-material" maxlength="200" placeholder="Ej. Lana 100 3/c CREMA + Lana 100 5/c CARAMEL" autocomplete="off" list="ms-materiales" /><datalist id="ms-materiales"></datalist></div>
-          <div class="c3"><label>Hilos púa</label><input type="text" id="ms-n-hilos" maxlength="40" placeholder="Ej. 3" inputmode="decimal" autocomplete="off" /></div>
+          <div class="full ms-tecnica-sub">Datos de materias <span class="ms-hint">una fila por cuerpo</span></div>
+          <div class="full" id="ms-n-materias"></div>
+          <datalist id="ms-materiales"></datalist>
+          <datalist id="ms-coloridos"></datalist>
         </div>
       </div>
       <div class="full"><label>Referencia muestra <small style="font-weight:400;color:#9a9a9a">(resumen corto: es lo que sale en el listado)</small></label><input type="text" id="ms-n-ref" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" /></div>

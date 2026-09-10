@@ -180,7 +180,7 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 5
+_VERSION_SCHEMA = 6
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
@@ -198,7 +198,16 @@ ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "
                                          ("resina", "Resina"), ("latex_resina", "Látex + resina"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
-CAMPOS_TECNICOS = ("material", "pasadas", "altura_felpa", "n_cuerpos", "hilos_pua", "pelo", "acabado")
+CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "n_cuerpos", "pelo", "acabado")
+
+# MATERIAS: una fila por cuerpo (que se teje con que). Sustituyen a los campos
+# planos `material` / `hilos_pua` (v6 los paso a una fila). Cada fila:
+#   {id, cuerpo, materia, hilos_pua, colorido}
+# El `id` lo pone el servidor; el cliente manda solo los cuatro textos y la
+# lista entera en cada guardado (no hay endpoint por fila).
+CAMPOS_MATERIA = ("cuerpo", "materia", "hilos_pua", "colorido")
+_MAX_MATERIA = {"cuerpo": 20, "materia": 200, "hilos_pua": 40, "colorido": 120}
+MAX_MATERIAS = 12
 
 # Adjuntos de la muestra (el diseno): los ficheros van a
 # ROLS_DATA_DIR/muestras_adjuntos/<id de la muestra>/<id adjunto>.<ext> y los
@@ -244,6 +253,8 @@ CAMPOS_EDITABLES = {
     "proximo_hito_fecha", "proximo_hito",
     # Datos tecnicos (telar de varilla)
     *CAMPOS_TECNICOS,
+    # Tabla de materias (una fila por cuerpo)
+    "materias",
 }
 _MAX_TEXTO = 6000
 
@@ -294,6 +305,8 @@ def cargar() -> dict:
                     _migrar_v3(data)
                 if v < 5:
                     _migrar_v5(data)
+                if v < 6:
+                    _migrar_v6(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -391,6 +404,20 @@ def _migrar_v5(data: dict) -> None:
         ref = _REFERENCIAS_V5.get(str(m.get("id") or ""))
         if ref:
             m["referencia"] = ref
+
+
+def _migrar_v6(data: dict) -> None:
+    """v5 → v6: los campos planos `material` / `hilos_pua` pasan a la tabla de
+    materias (una fila por cuerpo). Lo que hubiera escrito se conserva como la
+    primera fila; el campo plano desaparece. Idempotente."""
+    for m in data.get("muestras", []):
+        mat = (m.pop("material", "") or "").strip()
+        hp = (m.pop("hilos_pua", "") or "").strip()
+        if not (mat or hp):
+            continue
+        fila = {"id": _nuevo_id_apunte(), "cuerpo": "", "materia": mat,
+                "hilos_pua": hp, "colorido": ""}
+        m["materias"] = [fila] + list(m.get("materias") or [])
 
 
 def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:
@@ -720,7 +747,8 @@ def _historial(m: dict, usuario, tipo: str, **extra) -> None:
 def _texto_buscable(m: dict) -> str:
     partes = [m.get("id"), m.get("cliente"), m.get("cliente_navision"), m.get("referencia"), m.get("descripcion"),
               m.get("anotacion_registro"), m.get("resultado"),
-              m.get("encargada_por"), m.get("telar"), m.get("material"),
+              m.get("encargada_por"), m.get("telar"),
+              " ".join(f"{f.get('materia') or ''} {f.get('colorido') or ''}" for f in (m.get("materias") or [])),
               ESTADOS_LABEL.get(m.get("estado") or "", ""),
               etiqueta_estado(m.get("estado"), m.get("telar")),
               "interna" if m.get("tipo") == "interna" else ""]
@@ -856,6 +884,8 @@ def obtener(mid: str) -> dict | None:
     out["hito_vencido"] = _hito_vencido(m, hoy)
     for k in CAMPOS_TECNICOS:
         out[k] = out.get(k) or ""
+    out["materias"] = [{"id": f.get("id"), **{k: f.get(k) or "" for k in CAMPOS_MATERIA}}
+                       for f in (m.get("materias") or [])]
     out["es_varilla"] = _es_telar_tecnico(m.get("telar"))
     out["tecnica_resumen"] = resumen_tecnico(m)
     out["adjuntos"] = _adjuntos_publicos(m.get("adjuntos") or [])
@@ -881,8 +911,10 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
                        if (m.get("cliente") or "").strip()
                        and (m.get("tipo") or "cliente") != "interna"},
                       key=lambda s: _clave(s))
-    materiales = sorted({(m.get("material") or "").strip() for m in data["muestras"]
-                         if (m.get("material") or "").strip()}, key=_clave)
+    materiales = sorted({(f.get("materia") or "").strip() for m in data["muestras"]
+                         for f in (m.get("materias") or []) if (f.get("materia") or "").strip()}, key=_clave)
+    coloridos = sorted({(f.get("colorido") or "").strip() for m in data["muestras"]
+                        for f in (m.get("materias") or []) if (f.get("colorido") or "").strip()}, key=_clave)
     activas = _personas_conocidas(data, usuarios_one, usuario_actual)
     nombres_activas = {_clave(p["nombre"]) for p in activas}
     legacy = sorted({(m.get("encargada_por") or "").strip() for m in data["muestras"]
@@ -906,6 +938,7 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "pelos": [{"valor": s, "label": l} for s, l in PELOS],
         "acabados": [{"valor": s, "label": l} for s, l in ACABADOS],
         "materiales": materiales,
+        "coloridos": coloridos,
         "siguiente_numero": int(data["_meta"].get("ultimo_numero") or 0) + 1,
     }
 
@@ -1104,7 +1137,69 @@ def _validar_tecnico(k: str, v) -> tuple[str, str]:
         return _validar_opcion(v, k, PELOS)
     if k == "acabado":
         return _validar_opcion(v, k, ACABADOS)
-    return _validar_texto(v, k, 200 if k == "material" else 40)
+    return _validar_texto(v, k, 40)
+
+
+def _materia_util(f: dict) -> bool:
+    """Una fila cuenta si dice ALGO de la materia; solo con el nº de cuerpo no
+    (asi una fila recien anadida y sin rellenar no se guarda)."""
+    return any((f.get(k) or "").strip() for k in ("materia", "hilos_pua", "colorido"))
+
+
+def _validar_materias(v, anteriores=None) -> tuple[list[dict] | None, str]:
+    """Normaliza la tabla de materias: lista de filas con los cuatro textos.
+    Se tiran las filas vacias y los ids se reaprovechan por posicion."""
+    if v is None:
+        return [], ""
+    if not isinstance(v, list):
+        return None, "materias debe ser una lista de filas"
+    if len(v) > MAX_MATERIAS + 4:
+        return None, f"demasiadas materias (max {MAX_MATERIAS})"
+    viejas = list(anteriores or [])
+    filas = []
+    for i, f in enumerate(v):
+        if not isinstance(f, dict):
+            return None, "cada materia debe ser un objeto"
+        sobra = set(f) - set(CAMPOS_MATERIA) - {"id"}
+        if sobra:
+            return None, f"campos no validos en una materia: {sorted(sobra)}"
+        fila = {}
+        for k in CAMPOS_MATERIA:
+            fila[k], err = _validar_texto(f.get(k), k, _MAX_MATERIA[k])
+            if err:
+                return None, err
+        if not _materia_util(fila):
+            continue
+        previa = viejas[i] if i < len(viejas) else None
+        filas.append({"id": (previa or {}).get("id") or _nuevo_id_apunte(), **fila})
+    if len(filas) > MAX_MATERIAS:
+        return None, f"demasiadas materias (max {MAX_MATERIAS})"
+    return filas, ""
+
+
+def _texto_materia(f: dict) -> str:
+    """'Cuerpo 1: Lana 100 3/c (CREMA · 3 hilos/púa)' (solo lo relleno)."""
+    if not _materia_util(f):
+        return ""
+    mat = (f.get("materia") or "").strip()
+    col = (f.get("colorido") or "").strip()
+    hp = (f.get("hilos_pua") or "").strip()
+    entre = [x for x in (col, (hp if "hilo" in hp.lower() else f"{hp} hilos/púa") if hp else "") if x]
+    txt = mat or "—"
+    if entre:
+        txt += " (" + " · ".join(entre) + ")"
+    cuerpo = (f.get("cuerpo") or "").strip()
+    return f"Cuerpo {cuerpo}: {txt}" if cuerpo else txt
+
+
+def resumen_materias(filas, maximo: int | None = 4) -> str:
+    """Las materias en una linea: fila + fila + …"""
+    txt = [t for t in (_texto_materia(f) for f in (filas or [])) if t]
+    if not txt:
+        return ""
+    if maximo and len(txt) > maximo:
+        txt = txt[:maximo] + ["…"]
+    return " + ".join(txt)
 
 
 def _es_telar_tecnico(telar) -> bool:
@@ -1112,12 +1207,12 @@ def _es_telar_tecnico(telar) -> bool:
 
 
 def resumen_tecnico(m: dict) -> str:
-    """'Lana 100 3/c · 30 pasadas · felpa 12 mm · Corte · Látex' (solo lo
-    relleno y solo si el telar es de varilla)."""
+    """'Cuerpo 1: Lana 100 3/c (CREMA) · 30 pasadas · felpa 12 mm · Corte ·
+    Látex' (solo lo relleno y solo si el telar es de varilla)."""
     if not _es_telar_tecnico(m.get("telar")):
         return ""
     partes = []
-    mat = (m.get("material") or "").strip()
+    mat = resumen_materias(m.get("materias"))
     if mat:
         partes.append(mat)
     pas = (m.get("pasadas") or "").strip()
@@ -1129,9 +1224,6 @@ def resumen_tecnico(m: dict) -> str:
     cu = (m.get("n_cuerpos") or "").strip()
     if cu:
         partes.append(cu if "cuerpo" in cu.lower() else f"{cu} cuerpos")
-    hp = (m.get("hilos_pua") or "").strip()
-    if hp:
-        partes.append(hp if "hilo" in hp.lower() else f"{hp} hilos/púa")
     if m.get("pelo"):
         partes.append(PELOS_LABEL.get(m["pelo"], m["pelo"]))
     if m.get("acabado"):
@@ -1211,6 +1303,9 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         tecnicos[k], err = _validar_tecnico(k, datos.get(k))
         if err:
             return None, err
+    materias, err = _validar_materias(datos.get("materias"))
+    if err:
+        return None, err
     persona_raw = datos.get("encargada_por")
     prioridad, err = _validar_prioridad(datos.get("prioridad", 2))
     if err:
@@ -1276,7 +1371,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
             "fecha_estimada": fecha_estimada,
-            **tecnicos, "adjuntos": [],
+            **tecnicos, "materias": materias, "adjuntos": [],
             "diseno_verificado": False, "diseno_verificado_por": None,
             "diseno_verificado_por_nombre": None, "diseno_verificado_en": None,
             "apuntes": [], "historial": [],
@@ -1346,6 +1441,10 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v, err = _validar_tecnico(k, v)
                 if err:
                     return None, err
+            elif k == "materias":
+                v, err = _validar_materias(v, m.get("materias"))
+                if err:
+                    return None, err
             elif k == "prioridad":
                 v, err = _validar_prioridad(v)
                 if err:
@@ -1381,6 +1480,8 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
             return None, "una muestra de cliente necesita el nombre del cliente"
         if cambios:
             for k, de, a in cambios:
+                if k == "materias":
+                    de, a = resumen_materias(de, None), resumen_materias(a, None)
                 _historial(m, usuario, "campo", campo=k,
                            de=_recortar(str(de) if de is not None else "", 80),
                            a=_recortar(str(a) if a is not None else "", 80))

@@ -7,7 +7,7 @@
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
-          gestionarOtro, montarBuscadorCliente } = window.MS;
+          gestionarOtro, montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -343,7 +343,7 @@
       if (campo === 'tipo') pintarFicha();
       if (campo === 'telar') pintarTecnica();
       if (campo === 'cliente') { clienteEditadoAMano = false; pintarNavLink(); }
-      if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar' || campo === 'material') {
+      if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar') {
         // catálogos pueden haber crecido (valor nuevo)
         CAT = await api('/api/muestras/catalogos');
       }
@@ -380,17 +380,51 @@
   // ------------------------------------------------------------
   const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado' };
   const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina' };
+  // Tabla de materias: una fila por cuerpo. Se guarda entera en cada cambio
+  // (misma marca de guardado que el resto de campos de la ficha).
+  const tablaMaterias = montarTablaMaterias($('md-materias'), {
+    listaMateriales: 'md-materiales', listaColoridos: 'md-coloridos',
+    onCambio: (filas, el) => guardarMaterias(filas, el),
+  });
+
+  function pintarDatalists() {
+    $('md-materiales').innerHTML = (CAT.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+    $('md-coloridos').innerHTML = (CAT.coloridos || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+  }
+
   function pintarTecnica() {
     // Los valores se conservan aunque cambie el telar; solo se esconden
     $('md-tecnica').hidden = !esVarilla(M.telar);
-    $('md-materiales').innerHTML = (CAT.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
-    $('md-f-material').value = M.material || '';
+    pintarDatalists();
     $('md-f-pasadas').value = M.pasadas || '';
     $('md-f-altura').value = M.altura_felpa || '';
     $('md-f-cuerpos').value = M.n_cuerpos || '';
-    $('md-f-hilos').value = M.hilos_pua || '';
     $('md-f-pelo').value = M.pelo || '';
     $('md-f-acabado').value = M.acabado || '';
+    tablaMaterias.pintar(M.materias || []);
+  }
+
+  async function guardarMaterias(filas, el) {
+    const nuevas = materiasUtiles(filas);
+    const antes = materiasUtiles(M.materias || []);
+    // Una fila recién añadida y aún vacía no es un cambio: no se guarda ni se
+    // repinta (si no, desaparecería mientras se escribe en ella).
+    if (JSON.stringify(nuevas) === JSON.stringify(antes)) { if (el) marcar(el, null); return; }
+    if (el) marcar(el, 'saving');
+    try {
+      const d = await api(URL_API, { method: 'PUT', body: { materias: nuevas } });
+      M = d.muestra;
+      if (el) marcar(el, 'saved-ok');
+      pintarHero(); pintarHistorial();
+      // Si el servidor descartó alguna fila, se repinta para que se vea igual
+      if ((M.materias || []).length !== filas.length) tablaMaterias.pintar(M.materias || []);
+      CAT = await api('/api/muestras/catalogos');
+      pintarDatalists();
+    } catch (e) {
+      if (el) marcar(el, 'saved-err');
+      await window.mostrarAlerta({ titulo: 'No se pudieron guardar las materias', mensaje: e.message, tipo: 'danger' });
+      tablaMaterias.pintar(M.materias || []);
+    }
   }
 
   // ------------------------------------------------------------
@@ -632,7 +666,7 @@
     // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
+      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', materias: 'Materias', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
       if (h.campo === 'diseno_verificado') return h.a === 'True' ? 'Diseño <b>verificado</b>' : 'Verificación de diseño retirada';
       const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;

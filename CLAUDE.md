@@ -84,10 +84,16 @@ laboratorio pueda llevar las muestras sin ver costes.
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
   cortos —, `pelo` con etiqueta "Construcción": corte | bucle | corte_bucle |
   estructurado, y `acabado`: latex | sin_aprestar | resina | latex_resina) y
-  *Datos de materias* (`material`, `hilos_pua`). Van planos en la muestra; la
-  ficha y el alta los enseñan solo si el telar es de varilla (si cambia, se
-  conservan).
-  `resumen_tecnico()` los junta para el hero y los correos.
+  *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
+  (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
+  La ficha y el alta los enseñan solo si el telar es de varilla (si cambia, se
+  conservan). La tabla se guarda **entera** en cada cambio (`PUT` con
+  `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
+  nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`
+  por posición. v6 pasó los campos planos `material` / `hilos_pua` a una
+  primera fila de la tabla. `resumen_tecnico()` junta materias y tejeduría
+  para el hero y los correos; `materiales` y `coloridos` de `catalogos` salen
+  de las filas ya escritas (datalist).
 - **Diseño adjunto** (`adjuntos[]`): ficheros en
   `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
   ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas

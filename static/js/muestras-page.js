@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, esVarilla, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
-          ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado,
+          ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, montarTablaMaterias,
           llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -537,6 +537,8 @@
     const b = e.target.closest('.ms-seg-btn');
     if (b) ponerTipoNuevo(b.dataset.tipo);
   });
+  const tablaMaterias = montarTablaMaterias($('ms-n-materias'), { listaMateriales: 'ms-materiales', listaColoridos: 'ms-coloridos' });
+
   function abrirNueva() {
     ponerTipoNuevo('cliente');
     const c = ST.catalogos || { personas_activas: [], telares: [] };
@@ -547,7 +549,9 @@
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
-    ['ms-n-ref', 'ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-hilos', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    $('ms-coloridos').innerHTML = (c.coloridos || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+    ['ms-n-ref', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    tablaMaterias.pintar([]);
     $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
@@ -585,8 +589,8 @@
       encargada_por: $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
-      material: $('ms-n-material').value.trim(), pasadas: $('ms-n-pasadas').value.trim(),
-      altura_felpa: $('ms-n-altura').value.trim(), n_cuerpos: $('ms-n-cuerpos').value.trim(), hilos_pua: $('ms-n-hilos').value.trim(),
+      pasadas: $('ms-n-pasadas').value.trim(), altura_felpa: $('ms-n-altura').value.trim(),
+      n_cuerpos: $('ms-n-cuerpos').value.trim(), materias: tablaMaterias.utiles(),
       pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
     };
     if (tipo === 'variante') {

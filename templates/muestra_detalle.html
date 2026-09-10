@@ -171,19 +171,11 @@
               </select>
             </div>
           </div>
-          <!-- Materias: con qué se teje -->
+          <!-- Materias: una fila por cuerpo (se guardan solas, como el resto) -->
           <div class="ms-tecnica-sub">Datos de materias</div>
-          <div class="ms-campo">
-            <label for="md-f-material">Material</label>
-            <input type="text" id="md-f-material" data-campo="material" maxlength="200" placeholder="Ej. Lana 100 3/c CREMA + Lana 100 5/c CARAMEL" autocomplete="off" list="md-materiales" />
-            <datalist id="md-materiales"></datalist>
-          </div>
-          <div class="ms-campo-row">
-            <div class="ms-campo">
-              <label for="md-f-hilos">Hilos púa</label>
-              <input type="text" id="md-f-hilos" data-campo="hilos_pua" maxlength="40" placeholder="Ej. 3" inputmode="decimal" autocomplete="off" />
-            </div>
-          </div>
+          <div id="md-materias"></div>
+          <datalist id="md-materiales"></datalist>
+          <datalist id="md-coloridos"></datalist>
         </div>
         <div class="ms-campo">
           <label for="md-f-ref">Referencia muestra <span class="ms-hint">resumen corto: es lo que sale en el listado</span></label>

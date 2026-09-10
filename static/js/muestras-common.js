@@ -269,6 +269,90 @@
     return { cerrar, buscar };
   }
 
+  // ---- Tabla de materias (una fila por cuerpo) --------------------------
+  // Se usa igual en la ficha (autoguardado, opts.onCambio) y en el alta (se
+  // lee al crear). El servidor tira las filas que no dicen nada de la materia.
+  const MAX_MATERIAS = 12;
+  function materiaUtil(f) {
+    return !!((f.materia || '').trim() || (f.hilos_pua || '').trim() || (f.colorido || '').trim());
+  }
+  // Filas que vale la pena guardar, con las claves SIEMPRE en el mismo orden
+  // (así comparar dos listas con JSON.stringify es fiable).
+  function materiasUtiles(filas) {
+    return (filas || []).filter(materiaUtil).map(f => ({
+      cuerpo: (f.cuerpo || '').trim(), materia: (f.materia || '').trim(),
+      hilos_pua: (f.hilos_pua || '').trim(), colorido: (f.colorido || '').trim(),
+    }));
+  }
+  // opts: { listaMateriales, listaColoridos (ids de <datalist>), onCambio(filas, input), minimo }
+  function montarTablaMaterias(root, opts) {
+    const o = opts || {};
+    const minimo = o.minimo === undefined ? 1 : o.minimo;
+    let filas = [];
+    root.classList.add('ms-materias');
+    root.innerHTML =
+      '<div class="ms-materias-cab"><span>Nº de cuerpo</span><span>Materia</span><span>Hilos púa</span><span>Colorido</span><span></span></div>' +
+      '<div class="ms-materias-filas"></div>' +
+      '<div class="ms-materias-pie"><button type="button" class="ms-link ms-materias-add">+ Añadir materia</button>' +
+      '<span class="ms-materias-hint"></span></div>';
+    const cont = root.querySelector('.ms-materias-filas');
+    const btnAdd = root.querySelector('.ms-materias-add');
+    const hint = root.querySelector('.ms-materias-hint');
+    const lm = o.listaMateriales ? ` list="${esc(o.listaMateriales)}"` : '';
+    const lc = o.listaColoridos ? ` list="${esc(o.listaColoridos)}"` : '';
+
+    function htmlFila(f, i) {
+      return `<div class="ms-materia">` +
+        `<input type="text" class="cuerpo" maxlength="20" value="${esc(f.cuerpo || '')}" placeholder="${i + 1}" title="Nº de cuerpo" aria-label="Nº de cuerpo" autocomplete="off" />` +
+        `<input type="text" class="materia" maxlength="200" value="${esc(f.materia || '')}" placeholder="Ej. Lana 100 3/c" title="Materia" aria-label="Materia" autocomplete="off"${lm} />` +
+        `<input type="text" class="hilos" maxlength="40" value="${esc(f.hilos_pua || '')}" placeholder="Ej. 3" title="Hilos púa" aria-label="Hilos púa" autocomplete="off" />` +
+        `<input type="text" class="colorido" maxlength="120" value="${esc(f.colorido || '')}" placeholder="Ej. CREMA" title="Colorido" aria-label="Colorido" autocomplete="off"${lc} />` +
+        `<button type="button" class="ms-materia-x" title="Quitar esta materia" aria-label="Quitar esta materia">×</button></div>`;
+    }
+    function repintar() {
+      cont.innerHTML = filas.map(htmlFila).join('');
+      btnAdd.disabled = filas.length >= MAX_MATERIAS;
+      hint.textContent = filas.length >= MAX_MATERIAS ? `máximo ${MAX_MATERIAS} materias` : '';
+    }
+    function leer() {
+      return [...cont.querySelectorAll('.ms-materia')].map(d => ({
+        cuerpo: d.querySelector('.cuerpo').value, materia: d.querySelector('.materia').value,
+        hilos_pua: d.querySelector('.hilos').value, colorido: d.querySelector('.colorido').value,
+      }));
+    }
+    function pintar(nuevas) {
+      filas = (nuevas || []).map(f => ({ cuerpo: f.cuerpo || '', materia: f.materia || '', hilos_pua: f.hilos_pua || '', colorido: f.colorido || '' }));
+      while (filas.length < minimo) filas.push({ cuerpo: '', materia: '', hilos_pua: '', colorido: '' });
+      repintar();
+    }
+    cont.addEventListener('change', (e) => {
+      if (!e.target.matches('input')) return;
+      filas = leer();
+      if (o.onCambio) o.onCambio(filas, e.target);
+    });
+    cont.addEventListener('click', (e) => {
+      const b = e.target.closest('.ms-materia-x');
+      if (!b) return;
+      const i = [...cont.querySelectorAll('.ms-materia')].indexOf(b.closest('.ms-materia'));
+      filas = leer();
+      filas.splice(i, 1);
+      while (filas.length < minimo) filas.push({ cuerpo: '', materia: '', hilos_pua: '', colorido: '' });
+      repintar();
+      if (o.onCambio) o.onCambio(filas, null);
+    });
+    btnAdd.addEventListener('click', () => {
+      filas = leer();
+      if (filas.length >= MAX_MATERIAS) return;
+      // el nº de cuerpo se propone (1, 2, 3…); la fila no se guarda hasta que diga algo de la materia
+      filas.push({ cuerpo: String(filas.length + 1), materia: '', hilos_pua: '', colorido: '' });
+      repintar();
+      const ult = cont.querySelector('.ms-materia:last-child .materia');
+      if (ult) ult.focus();
+    });
+    pintar([]);
+    return { pintar, leer, utiles: () => materiasUtiles(leer()) };
+  }
+
   // Al elegir "Otro…" en un select de catálogo: pide el valor, lo guarda y lo selecciona.
   async function gestionarOtro(sel, tipo, etiqueta) {
     if (sel.value !== '__otro__') return true;
@@ -288,5 +372,6 @@
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
-    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente };
+    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente,
+    materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
 })();
