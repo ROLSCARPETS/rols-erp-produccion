@@ -56,6 +56,7 @@
     if (M.telar) chips += ` <span class="ms-estado" style="background:#f1ece4;color:#6b5323">${esc(M.telar)}</span>`;
     if (M.cliente_navision) chips += ` <span class="ms-estado" style="background:#dbeafe;color:#1e40af" title="Cliente vinculado a su ficha de Navision">Navision ${esc(M.cliente_navision)}</span>`;
     if (M.archivada && !TERMINALES.includes(M.estado)) chips += ' <span class="ms-tag-archivada">archivada</span>';
+    if (M.diseno_verificado) chips += ` <span class="ms-estado" style="background:#e8f3e1;color:#256b1f" title="Diseño verificado por ${esc(M.diseno_verificado_por_nombre || M.diseno_verificado_por || '')}${M.diseno_verificado_en ? ' el ' + esc(fmtFechaHora(M.diseno_verificado_en)) : ''}">Diseño verificado</span>`;
     $('md-chips').innerHTML = chips;
     $('md-ref').textContent = M.referencia || '';
     $('md-ref').hidden = !M.referencia;
@@ -384,7 +385,7 @@
   // ------------------------------------------------------------
   // Datos técnicos (solo telar de varilla)
   // ------------------------------------------------------------
-  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle' };
+  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado' };
   const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar' };
   function pintarTecnica() {
     // Los valores se conservan aunque cambie el telar; solo se esconden
@@ -393,6 +394,8 @@
     $('md-f-material').value = M.material || '';
     $('md-f-pasadas').value = M.pasadas || '';
     $('md-f-altura').value = M.altura_felpa || '';
+    $('md-f-cuerpos').value = M.n_cuerpos || '';
+    $('md-f-hilos').value = M.hilos_pua || '';
     $('md-f-pelo').value = M.pelo || '';
     $('md-f-acabado').value = M.acabado || '';
   }
@@ -407,7 +410,31 @@
     return (n / 1048576).toFixed(1) + ' MB';
   }
   function urlAdjunto(a) { return `${URL_API}/adjuntos/${encodeURIComponent(a.id)}`; }
+  function pintarVerificacion() {
+    $('md-verif').checked = !!M.diseno_verificado;
+    $('md-verif-wrap').classList.toggle('ok', !!M.diseno_verificado);
+    const quien = M.diseno_verificado_por_nombre || M.diseno_verificado_por || '';
+    $('md-verif-quien').textContent = M.diseno_verificado
+      ? `verificado por ${quien}${M.diseno_verificado_en ? ' el ' + fmtFechaHora(M.diseno_verificado_en) : ''}`
+      : '';
+  }
+  $('md-verif').addEventListener('change', async () => {
+    const el = $('md-verif');
+    el.disabled = true;
+    try {
+      const d = await api(URL_API, { method: 'PUT', body: { diseno_verificado: el.checked } });
+      M = d.muestra;
+      pintarVerificacion(); pintarHero(); pintarHistorial();
+    } catch (err) {
+      await window.mostrarAlerta({ titulo: 'No se pudo guardar la verificación', mensaje: err.message, tipo: 'danger' });
+      pintarVerificacion();
+    } finally {
+      el.disabled = false;
+    }
+  });
+
   function pintarAdjuntos() {
+    pintarVerificacion();
     const lista = M.adjuntos || [];
     $('md-adjuntos').hidden = !lista.length;
     $('md-adjuntos').innerHTML = lista.map(a => {
@@ -612,7 +639,8 @@
     // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', pelo: 'Construcción', acabado: 'Acabado' };
+      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
+      if (h.campo === 'diseno_verificado') return h.a === 'True' ? 'Diseño <b>verificado</b>' : 'Verificación de diseño retirada';
       const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;
     }

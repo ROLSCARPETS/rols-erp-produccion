@@ -73,7 +73,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
 - **Datos técnicos** (solo con telar **Varilla**): `material`, `pasadas`,
-  `altura_felpa` (texto corto), `pelo` (etiqueta "Construcción": corte | bucle | corte_bucle) y
+  `altura_felpa`, `n_cuerpos`, `hilos_pua` (textos cortos), `pelo` (etiqueta
+  "Construcción": corte | bucle | corte_bucle | estructurado) y
   `acabado` (latex | sin_aprestar). Van planos en la muestra; la ficha y el
   alta los enseñan solo si el telar es de varilla (si cambia, se conservan).
   `resumen_tecnico()` los junta para el hero y los correos.
@@ -85,7 +86,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   imagen/PDF se abren en la pestaña). Cada adjunto lleva `clase`: `version`
   (las versiones se numeran por orden de subida en la UI), `final` (diseño
   final) u `otro`; `PUT …/adjuntos/<aid>` `{clase}` la cambia. Rastro en el
-  historial (`tipo: adjunto`, a = anadido | etiqueta | borrado).
+  historial (`tipo: adjunto`, a = anadido | etiqueta | borrado). Check
+  **Verificación de diseño** (`diseno_verificado` + `_por`, `_por_nombre`,
+  `_en`, que pone el servidor con el actor al marcarlo y limpia al quitarlo);
+  chip "Diseño verificado" en el hero.
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida. Cada cambio de
   etapa deja además un apunte automático (`tipo: "estado"`, "Pasa a «…»",

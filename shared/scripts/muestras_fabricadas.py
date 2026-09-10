@@ -145,11 +145,11 @@ TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
 # sin aprestar). Van planos en la muestra y la UI los ensena solo con telar
 # de varilla (si cambia de telar se conservan, no se borran).
 PELOS: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
-                                      ("corte_bucle", "Corte y bucle"))
+                                      ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"))
 ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
-CAMPOS_TECNICOS = ("material", "pasadas", "altura_felpa", "pelo", "acabado")
+CAMPOS_TECNICOS = ("material", "pasadas", "altura_felpa", "n_cuerpos", "hilos_pua", "pelo", "acabado")
 
 # Adjuntos de la muestra (el diseno): los ficheros van a
 # ROLS_DATA_DIR/muestras_adjuntos/<id de la muestra>/<id adjunto>.<ext> y los
@@ -182,6 +182,9 @@ CAMPOS_EDITABLES = {
     # Referencia muestra: resumen corto (una linea) que sale en el listado;
     # `descripcion` sigue siendo el texto largo.
     "referencia",
+    # Check "Verificacion de diseno": quien lo marca y cuando se guardan aparte
+    # (diseno_verificado_por / _por_nombre / _en) al ponerlo; se limpian al quitarlo.
+    "diseno_verificado",
     "prioridad", "telar", "fecha_solicitud", "fecha_lista", "resultado",
     "anotacion_registro",
     # Fecha estimada de muestra lista (prevision mientras esta en curso;
@@ -707,6 +710,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "n_apuntes": len(apuntes), "dias": dias, "dias_tipo": dias_tipo,
         "n_variantes": n_variantes,
         "n_adjuntos": len(m.get("adjuntos") or []),
+        "diseno_verificado": bool(m.get("diseno_verificado")),
     }
 
 
@@ -787,6 +791,9 @@ def obtener(mid: str) -> dict | None:
     out = dict(m)
     out["tipo"] = out.get("tipo") or "cliente"
     out["referencia"] = out.get("referencia") or ""
+    out["diseno_verificado"] = bool(out.get("diseno_verificado"))
+    for k in ("diseno_verificado_por", "diseno_verificado_por_nombre", "diseno_verificado_en"):
+        out.setdefault(k, None)
     out["estado_label"] = etiqueta_estado(out.get("estado"), out.get("telar"))
     out["prioridad_label"] = PRIORIDADES.get(out.get("prioridad") or 0, "")
     out["activa"] = es_activa(m)
@@ -1007,6 +1014,12 @@ def _validar_prioridad(v) -> tuple[int | None, str]:
     return p, ""
 
 
+def _a_bool(v) -> bool:
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "si", "sí", "on", "yes")
+    return bool(v)
+
+
 def _validar_referencia(v) -> tuple[str, str]:
     """Referencia muestra: una sola linea de hasta 120 caracteres."""
     v, err = _validar_texto(v, "referencia", 400)
@@ -1062,6 +1075,12 @@ def resumen_tecnico(m: dict) -> str:
     alt = (m.get("altura_felpa") or "").strip()
     if alt:
         partes.append(alt if "felpa" in alt.lower() else f"felpa {alt}")
+    cu = (m.get("n_cuerpos") or "").strip()
+    if cu:
+        partes.append(cu if "cuerpo" in cu.lower() else f"{cu} cuerpos")
+    hp = (m.get("hilos_pua") or "").strip()
+    if hp:
+        partes.append(hp if "hilo" in hp.lower() else f"{hp} hilos/púa")
     if m.get("pelo"):
         partes.append(PELOS_LABEL.get(m["pelo"], m["pelo"]))
     if m.get("acabado"):
@@ -1207,6 +1226,8 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
             "fecha_estimada": fecha_estimada,
             **tecnicos, "adjuntos": [],
+            "diseno_verificado": False, "diseno_verificado_por": None,
+            "diseno_verificado_por_nombre": None, "diseno_verificado_en": None,
             "apuntes": [], "historial": [],
             "creado_en": ahora, "actualizado_en": ahora,
             "creado_por": _actor_username(usuario), "creado_por_nombre": _actor_nombre(usuario),
@@ -1249,6 +1270,13 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v, err = _validar_referencia(v)
                 if err:
                     return None, err
+            elif k == "diseno_verificado":
+                v = _a_bool(v)
+                if bool(m.get("diseno_verificado")) == v:
+                    continue
+                m["diseno_verificado_por"] = _actor_username(usuario) if v else None
+                m["diseno_verificado_por_nombre"] = _actor_nombre(usuario) if v else None
+                m["diseno_verificado_en"] = _ahora() if v else None
             elif k in ("cliente", "descripcion", "resultado", "anotacion_registro"):
                 v, err = _validar_texto(v, k, 160 if k == "cliente" else _MAX_TEXTO)
                 if err:

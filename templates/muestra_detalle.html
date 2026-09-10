@@ -158,9 +158,19 @@
           </div>
           <div class="ms-campo-row">
             <div class="ms-campo">
+              <label for="md-f-cuerpos">Nº de cuerpos</label>
+              <input type="text" id="md-f-cuerpos" data-campo="n_cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" />
+            </div>
+            <div class="ms-campo">
+              <label for="md-f-hilos">Hilos púa</label>
+              <input type="text" id="md-f-hilos" data-campo="hilos_pua" maxlength="40" placeholder="Ej. 3" inputmode="decimal" autocomplete="off" />
+            </div>
+          </div>
+          <div class="ms-campo-row">
+            <div class="ms-campo">
               <label for="md-f-pelo">Construcción</label>
               <select id="md-f-pelo" data-campo="pelo">
-                <option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option>
+                <option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option><option value="estructurado">Estructurado</option>
               </select>
             </div>
             <div class="ms-campo">
@@ -193,6 +203,12 @@
             <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="md-adj-btn">Adjuntar diseño</button>
             <span class="ms-adj-ayuda">o arrastra el fichero aquí</span>
           </div>
+          <!-- Verificación de diseño: quién la marca y cuándo lo pone el servidor -->
+          <label class="ms-check" id="md-verif-wrap" title="Marca cuando el diseño esté revisado y aprobado">
+            <input type="checkbox" id="md-verif" />
+            <span>Verificación de diseño</span>
+            <span class="ms-verif-quien" id="md-verif-quien"></span>
+          </label>
         </div>
         <div class="ms-campo" id="md-anotacion-wrap" hidden>
           <label>Anotación del registro de números</label>

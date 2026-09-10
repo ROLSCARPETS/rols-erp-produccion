@@ -547,7 +547,7 @@
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
-    ['ms-n-ref', 'ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    ['ms-n-ref', 'ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-hilos', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
     $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
@@ -586,7 +586,8 @@
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
       material: $('ms-n-material').value.trim(), pasadas: $('ms-n-pasadas').value.trim(),
-      altura_felpa: $('ms-n-altura').value.trim(), pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
+      altura_felpa: $('ms-n-altura').value.trim(), n_cuerpos: $('ms-n-cuerpos').value.trim(), hilos_pua: $('ms-n-hilos').value.trim(),
+      pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
     };
     if (tipo === 'variante') {
       const v = $('ms-n-variante').value.trim();

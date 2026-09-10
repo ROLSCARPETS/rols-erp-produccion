@@ -410,3 +410,17 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-campo .ms-adj-clase:focus, .ms-adj-clase:focus { outline: none; border-color: var(--accent); }
 .ms-campo .ms-adj-clase-sel, .ms-adj-clase-sel { width: auto; height: auto; min-height: 0; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.78rem; padding: 0.3rem 0.5rem; background: #fff; color: #2a2a2a; }
 .ms-campo .ms-adj-clase-sel:focus, .ms-adj-clase-sel:focus { outline: none; border-color: var(--accent); }
+
+/* La prioridad no pierde su color mientras se guarda (el feedback genérico
+   pinta el fondo con !important); aquí el feedback va en un anillo */
+.ms-campo select.ms-prio-sel-1.saving, .ms-campo select.ms-prio-sel-1.saved-ok { background-color: #c9302c !important; border-color: #c9302c !important; }
+.ms-campo select.ms-prio-sel-2.saving, .ms-campo select.ms-prio-sel-2.saved-ok { background-color: #2f6fd6 !important; border-color: #2f6fd6 !important; }
+.ms-campo select.ms-prio-sel-3.saving, .ms-campo select.ms-prio-sel-3.saved-ok { background-color: #d6efcf !important; border-color: #b9dcae !important; }
+.ms-campo select.ms-prio-sel.saving { box-shadow: 0 0 0 3px rgba(213,179,140,0.45); }
+.ms-campo select.ms-prio-sel.saved-ok { box-shadow: 0 0 0 3px rgba(47,107,41,0.4); }
+
+/* ---- Verificación de diseño ---- */
+.ms-campo .ms-check { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0.55rem 0 0; font-size: 0.84rem; font-weight: 600; color: #2a2a2a; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.ms-campo .ms-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: #2f6b29; cursor: pointer; }
+.ms-campo .ms-check.ok > span:first-of-type { color: #256b1f; }
+.ms-verif-quien { font-weight: 400; font-size: 0.76rem; color: #256b1f; }
