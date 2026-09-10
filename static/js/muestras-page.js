@@ -5,7 +5,8 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, esVarilla, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
-          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
+          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, esPrint, flujoDe, etiquetaEstado,
+          llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -89,7 +90,9 @@
     const r = ST.resumen;
     if (!r) return;
     const cont = $('ec-estados');
-    const slugs = ESTADOS_FLUJO.filter(s => s !== 'terminada');
+    // Todas las etapas vivas, con la de revisión de diseño (Print) en su sitio.
+    const slugs = ESTADOS.map(e => e[0])
+      .filter(s => !['terminada', 'cancelada', 'sin_seguimiento'].includes(s));
     const activos = ST.ec.estados;
     let html = `<button type="button" class="ms-chip ${activos.size ? '' : 'activo'}" data-estado="">Todos <span class="n">${fmtNum(r.en_curso)}</span></button>`;
     slugs.forEach(s => {
@@ -144,9 +147,20 @@
     pintarEnCurso();
   }
 
-  function opcionesEstado(actual) {
-    return ESTADOS.filter(e => e[0] !== 'sin_seguimiento' || e[0] === actual)
-      .map(e => `<option value="${e[0]}" ${e[0] === actual ? 'selected' : ''}>${esc(e[1])}</option>`).join('');
+  // Opciones del select de estado de una fila: el flujo que toca a SU técnica
+  // (el corto de Print o el textil), más cancelada y el estado actual. Igual
+  // que la ficha, una Print parada en una etapa textil sigue su flujo textil.
+  function opcionesEstado(m) {
+    const actual = m.estado;
+    let flujo = flujoDe(m.telar);
+    if (!flujo.includes(actual) && ESTADOS_FLUJO.includes(actual)) flujo = ESTADOS_FLUJO;
+    return ESTADOS.filter(e => {
+      const s = e[0];
+      if (s === actual) return true;
+      if (s === 'sin_seguimiento') return false;
+      if (s === 'cancelada') return true;
+      return flujo.includes(s);
+    }).map(e => `<option value="${e[0]}" ${e[0] === actual ? 'selected' : ''}>${esc(etiquetaEstado(e[0], m.telar))}</option>`).join('');
   }
 
   function ordenar(rows) {
@@ -171,7 +185,7 @@
 
   function filaEnCurso(m) {
     const ult = m.ultimo_apunte;
-    const sel = `<select class="ms-sel-estado ms-estado-${esc(m.estado)}" data-id="${esc(m.id)}" data-estado="${esc(m.estado)}" title="Cambiar el estado">${opcionesEstado(m.estado)}</select>`;
+    const sel = `<select class="ms-sel-estado ms-estado-${esc(m.estado)}" data-id="${esc(m.id)}" data-estado="${esc(m.estado)}" title="Cambiar el estado">${opcionesEstado(m)}</select>`;
     const mudo = '<span class="ms-mudo">—</span>';
     return `<tr class="ms-fila" data-id="${esc(m.id)}">
       <td>${numeroHtml(m)}</td>

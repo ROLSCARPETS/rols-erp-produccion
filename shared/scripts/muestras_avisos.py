@@ -26,8 +26,6 @@ import muestras_fabricadas as mf
 
 log = logging.getLogger("muestras.avisos")
 
-_FLUJO_ORDEN = {s: i for i, s in enumerate(mf.ESTADOS_FLUJO)}
-
 
 # ---------------------------------------------------------------------------
 # Destinatarios
@@ -145,7 +143,7 @@ def _asunto_estado(m: dict, nuevo: str) -> str:
         return f"[Muestras] {cab} · TERMINADA" + (f" (lista el {_fmt_fecha(m.get('fecha_lista'))})" if m.get("fecha_lista") else "")
     if nuevo == "cancelada":
         return f"[Muestras] {cab} · CANCELADA"
-    return f"[Muestras] {cab} · ahora en {mf.ESTADOS_LABEL.get(nuevo, nuevo)}"
+    return f"[Muestras] {cab} · ahora en {mf.etiqueta_estado(nuevo, m.get('telar'))}"
 
 
 # ---------------------------------------------------------------------------
@@ -176,8 +174,8 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
     if not email:
         mf.registrar_aviso(mid, motivo, dest_u, False, "sin e-mail conocido para el usuario")
         return {"enviado": False, "motivo": "sin e-mail"}
-    de_lbl = mf.ESTADOS_LABEL.get(anterior, anterior or "—")
-    a_lbl = mf.ESTADOS_LABEL.get(nuevo, nuevo)
+    de_lbl = mf.etiqueta_estado(anterior, m.get("telar")) if anterior else "—"
+    a_lbl = mf.etiqueta_estado(nuevo, m.get("telar"))
     if nuevo == "terminada":
         titulo = f"La muestra {_cabecera(m)} está terminada"
         lineas = [f"Lista el {_fmt_fecha(m.get('fecha_lista'))}." if m.get("fecha_lista") else "Marcada como terminada."]
@@ -185,7 +183,7 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
         titulo = f"La muestra {_cabecera(m)} se ha cancelado"
         lineas = ["Pasa al histórico como cancelada."]
     else:
-        retro = _FLUJO_ORDEN.get(nuevo, 99) < _FLUJO_ORDEN.get(anterior, -1)
+        retro = mf.es_retroceso(anterior, nuevo, m.get("telar"))
         titulo = f"La muestra {_cabecera(m)} {'vuelve a' if retro else 'pasa a'} {a_lbl}"
         lineas = [f"Etapa anterior: {de_lbl}."]
     lineas.append(f"Cambio hecho por {actor_n} el {datetime.now().strftime('%d/%m/%Y %H:%M')}.")
@@ -228,7 +226,7 @@ def aviso_nueva_muestra(mid: str, actor, directorio, base_url: str) -> dict:
         lineas.append(f"Encargada por {m['encargada_por']}.")
     if m.get("sufijo") and m.get("numero") is not None:
         lineas.append(f"Es variante de M-{m['numero']}.")
-    lineas.append(f"Estado inicial: {mf.ESTADOS_LABEL.get(m.get('estado') or '', '—')}.")
+    lineas.append(f"Estado inicial: {mf.etiqueta_estado(m.get('estado'), m.get('telar'))}.")
     texto, html = _render(titulo, lineas, m, base_url, "",
                           pie="Aviso automático de alta de muestra: llega al laboratorio y a quien la ha creado.")
     ok, err = correo.enviar(destinos, asunto, texto, html)
@@ -266,7 +264,7 @@ def chequear_hitos(directorio, base_url: str, hoy: str | None = None) -> dict:
         titulo = (f"Hoy toca el hito de {_cabecera(m)}" if not tarde
                   else f"El hito de {_cabecera(m)} previsto para el {_fmt_fecha(fecha)} ha llegado")
         lineas = [f"Previsto: {que}" if que else "Fecha de próximo hito alcanzada.",
-                  f"Estado actual: {mf.ESTADOS_LABEL.get(m.get('estado') or '', '—')}."]
+                  f"Estado actual: {mf.etiqueta_estado(m.get('estado'), m.get('telar'))}."]
         asunto = f"[Muestras] {_cabecera(m)} · hito {_fmt_fecha(fecha)}" + (f": {mf._recortar(que, 60)}" if que else "")
         texto, html = _render(titulo, lineas, m, base_url, nombre)
         ok, err = correo.enviar(email, asunto, texto, html)

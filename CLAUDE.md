@@ -54,7 +54,13 @@ laboratorio pueda llevar las muestras sin ver costes.
 - **Estados** (slugs estables): por_empezar → en_diseno → en_hilatura →
   en_tintoreria → bobinando → esperando_telar → en_telar → en_aprestos →
   terminada; además cancelada y `sin_seguimiento` (solo histórico del
-  registro antiguo, no seleccionable).
+  registro antiguo, no seleccionable). Las muestras de **Print** llevan su
+  flujo corto (`FLUJO_PRINT`): por_empezar («Listo para empezar diseño») →
+  en_diseno → `revision_diseno` («Listo para revisión diseño», etapa solo de
+  Print, rechazada en backend para otras técnicas) → terminada;
+  `etiqueta_estado(estado, telar)` / `MS.etiquetaEstado` dan el label que
+  toca y `flujo_de`/`MS.flujoDe` el flujo (una Print histórica parada en una
+  etapa textil se sigue pintando con el flujo completo).
 - `archivada` = fuera de "En curso" sin estar terminada (lo que en el Excel
   era mover la fila a la hoja de terminadas).
 - `fecha_estimada` = "Fecha estimada muestra lista": previsión que mantiene

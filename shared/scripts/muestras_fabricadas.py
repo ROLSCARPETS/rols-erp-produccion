@@ -71,6 +71,7 @@ _KEY = "muestras_fabricadas"
 ESTADOS: tuple[tuple[str, str], ...] = (
     ("por_empezar",      "Por empezar"),
     ("en_diseno",        "En diseño"),
+    ("revision_diseno",  "Listo para revisión diseño"),   # solo muestras de Print
     ("en_hilatura",      "En hilatura"),
     ("en_tintoreria",    "En tintorería"),
     ("bobinando",        "Bobinando"),
@@ -82,10 +83,50 @@ ESTADOS: tuple[tuple[str, str], ...] = (
     ("sin_seguimiento",  "Sin seguimiento"),
 )
 ESTADOS_LABEL = dict(ESTADOS)
-ESTADOS_FLUJO = tuple(s for s, _ in ESTADOS[:9])          # por_empezar … terminada
+# Flujo textil completo (todas las tecnicas salvo Print).
+ESTADOS_FLUJO = ("por_empezar", "en_diseno", "en_hilatura", "en_tintoreria",
+                 "bobinando", "esperando_telar", "en_telar", "en_aprestos",
+                 "terminada")
 ESTADOS_TERMINALES = {"terminada", "cancelada", "sin_seguimiento"}
-ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS[:10])  # todos menos sin_seguimiento
+ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS if s != "sin_seguimiento")
 _FLUJO_IDX = {s: i for i, s in enumerate(ESTADOS_FLUJO)}
+
+# Las muestras de PRINT no pasan por fabrica: su flujo es solo el del diseno
+# (y "por_empezar" se lee "Listo para empezar diseño"). El slug de cada etapa
+# sigue siendo unico y estable; cambia que etapas se recorren y una etiqueta.
+FLUJO_PRINT = ("por_empezar", "en_diseno", "revision_diseno", "terminada")
+ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
+_FLUJO_IDX_PRINT = {s: i for i, s in enumerate(FLUJO_PRINT)}
+
+
+def es_print(telar) -> bool:
+    """La tecnica Print (solo diseno) lleva su propio flujo de etapas."""
+    return normalizar_telar(telar) == "Print"
+
+
+def flujo_de(telar) -> tuple[str, ...]:
+    return FLUJO_PRINT if es_print(telar) else ESTADOS_FLUJO
+
+
+def etiqueta_estado(estado, telar=None) -> str:
+    """Label del estado; con telar Print, la etiqueta propia de ese flujo."""
+    s = estado or ""
+    if telar is not None and es_print(telar):
+        propio = ETIQUETAS_PRINT.get(s)
+        if propio:
+            return propio
+    return ESTADOS_LABEL.get(s, s or "—")
+
+
+def es_retroceso(anterior, nuevo, telar=None) -> bool:
+    """True si el cambio de etapa va hacia atras DENTRO del flujo que toca
+    (el de Print o el textil); entre flujos distintos no hay orden."""
+    idx = _FLUJO_IDX
+    if telar is not None and es_print(telar) \
+            and anterior in _FLUJO_IDX_PRINT and nuevo in _FLUJO_IDX_PRINT:
+        idx = _FLUJO_IDX_PRINT
+    ia, ib = idx.get(anterior), idx.get(nuevo)
+    return ia is not None and ib is not None and ib < ia
 
 PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 
@@ -410,6 +451,8 @@ def normalizar_numero(raw) -> tuple[str | None, int | None, str]:
 
 _ESTADO_POR_CLAVE = {
     "por empezar": "por_empezar",
+    "listo para empezar diseno": "por_empezar",       # etiqueta del flujo Print
+    "listo para revision diseno": "revision_diseno",  # etiqueta del flujo Print
     "en diseno": "en_diseno",
     "diseno": "en_diseno",
     "print": "en_diseno",
@@ -626,6 +669,7 @@ def _texto_buscable(m: dict) -> str:
               m.get("anotacion_registro"), m.get("resultado"),
               m.get("encargada_por"), m.get("telar"), m.get("material"),
               ESTADOS_LABEL.get(m.get("estado") or "", ""),
+              etiqueta_estado(m.get("estado"), m.get("telar")),
               "interna" if m.get("tipo") == "interna" else ""]
     partes += [a.get("texto") for a in (m.get("apuntes") or [])]
     return _clave(" ".join(p for p in partes if p))
@@ -648,7 +692,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "encargada_por_usuario": m.get("encargada_por_usuario"),
         "prioridad": m.get("prioridad"),
         "telar": m.get("telar") or "", "estado": estado,
-        "estado_label": ESTADOS_LABEL.get(estado, estado or "—"),
+        "estado_label": etiqueta_estado(estado, m.get("telar")),
         "fecha_lista": m.get("fecha_lista"), "archivada": bool(m.get("archivada")),
         "fecha_estimada": m.get("fecha_estimada"),
         "proximo_hito_fecha": m.get("proximo_hito_fecha"),
@@ -743,7 +787,7 @@ def obtener(mid: str) -> dict | None:
     out = dict(m)
     out["tipo"] = out.get("tipo") or "cliente"
     out["referencia"] = out.get("referencia") or ""
-    out["estado_label"] = ESTADOS_LABEL.get(out.get("estado") or "", out.get("estado") or "—")
+    out["estado_label"] = etiqueta_estado(out.get("estado"), out.get("telar"))
     out["prioridad_label"] = PRIORIDADES.get(out.get("prioridad") or 0, "")
     out["activa"] = es_activa(m)
     out["en_curso"] = en_curso(m)
@@ -760,7 +804,7 @@ def obtener(mid: str) -> dict | None:
     out["adjuntos"] = _adjuntos_publicos(m.get("adjuntos") or [])
     out["variantes"] = [
         {"id": v.get("id"), "sufijo": v.get("sufijo") or "", "estado": v.get("estado"),
-         "estado_label": ESTADOS_LABEL.get(v.get("estado") or "", "—"),
+         "estado_label": etiqueta_estado(v.get("estado"), v.get("telar")),
          "cliente": v.get("cliente") or "", "fecha_solicitud": v.get("fecha_solicitud"),
          "referencia": v.get("referencia") or "",
          "descripcion": _recortar(v.get("descripcion"), 120)}
@@ -1113,6 +1157,8 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         telar = normalizar_telar(datos.get("telar"), data["catalogos"].get("telares"))
         if len(telar) > 60:
             return None, "telar demasiado largo"
+        if estado == "revision_diseno" and not es_print(telar):
+            return None, "«Listo para revisión diseño» es una etapa solo de las muestras de Print"
         persona, persona_usuario, err = _resolver_persona(
             persona_raw, _personas_conocidas(data, usuarios_one, usuario_actual))
         if err:
@@ -1235,6 +1281,12 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v = normalizar_telar(v, data["catalogos"].get("telares"))
                 if len(v) > 60:
                     return None, "telar demasiado largo"
+                if m.get("estado") == "revision_diseno" and not es_print(v):
+                    # Etapa exclusiva de Print: sacarla de Print la dejaria
+                    # varada en un estado que el resto del backend prohibe.
+                    return None, ("la muestra está en «Listo para revisión diseño» "
+                                  "(etapa de Print): cámbiala antes de etapa para "
+                                  "pasarla a otra técnica")
                 _anadir_a_catalogo(data, "telares", v)
             elif k == "encargada_por":
                 v, v_usuario, err = _resolver_persona(
@@ -1280,6 +1332,10 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
         if not m:
             return None, f"la muestra {mid!r} no existe"
         anterior = m.get("estado") or ""
+        # Guard de ENTRADA: quedarse donde ya está (p.ej. para apuntar una
+        # nota) siempre se permite; lo que se veta es mover una no-Print aquí.
+        if slug == "revision_diseno" and anterior != slug and not es_print(m.get("telar")):
+            return None, "«Listo para revisión diseño» es una etapa solo de las muestras de Print"
         if anterior != slug:
             m["estado"] = slug
             if slug == "terminada":
@@ -1296,7 +1352,7 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
             # El cambio de etapa se apunta tambien en el diario del laboratorio
             m.setdefault("apuntes", []).append(
                 {"id": _nuevo_id_apunte(), "fecha": fecha,
-                 "texto": _texto_cambio_estado(anterior, slug, nota),
+                 "texto": _texto_cambio_estado(anterior, slug, nota, telar=m.get("telar")),
                  "tipo": "estado", "estado_de": anterior, "estado": slug,
                  "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
         elif nota:
@@ -1308,9 +1364,9 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
         return obtener(mid), ""
 
 
-def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "") -> str:
+def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "", telar=None) -> str:
     """Frase del apunte automatico del diario al cambiar de etapa."""
-    a = ESTADOS_LABEL.get(nuevo, nuevo)
+    a = etiqueta_estado(nuevo, telar)
     if nuevo == "terminada":
         frase = "Muestra terminada."
     elif nuevo == "cancelada":
@@ -1318,8 +1374,7 @@ def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "") -> str:
     elif anterior in ESTADOS_TERMINALES:
         frase = f"Se reabre la muestra: vuelve a «{a}»."
     else:
-        ia, ib = _FLUJO_IDX.get(anterior), _FLUJO_IDX.get(nuevo)
-        frase = f"Vuelve a «{a}»." if (ia is not None and ib is not None and ib < ia) else f"Pasa a «{a}»."
+        frase = f"Vuelve a «{a}»." if es_retroceso(anterior, nuevo, telar) else f"Pasa a «{a}»."
     return f"{frase} {nota.strip()}" if nota and nota.strip() else frase
 
 

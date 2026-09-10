@@ -6,7 +6,8 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla, estadoPill, prioPill, tipoTag, colorearPrio, api,
-          ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
+          ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, flujoDe, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
+          gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -146,11 +147,26 @@
   // ------------------------------------------------------------
   // Stepper de estado
   // ------------------------------------------------------------
+  // Flujo de etapas de ESTA muestra: el corto de Print o el textil completo.
+  // Si la etapa actual no está en el flujo de su técnica (una Print histórica
+  // parada en etapa textil, o datos que quedaron en revisión de diseño con
+  // otro telar), se enseña el flujo que SÍ contiene esa etapa.
+  function flujoActual() {
+    const flujo = flujoDe(M.telar);
+    if (!flujo.includes(M.estado)) {
+      if (ESTADOS_FLUJO.includes(M.estado)) return ESTADOS_FLUJO;
+      if (FLUJO_PRINT.includes(M.estado)) return FLUJO_PRINT;
+    }
+    return flujo;
+  }
+  const etiqueta = (s) => etiquetaEstado(s, M.telar);
+
   function pintarStepper() {
-    const idx = ESTADOS_FLUJO.indexOf(M.estado);
-    $('md-stepper').innerHTML = ESTADOS_FLUJO.map((s, i) => {
+    const flujo = flujoActual();
+    const idx = flujo.indexOf(M.estado);
+    $('md-stepper').innerHTML = flujo.map((s, i) => {
       const cls = i === idx ? 'actual' : (idx >= 0 && i < idx ? 'hecho' : '');
-      return `<div class="ms-step ${cls}" data-estado="${s}" title="${i === idx ? 'Estado actual' : 'Pasar a: ' + esc(ESTADOS_LABEL[s])}"><div class="dot"></div>${esc(ESTADOS_LABEL[s])}</div>`;
+      return `<div class="ms-step ${cls}" data-estado="${s}" title="${i === idx ? 'Estado actual' : 'Pasar a: ' + esc(etiqueta(s))}"><div class="dot"></div>${esc(etiqueta(s))}</div>`;
     }).join('');
     let txt, acciones = '';
     if (M.estado === 'cancelada') {
@@ -175,7 +191,8 @@
     const nuevo = st.dataset.estado;
     if (nuevo === M.estado) return;
     let nota = '';
-    const idxNuevo = ESTADOS_FLUJO.indexOf(nuevo), idxAct = ESTADOS_FLUJO.indexOf(M.estado);
+    const flujo = flujoActual();
+    const idxNuevo = flujo.indexOf(nuevo), idxAct = flujo.indexOf(M.estado);
     if (nuevo === 'terminada') {
       const r = await window.mostrarConfirmacion({
         titulo: `Marcar M-${M.id} como terminada`,
@@ -186,9 +203,9 @@
       nota = r.motivo || '';
     } else if (TERMINALES.includes(M.estado) || (idxAct >= 0 && idxNuevo < idxAct)) {
       const r = await window.mostrarConfirmacion({
-        titulo: TERMINALES.includes(M.estado) ? `Reabrir M-${M.id}` : `Volver a «${ESTADOS_LABEL[nuevo]}»`,
+        titulo: TERMINALES.includes(M.estado) ? `Reabrir M-${M.id}` : `Volver a «${etiqueta(nuevo)}»`,
         mensaje: TERMINALES.includes(M.estado)
-          ? `La muestra vuelve al seguimiento en «${ESTADOS_LABEL[nuevo]}»${M.estado === 'terminada' ? ' y se borra su fecha de muestra lista' : ''}.`
+          ? `La muestra vuelve al seguimiento en «${etiqueta(nuevo)}»${M.estado === 'terminada' ? ' y se borra su fecha de muestra lista' : ''}.`
           : 'Retrocede una etapa. Si quieres, deja un apunte con el porqué.',
         textoConfirmar: 'Continuar', conMotivo: true, placeholderMotivo: 'Apunte para el diario (opcional)',
       });
@@ -591,6 +608,8 @@
   function textoHistorial(h) {
     const t = h.tipo;
     if (t === 'creacion') return h.texto || 'Alta de la muestra';
+    // Etiquetas GENÉRICAS a propósito: el historial es pasado y el telar de
+    // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
       const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', pelo: 'Construcción', acabado: 'Acabado' };

@@ -5,13 +5,24 @@
   'use strict';
 
   const ESTADOS = [
-    ['por_empezar', 'Por empezar'], ['en_diseno', 'En diseño'], ['en_hilatura', 'En hilatura'],
+    ['por_empezar', 'Por empezar'], ['en_diseno', 'En diseño'],
+    ['revision_diseno', 'Listo para revisión diseño'],   // solo muestras de Print
+    ['en_hilatura', 'En hilatura'],
     ['en_tintoreria', 'En tintorería'], ['bobinando', 'Bobinando'], ['esperando_telar', 'Esperando a telar'],
     ['en_telar', 'En telar'], ['en_aprestos', 'En aprestos'], ['terminada', 'Terminada'],
     ['cancelada', 'Cancelada'], ['sin_seguimiento', 'Sin seguimiento'],
   ];
   const ESTADOS_LABEL = Object.fromEntries(ESTADOS);
-  const ESTADOS_FLUJO = ESTADOS.slice(0, 9).map(e => e[0]);
+  // Flujo textil completo; las muestras de Print (solo diseño) llevan el suyo,
+  // más corto, y su "por_empezar" se lee "Listo para empezar diseño".
+  const ESTADOS_FLUJO = ['por_empezar', 'en_diseno', 'en_hilatura', 'en_tintoreria',
+    'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
+  const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
+  const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
+  const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';
+  const flujoDe = (telar) => esPrint(telar) ? FLUJO_PRINT : ESTADOS_FLUJO;
+  const etiquetaEstado = (slug, telar) =>
+    (esPrint(telar) && ETIQUETAS_PRINT[slug]) || ESTADOS_LABEL[slug] || slug || '—';
   const PRIO_LABEL = { 1: 'Alta', 2: 'Media', 3: 'Baja' };
 
   function esc(s) {
@@ -261,6 +272,7 @@
     }
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, esPrint, flujoDe, etiquetaEstado,
+    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente };
 })();
