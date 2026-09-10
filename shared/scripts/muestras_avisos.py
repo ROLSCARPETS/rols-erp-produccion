@@ -33,6 +33,10 @@ log = logging.getLogger("muestras.avisos")
 
 # Buzon del laboratorio: recibe el resumen de cada muestra nueva.
 LAB_EMAIL_DEFECTO = "laboratorio@rolscarpets.com"
+# Hitos clave: al llegar a ellos se avisa SIEMPRE a quien encargo la muestra,
+# aunque el cambio lo haga esa misma persona (en el resto de etapas no se
+# avisa a quien hace el cambio).
+HITOS_CLAVE = ("revision_diseno", "terminada")
 PIE_DEFECTO = ("Aviso automático a quien encargó la muestra. Se envía al cambiar de etapa, "
                "al terminar o cancelar, y el día del próximo hito.")
 
@@ -143,6 +147,8 @@ def _asunto_estado(m: dict, nuevo: str) -> str:
         return f"[Muestras] {cab} · TERMINADA" + (f" (lista el {_fmt_fecha(m.get('fecha_lista'))})" if m.get("fecha_lista") else "")
     if nuevo == "cancelada":
         return f"[Muestras] {cab} · CANCELADA"
+    if nuevo == "revision_diseno":
+        return f"[Muestras] {cab} · DISEÑO LISTO PARA TU REVISIÓN"
     return f"[Muestras] {cab} · ahora en {mf.etiqueta_estado(nuevo, m.get('telar'))}"
 
 
@@ -153,7 +159,9 @@ def _asunto_estado(m: dict, nuevo: str) -> str:
 def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
                         directorio, base_url: str) -> dict:
     """Avisa a quien encargo la muestra de que ha cambiado de etapa (o se ha
-    terminado/cancelado). Devuelve {"enviado": bool, "motivo": str}."""
+    terminado/cancelado). No se avisa a quien hace el cambio, salvo en los
+    HITOS_CLAVE (listo para revision de diseno, terminada), que avisan
+    siempre. Devuelve {"enviado": bool, "motivo": str}."""
     if anterior == nuevo:
         return {"enviado": False, "motivo": "sin cambio"}
     if not correo.configurado():
@@ -166,11 +174,13 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
     dest_u = (m.get("encargada_por_usuario") or "").strip().lower()
     if not dest_u:
         return {"enviado": False, "motivo": "la muestra no tiene usuario que la encargue"}
-    if dest_u == str(actor_u).strip().lower():
+    clave = nuevo in HITOS_CLAVE
+    if dest_u == str(actor_u).strip().lower() and not clave:
         return {"enviado": False, "motivo": "el cambio lo hace quien la encargó"}
     email, nombre = email_de_usuario(dest_u, directorio)
     nombre = nombre or m.get("encargada_por") or dest_u
-    motivo = "terminada" if nuevo == "terminada" else ("cancelada" if nuevo == "cancelada" else "estado")
+    motivo = ("terminada" if nuevo == "terminada" else "cancelada" if nuevo == "cancelada"
+              else "revision_diseno" if nuevo == "revision_diseno" else "estado")
     if not email:
         mf.registrar_aviso(mid, motivo, dest_u, False, "sin e-mail conocido para el usuario")
         return {"enviado": False, "motivo": "sin e-mail"}
@@ -182,6 +192,10 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
     elif nuevo == "cancelada":
         titulo = f"La muestra {_cabecera(m)} se ha cancelado"
         lineas = ["Pasa al histórico como cancelada."]
+    elif nuevo == "revision_diseno":
+        titulo = f"El diseño de {_cabecera(m)} está listo para tu revisión"
+        lineas = ["Entra en la ficha, revisa el diseño adjunto y, si está bien, marca «Verificación de diseño». "
+                  "Si hay cambios, déjalos en el diario del laboratorio."]
     else:
         retro = mf.es_retroceso(anterior, nuevo, m.get("telar"))
         titulo = f"La muestra {_cabecera(m)} {'vuelve a' if retro else 'pasa a'} {a_lbl}"

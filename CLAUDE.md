@@ -114,7 +114,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   terminada/cancelada lo limpian.
 - **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
-  del próximo hito (`hito_avisado` evita repetir); y al **crear** una muestra,
+  del próximo hito (`hito_avisado` evita repetir). No se avisa a quien hace el
+  cambio, salvo en los `HITOS_CLAVE` («Listo para revisión diseño», que pide
+  marcar la Verificación de diseño, y «Terminada»), que avisan siempre; y al **crear** una muestra,
   resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`) y a
   quien la crea (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
