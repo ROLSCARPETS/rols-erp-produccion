@@ -158,7 +158,7 @@
           </div>
           <div class="ms-campo-row">
             <div class="ms-campo">
-              <label for="md-f-pelo">Pelo</label>
+              <label for="md-f-pelo">Construcción</label>
               <select id="md-f-pelo" data-campo="pelo">
                 <option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option>
               </select>
@@ -170,25 +170,6 @@
               </select>
             </div>
           </div>
-        </div>
-        <div class="ms-campo-row">
-          <div class="ms-campo">
-            <label for="md-f-estimada" title="Previsión: cuándo se espera tener la muestra lista">Fecha estimada muestra lista</label>
-            <input type="date" id="md-f-estimada" data-campo="fecha_estimada" />
-          </div>
-          <!-- En curso: próximo hito. Terminada/cancelada: la fecha real de lista -->
-          <div class="ms-campo" id="md-f-hito-fecha-wrap">
-            <label for="md-f-hito-fecha" title="Fecha del siguiente paso previsto, para que comercial y laboratorio sepan cuándo mirar">Próximo hito</label>
-            <input type="date" id="md-f-hito-fecha" data-campo="proximo_hito_fecha" />
-          </div>
-          <div class="ms-campo" id="md-f-lista-wrap" hidden>
-            <label for="md-f-lista" title="Fecha real en que la muestra estuvo lista (la fija 'Terminada')">Muestra lista el (fecha real)</label>
-            <input type="date" id="md-f-lista" data-campo="fecha_lista" />
-          </div>
-        </div>
-        <div class="ms-campo" id="md-f-hito-wrap">
-          <label for="md-f-hito">Qué se espera en el hito</label>
-          <input type="text" id="md-f-hito" data-campo="proximo_hito" maxlength="200" placeholder="Ej. llegan los colores de tintorería · entra a telar…" autocomplete="off" />
         </div>
         <div class="ms-campo">
           <label for="md-f-ref">Referencia muestra <span class="ms-hint">resumen corto: es lo que sale en el listado</span></label>
@@ -219,8 +200,32 @@
         <div class="ms-origen" id="md-origen"></div>
       </section>
 
-      <!-- ===== Columna derecha: diario, variantes, historial ===== -->
+      <!-- ===== Columna derecha: seguimiento, diario, variantes, historial ===== -->
       <div>
+        <!-- Seguimiento: fechas para que comercial y laboratorio sepan cuándo mirar
+             (mismos ids y data-campo que antes: el autoguardado es el mismo) -->
+        <section class="ms-section ms-seguimiento">
+          <div class="ms-section-title"><span>Seguimiento</span><span class="ms-hint">fechas para que comercial y laboratorio sepan cuándo mirar · se guardan solas</span></div>
+          <div class="ms-seg-grid">
+            <div class="ms-campo">
+              <label for="md-f-estimada" title="Previsión: cuándo se espera tener la muestra lista">Fecha estimada muestra lista</label>
+              <input type="date" id="md-f-estimada" data-campo="fecha_estimada" />
+            </div>
+            <!-- En curso: próximo hito. Terminada/cancelada: la fecha real de lista -->
+            <div class="ms-campo" id="md-f-hito-fecha-wrap">
+              <label for="md-f-hito-fecha" title="Fecha del siguiente paso previsto">Próximo hito</label>
+              <input type="date" id="md-f-hito-fecha" data-campo="proximo_hito_fecha" />
+            </div>
+            <div class="ms-campo" id="md-f-lista-wrap" hidden>
+              <label for="md-f-lista" title="Fecha real en que la muestra estuvo lista (la fija 'Terminada')">Muestra lista el (fecha real)</label>
+              <input type="date" id="md-f-lista" data-campo="fecha_lista" />
+            </div>
+            <div class="ms-campo ms-seg-hito" id="md-f-hito-wrap">
+              <label for="md-f-hito">Qué se espera en el hito</label>
+              <input type="text" id="md-f-hito" data-campo="proximo_hito" maxlength="200" placeholder="Ej. llegan los colores de tintorería · entra a telar…" autocomplete="off" />
+            </div>
+          </div>
+        </section>
         <section class="ms-section">
           <div class="ms-section-title">
             <span>Diario del laboratorio</span>

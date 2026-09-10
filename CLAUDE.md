@@ -67,7 +67,7 @@ laboratorio pueda llevar las muestras sin ver costes.
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
 - **Datos técnicos** (solo con telar **Varilla**): `material`, `pasadas`,
-  `altura_felpa` (texto corto), `pelo` (corte | bucle | corte_bucle) y
+  `altura_felpa` (texto corto), `pelo` (etiqueta "Construcción": corte | bucle | corte_bucle) y
   `acabado` (latex | sin_aprestar). Van planos en la muestra; la ficha y el
   alta los enseñan solo si el telar es de varilla (si cambia, se conservan).
   `resumen_tecnico()` los junta para el hero y los correos.

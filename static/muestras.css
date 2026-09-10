@@ -272,6 +272,11 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-link.danger { color: #c25656; }
 
 .ms-grid2 { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 1rem; align-items: start; }
+/* Tarjeta de seguimiento (columna derecha, encima del diario): fechas en una fila */
+.ms-seguimiento { padding-bottom: 0.9rem; }
+.ms-seg-grid { display: grid; grid-template-columns: 210px 210px minmax(240px, 1fr); gap: 0.6rem 0.9rem; align-items: end; }
+.ms-seg-grid > .ms-campo { min-width: 0; margin-bottom: 0; }
+@media (max-width: 1400px) { .ms-seg-grid { grid-template-columns: 1fr 1fr; } .ms-seg-grid > .ms-seg-hito { grid-column: 1 / -1; } }
 @media (max-width: 1100px) { .ms-grid2 { grid-template-columns: 1fr; } }
 .ms-campo { margin-bottom: 0.7rem; }
 .ms-campo label { display: block; font-size: 0.7rem; font-weight: 600; color: #6b6b6b; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
