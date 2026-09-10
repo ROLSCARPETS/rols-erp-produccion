@@ -291,7 +291,8 @@
     let filas = [];
     root.classList.add('ms-materias');
     root.innerHTML =
-      '<div class="ms-materias-cab"><span>Nº de cuerpo</span><span>Materia</span><span>Hilos púa</span><span>Colorido</span><span></span></div>' +
+      // "Cuerpo" a secas: "Nº de cuerpo" no cabe en la columna (va en el título del campo)
+      '<div class="ms-materias-cab"><span title="Nº de cuerpo">Cuerpo</span><span>Materia</span><span>Hilos púa</span><span>Colorido</span><span></span></div>' +
       '<div class="ms-materias-filas"></div>' +
       '<div class="ms-materias-pie"><button type="button" class="ms-link ms-materias-add">+ Añadir materia</button>' +
       '<span class="ms-materias-hint"></span></div>';
