@@ -398,9 +398,9 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-adj-meta { font-size: 0.68rem; color: #9a9a9a; margin-top: 0.1rem; }
 .ms-adj-acciones { display: flex; gap: 0.2rem; }
 .ms-adj-acciones .ms-ico-btn { text-decoration: none; }
-.ms-adj-zona { display: flex; align-items: center; gap: 0.6rem; border: 1px dashed var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: #faf8f5; transition: border-color 0.12s, background 0.12s; }
+.ms-adj-zona { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.6rem; border: 1px dashed var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: #faf8f5; transition: border-color 0.12s, background 0.12s; }
 .ms-adj-zona.over { border-color: var(--accent); background: #fff8e1; }
-.ms-adj-ayuda { font-size: 0.74rem; color: #9a9a9a; }
+.ms-adj-ayuda { font-size: 0.74rem; color: #9a9a9a; flex: 1 1 100%; }
 
 /* ---- Etiqueta de cada adjunto (versión / diseño final / otro) ---- */
 .ms-adj-linea { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; min-width: 0; }
