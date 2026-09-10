@@ -186,10 +186,19 @@
     function pintar(nav, usados, q, disponible) {
       items = [];
       let html = '';
+      const qk = q.toLowerCase();
       nav.forEach(c => {
-        items.push({ nombre: c.nombre, no: c.no, ciudad: c.ciudad || '' });
+        items.push({ nombre: c.nombre, no: c.no, ciudad: c.ciudad || '', alias: c.alias || '' });
+        const alias = (c.alias && c.alias.toLowerCase() !== c.nombre.toLowerCase()) ? c.alias : '';
+        // Si el texto no está en el nombre ni en el código, enseñamos por qué
+        // ha salido (alias o e-mail de facturación) para que no parezca un error.
+        const porEmail = c.email && c.email.toLowerCase().includes(qk) && !c.nombre.toLowerCase().includes(qk) && !(c.no || '').toLowerCase().includes(qk);
+        const partes = [esc(c.no || '')];
+        if (alias) partes.push(`alias <b>${esc(alias)}</b>`);
+        if (c.ciudad) partes.push(esc(c.ciudad));
+        if (porEmail) partes.push(`e-mail ${esc(c.email)}`);
         html += `<div class="ms-sug-it" data-i="${items.length - 1}"><span class="ms-sug-tag">Navision</span>` +
-                `<span class="ms-sug-nom">${esc(c.nombre)}</span><span class="ms-sug-sub">${esc(c.no || '')}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.alias && c.alias.toLowerCase() !== c.nombre.toLowerCase() ? ' · ' + esc(c.alias) : ''}</span></div>`;
+                `<span class="ms-sug-nom">${esc(c.nombre)}${alias ? ` <span class="ms-sug-alias">${esc(alias)}</span>` : ''}</span><span class="ms-sug-sub">${partes.join(' · ')}</span></div>`;
       });
       usados.forEach(n => {
         items.push({ nombre: n, no: null, ciudad: '' });

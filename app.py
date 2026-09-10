@@ -1949,6 +1949,7 @@ def _clientes_navision(q: str) -> tuple[list, bool]:
                         continue
                     out.append({"no": c.get("customer_no"), "nombre": nombre,
                                 "alias": (c.get("alias") or "").strip(),
+                                "email": (c.get("email") or "").strip(),
                                 "ciudad": (c.get("city") or "").strip(),
                                 "pais": (c.get("country_code") or "").strip()})
                 if len(_CLIENTES_NAV_CACHE) > 500:

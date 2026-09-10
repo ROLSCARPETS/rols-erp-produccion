@@ -154,6 +154,8 @@ tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 .ms-sug-tag.usado { background: #f1ece4; color: #6b5323; }
 .ms-sug-nom { font-size: 0.86rem; color: #2a2a2a; font-weight: 500; }
 .ms-sug-sub { font-size: 0.72rem; color: #8a857d; font-variant-numeric: tabular-nums; }
+.ms-sug-sub b { color: #4d4d4d; font-weight: 600; }
+.ms-sug-alias { display: inline-block; margin-left: 0.4rem; font-size: 0.7rem; font-weight: 600; color: #6b5323; background: #f1ece4; border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 1px; }
 .ms-sug-pie { font-size: 0.7rem; color: #9a9a9a; padding: 0.4rem 0.55rem 0.25rem; border-top: 1px solid #f2ede6; margin-top: 0.15rem; }
 /* Vínculo con la ficha de Navision (debajo del campo cliente) */
 .ms-nav-link { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.3rem; font-size: 0.72rem; color: #4d4d4d; }
@@ -206,6 +208,8 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-col:hover { filter: brightness(0.86); }
 .ms-col .val { position: absolute; z-index: 3; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 0.74rem; font-weight: 700; color: #2a2a2a; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
 .ms-col.cero .val { color: #b5b0a8; font-weight: 500; }
+.ms-col.prev .val { color: #5a6b85; font-weight: 600; }
+.ms-col.prev.cero .val { color: #b5b0a8; font-weight: 500; }
 .ms-chart-x { grid-column: 2; display: grid; grid-template-columns: repeat(12, 1fr); margin-top: 0.4rem; }
 .ms-chart-x span { text-align: center; font-size: 0.7rem; color: #8a857d; }
 .ms-chart-x span.actual { color: #2a2a2a; font-weight: 700; }

@@ -412,7 +412,7 @@
       const futuro = i > mesHoy;
       const tPrev = `${MESES_LARGO[i]} ${prev}: ${fmtNum(p)} solicitud${p === 1 ? '' : 'es'}`;
       const tAct = `${MESES_LARGO[i]} ${actual}: ${fmtNum(a)} solicitud${a === 1 ? '' : 'es'}`;
-      const barPrev = `<div class="ms-col prev ${p ? '' : 'cero'}" style="height:${pct(p)}%" title="${esc(tPrev)}"></div>`;
+      const barPrev = `<div class="ms-col prev ${p ? '' : 'cero'}" style="height:${pct(p)}%" title="${esc(tPrev)}"><span class="val">${fmtNum(p)}</span></div>`;
       const barAct = futuro ? '' : `<div class="ms-col act ${a ? '' : 'cero'}" style="height:${pct(a)}%" title="${esc(tAct)}"><span class="val">${fmtNum(a)}</span></div>`;
       return `<div class="ms-mes ${i === mesHoy ? 'actual' : ''}">${barPrev}${barAct}</div>`;
     }).join('');
