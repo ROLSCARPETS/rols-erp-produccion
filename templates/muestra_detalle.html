@@ -137,6 +137,39 @@
             <input type="date" id="md-f-fecha" data-campo="fecha_solicitud" />
           </div>
         </div>
+        <!-- Datos técnicos: solo cuando el telar es de varilla -->
+        <div class="ms-tecnica" id="md-tecnica" hidden>
+          <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
+          <div class="ms-campo">
+            <label for="md-f-material">Material</label>
+            <input type="text" id="md-f-material" data-campo="material" maxlength="200" placeholder="Ej. Lana 100 3/c CREMA + Lana 100 5/c CARAMEL" autocomplete="off" list="md-materiales" />
+            <datalist id="md-materiales"></datalist>
+          </div>
+          <div class="ms-campo-row">
+            <div class="ms-campo">
+              <label for="md-f-pasadas">Pasadas</label>
+              <input type="text" id="md-f-pasadas" data-campo="pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" />
+            </div>
+            <div class="ms-campo">
+              <label for="md-f-altura">Altura felpa</label>
+              <input type="text" id="md-f-altura" data-campo="altura_felpa" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" />
+            </div>
+          </div>
+          <div class="ms-campo-row">
+            <div class="ms-campo">
+              <label for="md-f-pelo">Pelo</label>
+              <select id="md-f-pelo" data-campo="pelo">
+                <option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option>
+              </select>
+            </div>
+            <div class="ms-campo">
+              <label for="md-f-acabado">Acabado</label>
+              <select id="md-f-acabado" data-campo="acabado">
+                <option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div class="ms-campo-row">
           <div class="ms-campo">
             <label for="md-f-estimada" title="Previsión: cuándo se espera tener la muestra lista">Fecha estimada muestra lista</label>
@@ -159,6 +192,16 @@
         <div class="ms-campo">
           <label for="md-f-desc">Descripción de la muestra</label>
           <textarea id="md-f-desc" data-campo="descripcion" placeholder="Qué se teje: telar, dibujo, calidad, colores, cuerpos…"></textarea>
+        </div>
+        <!-- Diseño adjunto (ficheros) -->
+        <div class="ms-campo" id="md-adjuntos-wrap">
+          <label>Diseño <span class="ms-hint">imagen, PDF, AI/EPS/PSD o ZIP · hasta 25 MB</span></label>
+          <div class="ms-adjuntos" id="md-adjuntos" hidden></div>
+          <div class="ms-adj-zona" id="md-adj-zona">
+            <input type="file" id="md-adj-file" accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.tif,.tiff,.svg,.pdf,.ai,.eps,.psd,.zip" multiple hidden />
+            <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="md-adj-btn">Adjuntar diseño</button>
+            <span class="ms-adj-ayuda">o arrastra el fichero aquí</span>
+          </div>
         </div>
         <div class="ms-campo" id="md-anotacion-wrap" hidden>
           <label>Anotación del registro de números</label>

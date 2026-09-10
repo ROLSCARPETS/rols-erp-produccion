@@ -34,6 +34,9 @@
     return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
   }
 
+  // Telar de varilla: lleva datos técnicos (material, pasadas, felpa, pelo, acabado)
+  function esVarilla(telar) { return (telar || '').trim().toLowerCase().startsWith('varilla'); }
+
   function hoyISO() {
     const d = new Date();
     const p = n => String(n).padStart(2, '0');
@@ -84,7 +87,7 @@
 
   async function api(url, opts) {
     const init = Object.assign({ headers: {} }, opts || {});
-    if (init.body && typeof init.body !== 'string') {
+    if (init.body && typeof init.body !== 'string' && !(init.body instanceof FormData)) {
       init.body = JSON.stringify(init.body);
       init.headers['Content-Type'] = 'application/json';
     }
@@ -258,6 +261,6 @@
     }
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente };
 })();

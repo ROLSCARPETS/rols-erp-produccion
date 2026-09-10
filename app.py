@@ -2209,6 +2209,9 @@ def api_muestras():
         nueva, err = mf.crear(data, usuario=_actor(), **_ctx_personas())
         if err:
             return jsonify({"error": err}), 400
+        # Resumen por correo al laboratorio y a quien la crea (en segundo plano)
+        _en_segundo_plano(_avisos_module().aviso_nueva_muestra, nueva["id"], _actor(),
+                          _directorio_avisos(), _url_publica())
         return jsonify({"muestra": nueva}), 201
     a = request.args
     vista = (a.get("vista") or "en-curso").strip().lower()
@@ -2356,6 +2359,52 @@ def api_muestra_apunte(mid, aid):
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m})
+
+
+@app.route("/api/muestras/<mid>/adjuntos", methods=["POST"])
+def api_muestra_adjuntos(mid):
+    """Adjunta un fichero (el diseño) a la muestra. Multipart: `fichero`
+    (+ `clase`, por defecto 'diseno')."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    mf = _muestras_module()
+    f = request.files.get("fichero")
+    if f is None or not (f.filename or "").strip():
+        return jsonify({"error": "falta el fichero (campo 'fichero')"}), 400
+    maximo = mf.ADJUNTO_MAX_BYTES
+    if request.content_length and request.content_length > maximo + 64 * 1024:
+        return jsonify({"error": f"el fichero pasa de {maximo // (1024 * 1024)} MB"}), 413
+    contenido = f.read(maximo + 1)
+    m, err = mf.guardar_adjunto(mid, f.filename, contenido, usuario=_actor(),
+                                clase=request.form.get("clase") or "diseno")
+    if err:
+        return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    return jsonify({"muestra": m}), 201
+
+
+@app.route("/api/muestras/<mid>/adjuntos/<aid>", methods=["GET", "DELETE"])
+def api_muestra_adjunto(mid, aid):
+    """GET sirve el fichero (imagen/PDF en la pestaña, el resto se descarga;
+    `?dl=1` fuerza descarga). DELETE lo quita (queda rastro en el historial)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    mf = _muestras_module()
+    if request.method == "DELETE":
+        m, err = mf.borrar_adjunto(mid, aid, usuario=_actor())
+        if err:
+            return jsonify({"error": err}), (404 if "no existe" in err else 400)
+        return jsonify({"muestra": m})
+    ruta, meta, err = mf.ruta_adjunto(mid, aid)
+    if err:
+        return jsonify({"error": err}), 404
+    from flask import send_file
+    mime = mf.ADJUNTO_INLINE.get(meta.get("ext") or "")
+    descargar = request.args.get("dl") == "1" or mime is None
+    return send_file(ruta, mimetype=mime or "application/octet-stream",
+                     as_attachment=descargar, download_name=meta.get("nombre") or "adjunto",
+                     max_age=0, conditional=True)
 
 
 # Cache busting: url_for('static', ...) añade ?v=<mtime> al final.

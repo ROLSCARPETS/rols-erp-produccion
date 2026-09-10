@@ -5,7 +5,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, colorearPrio, api,
+  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
@@ -36,6 +36,7 @@
     pintarHero();
     pintarStepper();
     pintarFicha();
+    pintarAdjuntos();
     pintarDiario();
     pintarVariantes();
     pintarHistorial();
@@ -69,6 +70,7 @@
       partes.push(`<b>${fmtNum(M.dias)} días</b> en curso`);
     }
     if (M.sufijo && M.numero != null) partes.push(`variante de M-${M.numero}`);
+    if (M.tecnica_resumen) partes.push(`<span class="ms-tec-inline" title="Datos técnicos (telar de varilla)">${esc(M.tecnica_resumen)}</span>`);
     if (M.fecha_estimada && !TERMINALES.includes(M.estado)) {
       const retrasada = M.fecha_estimada < hoyISO();
       partes.push(`<span class="${retrasada ? 'ms-hito-venc-inline' : ''}">lista prevista el ${fmtFecha(M.fecha_estimada)}${retrasada ? ' (fecha pasada)' : ''}</span>`);
@@ -229,6 +231,7 @@
     pintarNavLink();
     rellenarPersona();
     llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
+    pintarTecnica();
     $('md-f-prioridad').value = String(M.prioridad || 2);
     colorearPrio($('md-f-prioridad'));
     $('md-f-fecha').value = M.fecha_solicitud || '';
@@ -324,8 +327,9 @@
       marcar(el, 'saved-ok');
       pintarHero(); pintarStepper(); pintarHistorial();
       if (campo === 'tipo') pintarFicha();
+      if (campo === 'telar') pintarTecnica();
       if (campo === 'cliente') { clienteEditadoAMano = false; pintarNavLink(); }
-      if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar') {
+      if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar' || campo === 'material') {
         // catálogos pueden haber crecido (valor nuevo)
         CAT = await api('/api/muestras/catalogos');
       }
@@ -354,6 +358,108 @@
       el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); el.blur(); } });
     } else {
       el.addEventListener('change', () => guardarCampo(el));
+    }
+  });
+
+  // ------------------------------------------------------------
+  // Datos técnicos (solo telar de varilla)
+  // ------------------------------------------------------------
+  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle' };
+  const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar' };
+  function pintarTecnica() {
+    // Los valores se conservan aunque cambie el telar; solo se esconden
+    $('md-tecnica').hidden = !esVarilla(M.telar);
+    $('md-materiales').innerHTML = (CAT.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+    $('md-f-material').value = M.material || '';
+    $('md-f-pasadas').value = M.pasadas || '';
+    $('md-f-altura').value = M.altura_felpa || '';
+    $('md-f-pelo').value = M.pelo || '';
+    $('md-f-acabado').value = M.acabado || '';
+  }
+
+  // ------------------------------------------------------------
+  // Diseño adjunto (ficheros de la muestra)
+  // ------------------------------------------------------------
+  function fmtBytes(n) {
+    if (n == null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return Math.round(n / 1024) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function urlAdjunto(a) { return `${URL_API}/adjuntos/${encodeURIComponent(a.id)}`; }
+  function pintarAdjuntos() {
+    const lista = M.adjuntos || [];
+    $('md-adjuntos').hidden = !lista.length;
+    $('md-adjuntos').innerHTML = lista.map(a => {
+      const url = urlAdjunto(a);
+      const abrir = a.inline ? url : url + '?dl=1';
+      const vista = a.imagen
+        ? `<img src="${url}" alt="" loading="lazy" />`
+        : `<span class="ms-adj-ext">${esc((a.ext || '').toUpperCase())}</span>`;
+      const quien = a.usuario_nombre || a.usuario || '';
+      return `<div class="ms-adj" data-adj="${esc(a.id)}">
+        <a class="ms-adj-vista" href="${abrir}" target="_blank" rel="noopener" title="${a.inline ? 'Abrir' : 'Descargar'}">${vista}</a>
+        <div class="ms-adj-info">
+          <a class="ms-adj-nombre" href="${abrir}" target="_blank" rel="noopener">${esc(a.nombre)}</a>
+          <div class="ms-adj-meta">${fmtBytes(a.tamano)}${a.fecha ? ' · ' + fmtFechaHora(a.fecha) : ''}${quien ? ' · ' + esc(quien) : ''}</div>
+        </div>
+        <div class="ms-adj-acciones">
+          <a class="ms-ico-btn" href="${url}?dl=1" title="Descargar">⤓</a>
+          <button type="button" class="ms-ico-btn danger" data-accion="borrar-adj" title="Quitar el adjunto">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  async function subirAdjuntos(files) {
+    const btn = $('md-adj-btn');
+    btn.disabled = true;
+    try {
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append('fichero', f, f.name);
+        fd.append('clase', 'diseno');
+        btn.textContent = `Subiendo ${f.name}…`;
+        const d = await api(URL_API + '/adjuntos', { method: 'POST', body: fd });
+        M = d.muestra;
+        pintarAdjuntos(); pintarHistorial();
+      }
+    } catch (e) {
+      await window.mostrarAlerta({ titulo: 'No se pudo adjuntar', mensaje: e.message, tipo: 'danger' });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Adjuntar diseño';
+      $('md-adj-file').value = '';
+    }
+  }
+  $('md-adj-btn').addEventListener('click', () => $('md-adj-file').click());
+  $('md-adj-file').addEventListener('change', () => {
+    const fs = Array.from($('md-adj-file').files || []);
+    if (fs.length) subirAdjuntos(fs);
+  });
+  const zonaAdj = $('md-adj-zona');
+  ['dragenter', 'dragover'].forEach(ev => zonaAdj.addEventListener(ev, (e) => { e.preventDefault(); zonaAdj.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => zonaAdj.addEventListener(ev, (e) => { e.preventDefault(); zonaAdj.classList.remove('over'); }));
+  zonaAdj.addEventListener('drop', (e) => {
+    const fs = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    if (fs.length) subirAdjuntos(fs);
+  });
+  $('md-adjuntos').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-accion="borrar-adj"]');
+    if (!b) return;
+    const fila = b.closest('.ms-adj');
+    const a = (M.adjuntos || []).find(x => x.id === fila.dataset.adj);
+    const r = await window.mostrarConfirmacion({
+      titulo: 'Quitar el adjunto',
+      mensaje: `Se borra «${a ? a.nombre : ''}» del servidor. Queda rastro en el historial.`,
+      textoConfirmar: 'Quitar', tipo: 'danger',
+    });
+    if (!r.ok) return;
+    try {
+      const d = await api(`${URL_API}/adjuntos/${encodeURIComponent(fila.dataset.adj)}`, { method: 'DELETE' });
+      M = d.muestra;
+      pintarAdjuntos(); pintarHistorial();
+    } catch (err) {
+      await window.mostrarAlerta({ titulo: 'No se pudo quitar', mensaje: err.message, tipo: 'danger' });
     }
   });
 
@@ -463,17 +569,19 @@
     if (t === 'creacion') return h.texto || 'Alta de la muestra';
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito' };
-      return `${esc(nombres[h.campo] || h.campo)}: «${esc(h.de || '—')}» → «${esc(h.a || '—')}»`;
+      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', pelo: 'Pelo', acabado: 'Acabado' };
+      const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
+      return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;
     }
     if (t === 'archivo') return h.a === 'archivada' ? 'Archivada (fuera de En curso)' : 'Devuelta a En curso';
     if (t === 'aviso') {
-      const motivos = { estado: 'cambio de etapa', terminada: 'terminada', cancelada: 'cancelada', hito: 'próximo hito' };
+      const motivos = { estado: 'cambio de etapa', terminada: 'terminada', cancelada: 'cancelada', hito: 'próximo hito', nueva: 'alta de la muestra' };
       const por = motivos[h.motivo] || h.motivo || '';
       return h.ok
         ? `Aviso por correo a ${esc(h.a)} (${esc(por)})`
         : `Aviso por correo a ${esc(h.a)} (${esc(por)}) <b>no enviado</b>${h.detalle ? ': ' + esc(h.detalle) : ''}`;
     }
+    if (t === 'adjunto') return h.a === 'anadido' ? `Diseño adjuntado: «${esc(h.nombre || '')}»` : `Adjunto quitado: «${esc(h.nombre || '')}»`;
     if (t === 'apunte_borrado') return `Apunte borrado${h.fecha_apunte ? ' (' + fmtFecha(h.fecha_apunte) + ')' : ''}: «${esc(h.texto || '')}»`;
     if (t === 'importacion') return esc(h.texto || 'Importada del Libro de muestras');
     return esc(h.texto || t);

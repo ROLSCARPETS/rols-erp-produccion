@@ -98,6 +98,28 @@ _VERSION_SCHEMA = 4
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
 TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
                    "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
+
+# Datos tecnicos de la muestra cuando el telar es Varilla: material, pasadas,
+# altura de felpa, pelo (corte / bucle / corte y bucle) y acabado (latex /
+# sin aprestar). Van planos en la muestra y la UI los ensena solo con telar
+# de varilla (si cambia de telar se conservan, no se borran).
+PELOS: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
+                                      ("corte_bucle", "Corte y bucle"))
+ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"))
+PELOS_LABEL = dict(PELOS)
+ACABADOS_LABEL = dict(ACABADOS)
+CAMPOS_TECNICOS = ("material", "pasadas", "altura_felpa", "pelo", "acabado")
+
+# Adjuntos de la muestra (el diseno): los ficheros van a
+# ROLS_DATA_DIR/muestras_adjuntos/<id de la muestra>/<id adjunto>.<ext> y los
+# metadatos en `adjuntos[]` de la muestra (nunca la ruta en disco).
+ADJUNTOS_DIR = DATA_PATH.parent / "muestras_adjuntos"
+ADJUNTO_EXTENSIONES = {"png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff", "svg",
+                       "pdf", "ai", "eps", "psd", "zip"}
+ADJUNTO_MAX_BYTES = 25 * 1024 * 1024
+# Tipos que el navegador puede abrir en la propia pestana; el resto se descarga.
+ADJUNTO_INLINE = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                  "gif": "image/gif", "webp": "image/webp", "pdf": "application/pdf"}
 # Quien encarga la muestra debe ser un USUARIO DE ROLS ONE (cuentas): la lista
 # viva llega desde app.py (`usuarios_one`, endpoint de cuentas
 # /api/usuarios/con-permiso). Los nombres cortos del libro antiguo con usuario
@@ -124,6 +146,8 @@ CAMPOS_EDITABLES = {
     # Proximo hito: fecha del siguiente paso previsto (llegan los colores,
     # entra a telar...) para que comercial y laboratorio sepan cuando mirar.
     "proximo_hito_fecha", "proximo_hito",
+    # Datos tecnicos (telar de varilla)
+    *CAMPOS_TECNICOS,
 }
 _MAX_TEXTO = 6000
 
@@ -556,7 +580,7 @@ def _historial(m: dict, usuario, tipo: str, **extra) -> None:
 def _texto_buscable(m: dict) -> str:
     partes = [m.get("id"), m.get("cliente"), m.get("cliente_navision"), m.get("descripcion"),
               m.get("anotacion_registro"), m.get("resultado"),
-              m.get("encargada_por"), m.get("telar"),
+              m.get("encargada_por"), m.get("telar"), m.get("material"),
               ESTADOS_LABEL.get(m.get("estado") or "", ""),
               "interna" if m.get("tipo") == "interna" else ""]
     partes += [a.get("texto") for a in (m.get("apuntes") or [])]
@@ -593,6 +617,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
                           if ultimo else None),
         "n_apuntes": len(apuntes), "dias": dias, "dias_tipo": dias_tipo,
         "n_variantes": n_variantes,
+        "n_adjuntos": len(m.get("adjuntos") or []),
     }
 
 
@@ -682,6 +707,11 @@ def obtener(mid: str) -> dict | None:
     else:
         out["dias"], out["dias_tipo"] = _dias_entre(m.get("fecha_solicitud"), m.get("fecha_lista")), "plazo"
     out["hito_vencido"] = _hito_vencido(m, hoy)
+    for k in CAMPOS_TECNICOS:
+        out[k] = out.get(k) or ""
+    out["es_varilla"] = _es_telar_tecnico(m.get("telar"))
+    out["tecnica_resumen"] = resumen_tecnico(m)
+    out["adjuntos"] = [_adjunto_publico(a) for a in (m.get("adjuntos") or [])]
     out["variantes"] = [
         {"id": v.get("id"), "sufijo": v.get("sufijo") or "", "estado": v.get("estado"),
          "estado_label": ESTADOS_LABEL.get(v.get("estado") or "", "—"),
@@ -703,6 +733,8 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
                        if (m.get("cliente") or "").strip()
                        and (m.get("tipo") or "cliente") != "interna"},
                       key=lambda s: _clave(s))
+    materiales = sorted({(m.get("material") or "").strip() for m in data["muestras"]
+                         if (m.get("material") or "").strip()}, key=_clave)
     activas = _personas_conocidas(data, usuarios_one, usuario_actual)
     nombres_activas = {_clave(p["nombre"]) for p in activas}
     legacy = sorted({(m.get("encargada_por") or "").strip() for m in data["muestras"]
@@ -721,6 +753,10 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "personas": [p["nombre"] for p in activas] + legacy,
         "usuarios_one_disponibles": usuarios_one is not None,
         "clientes": clientes,
+        # Datos tecnicos (telar de varilla)
+        "pelos": [{"valor": s, "label": l} for s, l in PELOS],
+        "acabados": [{"valor": s, "label": l} for s, l in ACABADOS],
+        "materiales": materiales,
         "siguiente_numero": int(data["_meta"].get("ultimo_numero") or 0) + 1,
     }
 
@@ -880,6 +916,57 @@ def _validar_prioridad(v) -> tuple[int | None, str]:
     return p, ""
 
 
+def _validar_opcion(v, campo: str, opciones) -> tuple[str, str]:
+    """Selector cerrado: acepta el slug o la etiqueta (sin distinguir
+    mayusculas ni acentos). Vacio = sin dato."""
+    if v is None:
+        return "", ""
+    if not isinstance(v, str):
+        return "", f"{campo} debe ser texto"
+    v = v.strip()
+    if not v:
+        return "", ""
+    for slug, label in opciones:
+        if v.lower() == slug or _clave(v) == _clave(label):
+            return slug, ""
+    return "", f"{campo} no valido: {v!r} (" + ", ".join(s for s, _ in opciones) + ")"
+
+
+def _validar_tecnico(k: str, v) -> tuple[str, str]:
+    """Campos tecnicos del telar de varilla."""
+    if k == "pelo":
+        return _validar_opcion(v, k, PELOS)
+    if k == "acabado":
+        return _validar_opcion(v, k, ACABADOS)
+    return _validar_texto(v, k, 200 if k == "material" else 40)
+
+
+def _es_telar_tecnico(telar) -> bool:
+    return (telar or "").strip().lower().startswith("varilla")
+
+
+def resumen_tecnico(m: dict) -> str:
+    """'Lana 100 3/c · 30 pasadas · felpa 12 mm · Corte · Látex' (solo lo
+    relleno y solo si el telar es de varilla)."""
+    if not _es_telar_tecnico(m.get("telar")):
+        return ""
+    partes = []
+    mat = (m.get("material") or "").strip()
+    if mat:
+        partes.append(mat)
+    pas = (m.get("pasadas") or "").strip()
+    if pas:
+        partes.append(pas if "pasada" in pas.lower() else f"{pas} pasadas")
+    alt = (m.get("altura_felpa") or "").strip()
+    if alt:
+        partes.append(alt if "felpa" in alt.lower() else f"felpa {alt}")
+    if m.get("pelo"):
+        partes.append(PELOS_LABEL.get(m["pelo"], m["pelo"]))
+    if m.get("acabado"):
+        partes.append(ACABADOS_LABEL.get(m["acabado"], m["acabado"]))
+    return " · ".join(partes)
+
+
 def _validar_fecha(v, campo: str) -> tuple[str | None, str]:
     if v in (None, ""):
         return None, ""
@@ -944,6 +1031,11 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
     hito_txt, err = _validar_texto(datos.get("proximo_hito"), "proximo_hito", 200)
     if err:
         return None, err
+    tecnicos = {}
+    for k in CAMPOS_TECNICOS:
+        tecnicos[k], err = _validar_tecnico(k, datos.get(k))
+        if err:
+            return None, err
     persona_raw = datos.get("encargada_por")
     prioridad, err = _validar_prioridad(datos.get("prioridad", 2))
     if err:
@@ -1006,6 +1098,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
             "fecha_estimada": fecha_estimada,
+            **tecnicos, "adjuntos": [],
             "apuntes": [], "historial": [],
             "creado_en": ahora, "actualizado_en": ahora,
             "creado_por": _actor_username(usuario), "creado_por_nombre": _actor_nombre(usuario),
@@ -1056,6 +1149,10 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                     return None, err
             elif k == "proximo_hito":
                 v, err = _validar_texto(v, k, 200)
+                if err:
+                    return None, err
+            elif k in CAMPOS_TECNICOS:
+                v, err = _validar_tecnico(k, v)
                 if err:
                     return None, err
             elif k == "prioridad":
@@ -1158,6 +1255,105 @@ def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "") -> str:
         ia, ib = _FLUJO_IDX.get(anterior), _FLUJO_IDX.get(nuevo)
         frase = f"Vuelve a «{a}»." if (ia is not None and ib is not None and ib < ia) else f"Pasa a «{a}»."
     return f"{frase} {nota.strip()}" if nota and nota.strip() else frase
+
+
+# ---------------------------------------------------------------------------
+# Adjuntos (el diseno de la muestra)
+# ---------------------------------------------------------------------------
+
+def _adjunto_publico(a: dict) -> dict:
+    """Metadatos del adjunto para la UI (sin nada del disco)."""
+    ext = a.get("ext") or ""
+    return {"id": a.get("id"), "nombre": a.get("nombre"), "ext": ext,
+            "tamano": a.get("tamano"), "fecha": a.get("fecha"), "clase": a.get("clase") or "diseno",
+            "usuario": a.get("usuario"), "usuario_nombre": a.get("usuario_nombre"),
+            "inline": ext in ADJUNTO_INLINE,
+            "imagen": ADJUNTO_INLINE.get(ext, "").startswith("image/")}
+
+
+def _carpeta_adjuntos(mid: str) -> Path:
+    return ADJUNTOS_DIR / re.sub(r"[^A-Za-z0-9_-]", "_", str(mid))
+
+
+def _nombre_adjunto(nombre) -> tuple[str, str, str]:
+    """(nombre limpio para ensenar, extension, error)."""
+    nombre = (nombre or "").strip().replace("\\", "/").split("/")[-1]
+    nombre = re.sub(r"[\x00-\x1f]", "", nombre).strip()[:150]
+    if "." not in nombre or nombre.startswith("."):
+        return "", "", "el fichero no tiene extension"
+    ext = nombre.rsplit(".", 1)[1].lower()
+    if ext not in ADJUNTO_EXTENSIONES:
+        return "", "", f"tipo de fichero no admitido (.{ext}); vale imagen, PDF, AI/EPS/PSD o ZIP"
+    return nombre, ext, ""
+
+
+def guardar_adjunto(mid: str, nombre, contenido: bytes, usuario: str | None = None,
+                    clase: str = "diseno") -> tuple[dict | None, str]:
+    """Guarda un fichero adjunto (por defecto el diseno) y lo registra en la
+    muestra. El fichero se escribe en ADJUNTOS_DIR/<mid>/<id>.<ext>."""
+    nombre, ext, err = _nombre_adjunto(nombre)
+    if err:
+        return None, err
+    if not contenido:
+        return None, "el fichero esta vacio"
+    if len(contenido) > ADJUNTO_MAX_BYTES:
+        return None, f"el fichero pasa de {ADJUNTO_MAX_BYTES // (1024 * 1024)} MB"
+    clase = re.sub(r"[^a-z_]", "", (clase or "").strip().lower())[:20] or "diseno"
+    with jsonstore.store().tx():
+        data = cargar()
+        m = _buscar(data, mid)
+        if not m:
+            return None, f"la muestra {mid!r} no existe"
+        lista = m.setdefault("adjuntos", [])
+        aid = _nuevo_id_apunte()
+        while any(a.get("id") == aid for a in lista):
+            aid = _nuevo_id_apunte()
+        carpeta = _carpeta_adjuntos(mid)
+        carpeta.mkdir(parents=True, exist_ok=True)
+        (carpeta / f"{aid}.{ext}").write_bytes(contenido)
+        lista.append({"id": aid, "nombre": nombre, "ext": ext, "tamano": len(contenido),
+                      "clase": clase, "fecha": _ahora(),
+                      "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
+        _historial(m, usuario, "adjunto", a="anadido", nombre=nombre, clase=clase)
+        m["actualizado_en"] = _ahora()
+        _guardar(data)
+        return obtener(mid), ""
+
+
+def ruta_adjunto(mid: str, aid: str) -> tuple[Path | None, dict | None, str]:
+    """(ruta en disco, metadatos, error) de un adjunto."""
+    m = _buscar(cargar(), mid)
+    if not m:
+        return None, None, f"la muestra {mid!r} no existe"
+    a = next((x for x in (m.get("adjuntos") or []) if x.get("id") == aid), None)
+    if not a:
+        return None, None, "el adjunto no existe"
+    ruta = _carpeta_adjuntos(mid) / f"{a['id']}.{a.get('ext') or ''}"
+    if not ruta.is_file():
+        return None, a, "el fichero del adjunto no esta en el servidor"
+    return ruta, a, ""
+
+
+def borrar_adjunto(mid: str, aid: str, usuario: str | None = None) -> tuple[dict | None, str]:
+    with jsonstore.store().tx():
+        data = cargar()
+        m = _buscar(data, mid)
+        if not m:
+            return None, f"la muestra {mid!r} no existe"
+        lista = m.get("adjuntos") or []
+        a = next((x for x in lista if x.get("id") == aid), None)
+        if not a:
+            return None, "el adjunto no existe"
+        lista.remove(a)
+        try:
+            (_carpeta_adjuntos(mid) / f"{a['id']}.{a.get('ext') or ''}").unlink()
+        except FileNotFoundError:
+            pass
+        _historial(m, usuario, "adjunto", a="borrado", nombre=a.get("nombre") or "",
+                   clase=a.get("clase") or "diseno")
+        m["actualizado_en"] = _ahora()
+        _guardar(data)
+        return obtener(mid), ""
 
 
 def archivar(mid: str, usuario: str | None = None, valor: bool = True) -> tuple[dict | None, str]:

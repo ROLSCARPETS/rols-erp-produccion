@@ -353,7 +353,7 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 /* ---------- Modal alta ---------- */
 .ms-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem 0.9rem; margin-bottom: 0.5rem; }
 .ms-form-grid .full { grid-column: 1 / -1; }
-.ms-form-grid select, .ms-form-grid input[type="date"], .ms-form-grid input[type="number"] {
+.ms-form-grid select, .ms-form-grid input[type="date"], .ms-form-grid input[type="number"], .ms-form-grid input[type="text"] {
   width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem;
   font-size: 0.9rem; font-family: inherit; background: #FAF8F6; color: #2a2a2a;
 }
@@ -366,3 +366,28 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-feedback { margin-top: 0.6rem; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.82rem; display: none; }
 .ms-feedback.ok { background: #e8f3e1; color: #2f6b29; border: 1px solid #c8e2bd; display: block; }
 .ms-feedback.err { background: #fde2e2; color: #9b1c1c; border: 1px solid #f4baba; display: block; }
+
+/* ---- Datos técnicos (telar de varilla) ---- */
+.ms-tecnica { background: #faf6ee; border: 1px solid #efe2cd; border-radius: 10px; padding: 0.6rem 0.7rem 0; margin-bottom: 0.8rem; }
+.ms-tecnica-title { font-size: 0.72rem; font-weight: 700; color: #8a6d3b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem; display: flex; align-items: baseline; gap: 0.5rem; }
+.ms-tecnica-title .ms-hint, .ms-campo label .ms-hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.ms-campo label .ms-hint { margin-left: 0.3rem; }
+.ms-tec-inline { color: #6b6b6b; }
+.ms-n-tecnica { background: #faf6ee; border: 1px solid #efe2cd; border-radius: 10px; padding: 0.6rem 0.8rem; }
+.ms-n-tecnica .ms-form-grid-inner { margin-bottom: 0; }
+
+/* ---- Diseño adjunto ---- */
+.ms-adjuntos { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.45rem; }
+.ms-adj { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.5rem; background: #fff; }
+.ms-adj-vista { display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 8px; background: #faf8f5; overflow: hidden; text-decoration: none; border: 1px solid #f2ede6; }
+.ms-adj-vista img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ms-adj-ext { font-size: 0.66rem; font-weight: 700; color: #8a6d3b; letter-spacing: 0.04em; }
+.ms-adj-info { min-width: 0; }
+.ms-adj-nombre { font-size: 0.84rem; font-weight: 600; color: #2a2a2a; text-decoration: none; word-break: break-all; }
+.ms-adj-nombre:hover { color: var(--accent-hover); }
+.ms-adj-meta { font-size: 0.68rem; color: #9a9a9a; margin-top: 0.1rem; }
+.ms-adj-acciones { display: flex; gap: 0.2rem; }
+.ms-adj-acciones .ms-ico-btn { text-decoration: none; }
+.ms-adj-zona { display: flex; align-items: center; gap: 0.6rem; border: 1px dashed var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: #faf8f5; transition: border-color 0.12s, background 0.12s; }
+.ms-adj-zona.over { border-color: var(--accent); background: #fff8e1; }
+.ms-adj-ayuda { font-size: 0.74rem; color: #9a9a9a; }

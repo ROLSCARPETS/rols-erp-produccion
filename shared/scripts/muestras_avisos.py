@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import html as _html
 import logging
+import os
 from datetime import date, datetime
 
 import correo
@@ -31,6 +32,16 @@ _FLUJO_ORDEN = {s: i for i, s in enumerate(mf.ESTADOS_FLUJO)}
 # ---------------------------------------------------------------------------
 # Destinatarios
 # ---------------------------------------------------------------------------
+
+# Buzon del laboratorio: recibe el resumen de cada muestra nueva.
+LAB_EMAIL_DEFECTO = "laboratorio@rolscarpets.com"
+PIE_DEFECTO = ("Aviso automático a quien encargó la muestra. Se envía al cambiar de etapa, "
+               "al terminar o cancelar, y el día del próximo hito.")
+
+
+def email_laboratorio() -> str:
+    return (os.environ.get("ROLS_MUESTRAS_LAB_EMAIL") or LAB_EMAIL_DEFECTO).strip().lower()
+
 
 def email_de_usuario(usuario: str | None, directorio) -> tuple[str, str]:
     """(email, nombre) del usuario segun el directorio [{username, nombre, email}].
@@ -81,6 +92,9 @@ def _bloque_datos(m: dict) -> list[tuple[str, str]]:
     if m.get("telar"):
         filas.append(("Telar / técnica", m["telar"]))
     filas.append(("Prioridad", mf.PRIORIDADES.get(m.get("prioridad") or 0, "—")))
+    tec = mf.resumen_tecnico(m)
+    if tec:
+        filas.append(("Técnica", tec))
     if m.get("fecha_solicitud"):
         filas.append(("Solicitada", _fmt_fecha(m["fecha_solicitud"])))
     if m.get("fecha_estimada") and m.get("estado") not in mf.ESTADOS_TERMINALES:
@@ -91,8 +105,11 @@ def _bloque_datos(m: dict) -> list[tuple[str, str]]:
     return filas
 
 
-def _render(titulo: str, lineas: list[str], m: dict, base_url: str, nombre_dest: str) -> tuple[str, str]:
-    """(texto, html) con el mismo contenido."""
+def _render(titulo: str, lineas: list[str], m: dict, base_url: str, nombre_dest: str,
+            pie: str | None = None) -> tuple[str, str]:
+    """(texto, html) con el mismo contenido. `pie`: nota al pie (por defecto la
+    de los avisos a quien encargo la muestra)."""
+    pie = pie or PIE_DEFECTO
     url = _url_ficha(base_url, m.get("id") or "")
     saludo = f"Hola {nombre_dest.split(' ')[0]}," if nombre_dest else "Hola,"
     datos = _bloque_datos(m)
@@ -115,7 +132,7 @@ def _render(titulo: str, lineas: list[str], m: dict, base_url: str, nombre_dest:
     <table style="border-collapse:collapse;margin:14px 0;font-size:14px">{filas_html}</table>
     <p style="margin:16px 0 0"><a href="{e(url)}" style="display:inline-block;background:#d5b38c;color:#fff;text-decoration:none;padding:9px 16px;border-radius:999px;font-weight:600">Abrir la ficha M-{e(m.get('id') or '')}</a></p>
   </div>
-  <p style="font-size:11px;color:#9a9a9a;margin:12px 4px 0">Aviso automático a quien encargó la muestra. Se envía al cambiar de etapa, al terminar o cancelar, y el día del próximo hito.</p>
+  <p style="font-size:11px;color:#9a9a9a;margin:12px 4px 0">{e(pie)}</p>
 </div></body></html>"""
     return texto, html
 
@@ -178,6 +195,45 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
     if not ok:
         log.warning("aviso %s de M-%s a %s fallo: %s", motivo, mid, email, err)
     return {"enviado": ok, "motivo": err or "ok", "a": email}
+
+
+def aviso_nueva_muestra(mid: str, actor, directorio, base_url: str) -> dict:
+    """Al dar de alta una muestra: resumen al laboratorio
+    (ROLS_MUESTRAS_LAB_EMAIL, por defecto laboratorio@rolscarpets.com) y a
+    quien la ha creado. Devuelve {"enviado": bool, "motivo": str}."""
+    if not correo.configurado():
+        return {"enviado": False, "motivo": "correo no configurado"}
+    m = mf.obtener(mid)
+    if not m:
+        return {"enviado": False, "motivo": "muestra no existe"}
+    actor_u = (actor.get("username") if isinstance(actor, dict) else actor) or ""
+    actor_n = (actor.get("nombre") if isinstance(actor, dict) else "") or ""
+    email_actor, nombre_actor = email_de_usuario(actor_u, directorio)
+    nombre_actor = nombre_actor or actor_n or actor_u or "—"
+    destinos = []
+    lab = email_laboratorio()
+    if lab:
+        destinos.append(lab)
+    if email_actor and email_actor not in destinos:
+        destinos.append(email_actor)
+    asunto = f"[Muestras] Nueva muestra {_cabecera(m)}"
+    if not destinos:
+        mf.registrar_aviso(mid, "nueva", "", False, "sin destinatarios", asunto=asunto)
+        return {"enviado": False, "motivo": "sin destinatarios"}
+    titulo = f"Nueva muestra {_cabecera(m)}"
+    lineas = [f"Creada por {nombre_actor} el {datetime.now().strftime('%d/%m/%Y %H:%M')}."]
+    if m.get("encargada_por"):
+        lineas.append(f"Encargada por {m['encargada_por']}.")
+    if m.get("sufijo") and m.get("numero") is not None:
+        lineas.append(f"Es variante de M-{m['numero']}.")
+    lineas.append(f"Estado inicial: {mf.ESTADOS_LABEL.get(m.get('estado') or '', '—')}.")
+    texto, html = _render(titulo, lineas, m, base_url, "",
+                          pie="Aviso automático de alta de muestra: llega al laboratorio y a quien la ha creado.")
+    ok, err = correo.enviar(destinos, asunto, texto, html)
+    mf.registrar_aviso(mid, "nueva", ", ".join(destinos), ok, err, asunto=asunto)
+    if not ok:
+        log.warning("aviso de alta de M-%s a %s fallo: %s", mid, destinos, err)
+    return {"enviado": ok, "motivo": err or "ok", "a": destinos}
 
 
 def chequear_hitos(directorio, base_url: str, hoy: str | None = None) -> dict:

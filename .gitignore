@@ -46,3 +46,6 @@ shared/data/*.txt
 # SEED; en produccion la verdad vive en ROLS_DATA_DIR (fuera del docroot).
 # Backups locales generados durante migraciones.
 shared/data/.bak/
+
+# Adjuntos de muestras en local (en prod van a ROLS_DATA_DIR)
+shared/data/muestras_adjuntos/

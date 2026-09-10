@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
+  const { esc, fmtFecha, hoyISO, fmtNum, esVarilla, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
@@ -531,6 +531,10 @@
     llenarSelectPersonas($('ms-n-persona'), c.personas_activas, { vacio: '— quién la encarga —', usuario: u.username || '' });
     llenarSelect($('ms-n-telar'), c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
+    // Datos técnicos: solo con telar de varilla
+    $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
+    ['ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
     colorearPrio($('ms-n-prio'));
@@ -547,7 +551,10 @@
   modal.addEventListener('click', (e) => { if (e.target === modal) cerrarNueva(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) cerrarNueva(); });
   $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
-  $('ms-n-telar').addEventListener('change', () => gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica'));
+  $('ms-n-telar').addEventListener('change', async () => {
+    await gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica');
+    $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
+  });
   // Escribir en un campo de número selecciona su opción
   $('ms-n-variante').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="variante"]').checked = true; });
   $('ms-n-manual').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="manual"]').checked = true; });
@@ -564,6 +571,8 @@
       encargada_por: $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
+      material: $('ms-n-material').value.trim(), pasadas: $('ms-n-pasadas').value.trim(),
+      altura_felpa: $('ms-n-altura').value.trim(), pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
     };
     if (tipo === 'variante') {
       const v = $('ms-n-variante').value.trim();

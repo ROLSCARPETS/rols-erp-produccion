@@ -61,6 +61,17 @@ laboratorio pueda llevar las muestras sin ver costes.
   quien la lleva (en rojo si se pasa). `fecha_lista` es la fecha REAL: la fija
   el paso a `terminada` y es la que usan plazos y análisis; en la ficha solo
   se enseña cuando la muestra está terminada.
+- **Datos técnicos** (solo con telar **Varilla**): `material`, `pasadas`,
+  `altura_felpa` (texto corto), `pelo` (corte | bucle | corte_bucle) y
+  `acabado` (latex | sin_aprestar). Van planos en la muestra; la ficha y el
+  alta los enseñan solo si el telar es de varilla (si cambia, se conservan).
+  `resumen_tecnico()` los junta para el hero y los correos.
+- **Diseño adjunto** (`adjuntos[]`): ficheros en
+  `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
+  ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas
+  `POST /api/muestras/<id>/adjuntos` (multipart `fichero`) y
+  `GET|DELETE /api/muestras/<id>/adjuntos/<aid>` (`?dl=1` fuerza descarga;
+  imagen/PDF se abren en la pestaña). Rastro en el historial (`tipo: adjunto`).
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida. Cada cambio de
   etapa deja además un apunte automático (`tipo: "estado"`, "Pasa a «…»",
@@ -85,7 +96,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   terminada/cancelada lo limpian.
 - **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
-  del próximo hito (`hito_avisado` evita repetir). Envío como Rols Muestras:
+  del próximo hito (`hito_avisado` evita repetir); y al **crear** una muestra,
+  resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`) y a
+  quien la crea (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
   chequeo de hitos corre en segundo plano como mucho cada 15 min desde
