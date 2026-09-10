@@ -233,8 +233,12 @@
     colorearPrio($('md-f-prioridad'));
     $('md-f-fecha').value = M.fecha_solicitud || '';
     $('md-f-lista').value = M.fecha_lista || '';
-    // La fecha real de 'lista' solo tiene sentido cuando esta terminada
-    $('md-f-lista-wrap').hidden = !(M.estado === 'terminada' || M.fecha_lista);
+    // En curso se ensena el proximo hito; terminada/cancelada (el servidor
+    // limpia el hito) se ensena en su lugar la fecha real de 'lista'
+    const terminal = TERMINALES.includes(M.estado);
+    $('md-f-hito-fecha-wrap').hidden = terminal;
+    $('md-f-hito-wrap').hidden = terminal;
+    $('md-f-lista-wrap').hidden = !(terminal || M.fecha_lista);
     $('md-f-estimada').value = M.fecha_estimada || '';
     $('md-f-estimada').classList.toggle('vencido-campo', !!(M.fecha_estimada && !TERMINALES.includes(M.estado) && M.fecha_estimada < hoyISO()));
     $('md-f-hito-fecha').value = M.proximo_hito_fecha || '';

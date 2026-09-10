@@ -100,7 +100,7 @@
       <!-- ===== Columna izquierda: la ficha (autoguardado) ===== -->
       <section class="ms-section">
         <div class="ms-section-title"><span>Ficha</span><span class="ms-hint">los cambios se guardan solos</span></div>
-        <div class="ms-campo-row" style="grid-template-columns: 150px 1fr">
+        <div class="ms-campo-row">
           <div class="ms-campo">
             <label for="md-f-tipo">Tipo</label>
             <select id="md-f-tipo" data-campo="tipo">
@@ -137,21 +137,22 @@
             <input type="date" id="md-f-fecha" data-campo="fecha_solicitud" />
           </div>
         </div>
-        <div class="ms-campo-row" style="grid-template-columns: 1fr 1fr">
+        <div class="ms-campo-row">
           <div class="ms-campo">
             <label for="md-f-estimada" title="Previsión: cuándo se espera tener la muestra lista">Fecha estimada muestra lista</label>
             <input type="date" id="md-f-estimada" data-campo="fecha_estimada" />
           </div>
-          <div class="ms-campo">
+          <!-- En curso: próximo hito. Terminada/cancelada: la fecha real de lista -->
+          <div class="ms-campo" id="md-f-hito-fecha-wrap">
             <label for="md-f-hito-fecha" title="Fecha del siguiente paso previsto, para que comercial y laboratorio sepan cuándo mirar">Próximo hito</label>
             <input type="date" id="md-f-hito-fecha" data-campo="proximo_hito_fecha" />
           </div>
+          <div class="ms-campo" id="md-f-lista-wrap" hidden>
+            <label for="md-f-lista" title="Fecha real en que la muestra estuvo lista (la fija 'Terminada')">Muestra lista el (fecha real)</label>
+            <input type="date" id="md-f-lista" data-campo="fecha_lista" />
+          </div>
         </div>
-        <div class="ms-campo" id="md-f-lista-wrap" hidden>
-          <label for="md-f-lista" title="Fecha real en que la muestra estuvo lista (la fija 'Terminada')">Muestra lista el (fecha real)</label>
-          <input type="date" id="md-f-lista" data-campo="fecha_lista" />
-        </div>
-        <div class="ms-campo">
+        <div class="ms-campo" id="md-f-hito-wrap">
           <label for="md-f-hito">Qué se espera en el hito</label>
           <input type="text" id="md-f-hito" data-campo="proximo_hito" maxlength="200" placeholder="Ej. llegan los colores de tintorería · entra a telar…" autocomplete="off" />
         </div>

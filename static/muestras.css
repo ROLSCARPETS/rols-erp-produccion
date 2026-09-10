@@ -304,7 +304,10 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-campo select.ms-prio-sel-2:hover, .ms-form-grid select.ms-prio-sel-2:hover { border-color: #2559ad; }
 select.ms-prio-sel option { background: #fff; color: #2a2a2a; font-weight: 500; }
 .ms-campo textarea { resize: vertical; min-height: 84px; line-height: 1.4; }
-.ms-campo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+/* Filas de dos casillas: columnas iguales y casillas alineadas por su base
+   (si una etiqueta ocupa dos lineas, la casilla no baja respecto a la vecina) */
+.ms-campo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; align-items: end; }
+.ms-campo-row > .ms-campo { min-width: 0; }
 .ms-readonly { font-size: 0.84rem; color: #4d4d4d; background: #faf8f5; border-radius: 6px; padding: 0.45rem 0.55rem; line-height: 1.4; }
 .ms-origen { font-size: 0.72rem; color: #9a9a9a; margin-top: 0.8rem; line-height: 1.4; }
 
