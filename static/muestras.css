@@ -110,6 +110,16 @@ table.ms-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ms-ir { color: #b09d77; font-size: 1rem; }
 tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 
+/* Próximo hito (columna de En curso y ficha) */
+.ms-hito-td { min-width: 140px; }
+.ms-hito-inp { border: 1px solid var(--border); border-radius: 8px; padding: 0.2rem 0.4rem; font-size: 0.76rem; font-family: inherit; color: #2a2a2a; background: #fff; width: 132px; }
+.ms-hito-inp:focus { outline: none; border-color: var(--accent); }
+.ms-hito-inp.vencido { border-color: #e8a0a0; background: #fdf3f3; color: #9b1c1c; font-weight: 600; }
+.ms-hito-txt { font-size: 0.72rem; color: #4d4d4d; margin-top: 0.2rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-hito-venc { font-size: 0.62rem; font-weight: 700; color: #9b1c1c; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.1rem; }
+.ms-hito-venc-inline { color: #9b1c1c; font-weight: 600; }
+.ms-campo input.vencido-campo { border-color: #e8a0a0; background-color: #fdf3f3; color: #9b1c1c; font-weight: 600; }
+
 /* ---------- Pills de estado y prioridad ---------- */
 .ms-estado { display: inline-block; padding: 0.16rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
 .ms-estado-por_empezar     { background: #ececec; color: #6b6b6b; }

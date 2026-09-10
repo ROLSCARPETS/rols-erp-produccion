@@ -69,6 +69,9 @@
       partes.push(`<b>${fmtNum(M.dias)} días</b> en curso`);
     }
     if (M.sufijo && M.numero != null) partes.push(`variante de M-${M.numero}`);
+    if (M.proximo_hito_fecha && !TERMINALES.includes(M.estado)) {
+      partes.push(`<span class="${M.hito_vencido ? 'ms-hito-venc-inline' : ''}">próximo hito ${fmtFecha(M.proximo_hito_fecha)}${M.proximo_hito ? ' — ' + esc(M.proximo_hito) : ''}${M.hito_vencido ? ' (vencido)' : ''}</span>`);
+    }
     $('md-sub').innerHTML = partes.join(' · ') || '—';
 
     $('md-btn-variante').hidden = M.numero == null;
@@ -226,6 +229,9 @@
     colorearPrio($('md-f-prioridad'));
     $('md-f-fecha').value = M.fecha_solicitud || '';
     $('md-f-lista').value = M.fecha_lista || '';
+    $('md-f-hito-fecha').value = M.proximo_hito_fecha || '';
+    $('md-f-hito-fecha').classList.toggle('vencido-campo', !!M.hito_vencido);
+    $('md-f-hito').value = M.proximo_hito || '';
     $('md-f-desc').value = M.descripcion || '';
     $('md-f-resultado').value = M.resultado || '';
     const hayAnot = !!(M.anotacion_registro || '').trim();
@@ -444,7 +450,7 @@
     if (t === 'creacion') return h.texto || 'Alta de la muestra';
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Fecha muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación' };
+      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Fecha muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito' };
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(h.de || '—')}» → «${esc(h.a || '—')}»`;
     }
     if (t === 'archivo') return h.a === 'archivada' ? 'Archivada (fuera de En curso)' : 'Devuelta a En curso';

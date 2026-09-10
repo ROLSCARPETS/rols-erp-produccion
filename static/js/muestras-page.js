@@ -67,7 +67,12 @@
     if (!r) return;
     $('kpi-curso').textContent = fmtNum(r.en_curso);
     const arch = r.archivadas_sin_terminar || 0;
-    $('kpi-curso-sub').textContent = arch ? `+ ${fmtNum(arch)} archivadas sin terminar` : 'muestras en fabricación';
+    const sub = [];
+    if (r.hitos_vencidos) sub.push(`${fmtNum(r.hitos_vencidos)} hito${r.hitos_vencidos === 1 ? '' : 's'} vencido${r.hitos_vencidos === 1 ? '' : 's'}`);
+    if (r.hitos_semana) sub.push(`${fmtNum(r.hitos_semana)} hito${r.hitos_semana === 1 ? '' : 's'} esta semana`);
+    if (arch) sub.push(`${fmtNum(arch)} archivadas sin terminar`);
+    $('kpi-curso-sub').textContent = sub.length ? sub.join(' · ') : 'muestras en fabricación';
+    $('kpi-curso-sub').style.color = r.hitos_vencidos ? '#9b1c1c' : '';
     $('kpi-alta').textContent = fmtNum(r.prioridad_alta);
     $('kpi-anio-lbl').textContent = r.anio;
     $('kpi-anio-lbl2').textContent = r.anio;
@@ -126,7 +131,7 @@
     try {
       data = await api('/api/muestras?' + p.toString());
     } catch (e) {
-      $('ec-tbody').innerHTML = `<tr><td colspan="11" class="ms-vacio">No se pudo cargar: ${esc(e.message)}</td></tr>`;
+      $('ec-tbody').innerHTML = `<tr><td colspan="12" class="ms-vacio">No se pudo cargar: ${esc(e.message)}</td></tr>`;
       return;
     }
     ST.ec.rows = data.muestras || [];
@@ -151,6 +156,7 @@
       if (campo === 'numero') return [(m.numero == null ? 1e9 : m.numero), m.sufijo || ''];
       if (campo === 'prioridad') return [m.prioridad == null ? 9 : m.prioridad];
       if (campo === 'dias') return [m.dias == null ? -1 : m.dias];
+      if (campo === 'proximo_hito_fecha') return [m.proximo_hito_fecha || '9999-12-31'];
       return [String(m[campo] || '').toLowerCase()];
     };
     return rows.slice().sort((a, b) => {
@@ -177,6 +183,7 @@
       <td>${esc(m.telar) || mudo}</td>
       <td>${sel}</td>
       <td class="num"><span class="ms-dias ${(m.dias || 0) > 120 ? 'tarde' : ''}" title="Días desde la solicitud">${m.dias != null ? fmtNum(m.dias) : '—'}</span></td>
+      <td class="ms-hito-td"><input type="date" class="ms-hito-inp ${m.hito_vencido ? 'vencido' : ''}" data-id="${esc(m.id)}" value="${esc(m.proximo_hito_fecha || '')}" title="${esc(m.proximo_hito || 'Fecha del próximo hito (se guarda al cambiarla)')}" />${m.proximo_hito ? `<div class="ms-hito-txt" title="${esc(m.proximo_hito)}">${esc(m.proximo_hito)}</div>` : ''}${m.hito_vencido ? '<div class="ms-hito-venc">vencido</div>' : ''}</td>
       <td>${ult ? `<div class="ms-apunte-mini" title="${esc(ult.texto)}${ult.usuario_nombre ? ' — ' + esc(ult.usuario_nombre) : ''}"><b>${esc(fmtFecha(ult.fecha, false) || 's/f')}</b>${esc(ult.texto)}${ult.usuario_nombre ? ` <span class="ms-mudo">— ${esc(ult.usuario_nombre)}</span>` : ''}</div>` : '<span class="ms-mudo">sin apuntes</span>'}</td>
       <td><span class="ms-ir" title="Abrir la ficha">→</span></td>
     </tr>`;
@@ -190,7 +197,7 @@
     const tb = $('ec-tbody');
     if (!rows.length) {
       const hayFiltro = ST.ec.estados.size || filtrosEnCurso().toString() !== 'vista=en-curso';
-      tb.innerHTML = `<tr><td colspan="11" class="ms-vacio">${hayFiltro ? 'Ninguna muestra en curso coincide con el filtro.' : 'No hay muestras en curso. Crea una con «Nueva muestra».'}</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="12" class="ms-vacio">${hayFiltro ? 'Ninguna muestra en curso coincide con el filtro.' : 'No hay muestras en curso. Crea una con «Nueva muestra».'}</td></tr>`;
     } else {
       tb.innerHTML = rows.map(filaEnCurso).join('');
     }
@@ -225,11 +232,25 @@
     pintarEnCurso();
   }));
 
-  // Click en fila → ficha (salvo sobre el select de estado)
+  // Click en fila → ficha (salvo sobre el select de estado o la fecha del hito)
   $('ec-tbody').addEventListener('click', (e) => {
-    if (e.target.closest('select')) return;
+    if (e.target.closest('select') || e.target.closest('input')) return;
     const tr = e.target.closest('tr.ms-fila');
     if (tr) location.href = '/muestras-fabricadas/' + encodeURIComponent(tr.dataset.id);
+  });
+
+  // Fecha del próximo hito inline (comercial o laboratorio la ponen desde la tabla)
+  $('ec-tbody').addEventListener('change', async (e) => {
+    const inp = e.target.closest('input.ms-hito-inp');
+    if (!inp) return;
+    inp.disabled = true;
+    try {
+      await api(`/api/muestras/${encodeURIComponent(inp.dataset.id)}`, { method: 'PUT', body: { proximo_hito_fecha: inp.value || '' } });
+      await cargarEnCurso(false);
+    } catch (err) {
+      inp.disabled = false;
+      await window.mostrarAlerta({ titulo: 'No se pudo guardar el hito', mensaje: err.message, tipo: 'danger' });
+    }
   });
 
   // Cambio de estado inline

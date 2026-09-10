@@ -73,6 +73,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   v4: Alberto → Alberto Recio. Paco, Emilio, Blanca, Señor Gómez y Tano quedan
   como "antiguos" (`catalogos.personas_legacy`): filtran el histórico, no
   valen para altas.
+- **Próximo hito** (`proximo_hito_fecha` + `proximo_hito`): fecha del siguiente
+  paso previsto, la ponen comercial o laboratorio (columna editable en En curso
+  y campos en la ficha); en rojo si ya pasó, contador en el KPI En curso;
+  terminada/cancelada lo limpian.
 - **Cliente**: texto libre (prospectos) con buscador sobre el maestro de
   clientes de Navision que tiene Rols One (`/api/navision/clientes`, copia
   diaria de BC; el ERP lo proxya en `/api/muestras/clientes-navision`). Al

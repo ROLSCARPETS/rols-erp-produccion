@@ -54,7 +54,7 @@ import os
 import re
 import secrets
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import jsonstore
@@ -117,6 +117,9 @@ CAMPOS_EDITABLES = {
     "tipo", "cliente", "cliente_navision", "descripcion", "encargada_por",
     "prioridad", "telar", "fecha_solicitud", "fecha_lista", "resultado",
     "anotacion_registro",
+    # Proximo hito: fecha del siguiente paso previsto (llegan los colores,
+    # entra a telar...) para que comercial y laboratorio sepan cuando mirar.
+    "proximo_hito_fecha", "proximo_hito",
 }
 _MAX_TEXTO = 6000
 
@@ -501,6 +504,12 @@ def _dias_entre(a: str | None, b: str | None) -> int | None:
         return None
 
 
+def _hito_vencido(m: dict, hoy: str) -> bool:
+    """Proximo hito con fecha pasada en una muestra aun activa."""
+    f = m.get("proximo_hito_fecha")
+    return bool(f) and es_activa(m) and f < hoy
+
+
 def _anio(fecha: str | None) -> int | None:
     try:
         return int(fecha[:4]) if fecha else None
@@ -569,6 +578,9 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "telar": m.get("telar") or "", "estado": estado,
         "estado_label": ESTADOS_LABEL.get(estado, estado or "—"),
         "fecha_lista": m.get("fecha_lista"), "archivada": bool(m.get("archivada")),
+        "proximo_hito_fecha": m.get("proximo_hito_fecha"),
+        "proximo_hito": m.get("proximo_hito") or "",
+        "hito_vencido": _hito_vencido(m, hoy),
         "descripcion": _recortar(m.get("descripcion"), 220) if recortar_textos else (m.get("descripcion") or ""),
         "resultado": _recortar(m.get("resultado"), 160),
         "ultimo_apunte": ({"fecha": ultimo.get("fecha"), "texto": _recortar(ultimo.get("texto"), 180),
@@ -664,6 +676,7 @@ def obtener(mid: str) -> dict | None:
         out["dias"], out["dias_tipo"] = _dias_entre(m.get("fecha_solicitud"), hoy), "en_curso"
     else:
         out["dias"], out["dias_tipo"] = _dias_entre(m.get("fecha_solicitud"), m.get("fecha_lista")), "plazo"
+    out["hito_vencido"] = _hito_vencido(m, hoy)
     out["variantes"] = [
         {"id": v.get("id"), "sufijo": v.get("sufijo") or "", "estado": v.get("estado"),
          "estado_label": ESTADOS_LABEL.get(v.get("estado") or "", "—"),
@@ -714,6 +727,9 @@ def resumen() -> dict:
     anio = hoy.year
     por_estado = {s: 0 for s, _ in ESTADOS}
     n_curso = n_alta = n_solic = n_term = n_archivadas_activas = 0
+    n_hito_venc = n_hito_sem = 0
+    hoy_iso = hoy.isoformat()
+    semana_iso = (hoy + timedelta(days=7)).isoformat()
     anios = set()
     for m in data["muestras"]:
         a = _anio(m.get("fecha_solicitud"))
@@ -724,6 +740,12 @@ def resumen() -> dict:
             por_estado[m.get("estado") or ""] = por_estado.get(m.get("estado") or "", 0) + 1
             if m.get("prioridad") == 1:
                 n_alta += 1
+            f = m.get("proximo_hito_fecha")
+            if f:
+                if f < hoy_iso:
+                    n_hito_venc += 1
+                elif f <= semana_iso:
+                    n_hito_sem += 1
         elif es_activa(m) and m.get("archivada"):
             n_archivadas_activas += 1
         if a == anio:
@@ -734,6 +756,8 @@ def resumen() -> dict:
         "en_curso": n_curso,
         "por_estado": por_estado,
         "prioridad_alta": n_alta,
+        "hitos_vencidos": n_hito_venc,
+        "hitos_semana": n_hito_sem,
         "solicitadas_anio": n_solic,
         "terminadas_anio": n_term,
         "media_mes_anio": round(n_solic / max(1, hoy.month), 1),
@@ -906,6 +930,12 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
     resultado, err = _validar_texto(datos.get("resultado"), "resultado")
     if err:
         return None, err
+    hito_fecha, err = _validar_fecha(datos.get("proximo_hito_fecha"), "proximo_hito_fecha")
+    if err:
+        return None, err
+    hito_txt, err = _validar_texto(datos.get("proximo_hito"), "proximo_hito", 200)
+    if err:
+        return None, err
     persona_raw = datos.get("encargada_por")
     prioridad, err = _validar_prioridad(datos.get("prioridad", 2))
     if err:
@@ -966,6 +996,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "prioridad": prioridad if prioridad is not None else 2,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
+            "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
             "apuntes": [], "historial": [],
             "creado_en": ahora, "actualizado_en": ahora,
             "creado_por": _actor_username(usuario), "creado_por_nombre": _actor_nombre(usuario),
@@ -1010,6 +1041,14 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                     return None, err
                 if k == "cliente" and not v and tipo_final == "cliente":
                     return None, "el cliente no puede quedar vacio (o marca la muestra como interna)"
+            elif k == "proximo_hito_fecha":
+                v, err = _validar_fecha(v, k)
+                if err:
+                    return None, err
+            elif k == "proximo_hito":
+                v, err = _validar_texto(v, k, 200)
+                if err:
+                    return None, err
             elif k == "prioridad":
                 v, err = _validar_prioridad(v)
                 if err:
@@ -1072,6 +1111,9 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
             if slug == "terminada":
                 if not m.get("fecha_lista"):
                     m["fecha_lista"] = fecha
+            if slug in ESTADOS_TERMINALES and (m.get("proximo_hito_fecha") or m.get("proximo_hito")):
+                m["proximo_hito_fecha"] = None
+                m["proximo_hito"] = ""
             elif slug not in ESTADOS_TERMINALES and anterior in ESTADOS_TERMINALES:
                 m["fecha_lista"] = None
                 m["archivada"] = False
