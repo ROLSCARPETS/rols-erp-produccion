@@ -177,7 +177,7 @@
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
-      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
+      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.referencia ? (m.descripcion ? m.referencia + '\n\n' + m.descripcion : m.referencia) : m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${prioPill(m.prioridad)}</td>
       <td>${esc(m.telar) || mudo}</td>
@@ -330,7 +330,7 @@
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
-      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
+      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.referencia ? (m.descripcion ? m.referencia + '\n\n' + m.descripcion : m.referencia) : m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${esc(m.telar) || mudo}</td>
       <td>${estadoPill(m.estado, m.estado_label)}${arch}</td>
