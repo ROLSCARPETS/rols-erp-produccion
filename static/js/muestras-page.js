@@ -409,7 +409,8 @@
       if (e.configurado) {
         box.innerHTML = `<span class="ms-estado" style="background:#e8f3e1;color:#2f6b29">Correo configurado</span> ` +
           `remitente <b>${esc(e.remitente)}</b> · servidor ${esc(e.host)}${e.origen ? ' — ' + esc(e.origen) : ''} · e-mails conocidos de ${fmtNum(e.directorio_usuarios)} usuarios` +
-          (e.ultimo_chequeo_hitos ? ` · último chequeo de hitos ${esc(String(e.ultimo_chequeo_hitos).replace('T', ' ').slice(0, 16))}` : ' · el chequeo de hitos corre solo al usar la app (como mucho cada 15 min)');
+          (e.ultimo_chequeo_hitos ? ` · último chequeo de hitos ${esc(String(e.ultimo_chequeo_hitos).replace('T', ' ').slice(0, 16))}` : ' · el chequeo de hitos corre solo al usar la app (como mucho cada 15 min)') +
+          (e.ultimo && e.ultimo.cuando ? ` · último envío ${esc(String(e.ultimo.cuando).replace('T', ' ').slice(0, 16))}: ${e.ultimo.ok ? 'OK por ' + esc(e.ultimo.via || '') : 'ERROR ' + esc(e.ultimo.error || '')}` : '');
       } else {
         box.innerHTML = `<span class="ms-estado" style="background:#fde2e2;color:#9b1c1c">Correo sin configurar</span> ` +
           `hasta que el servidor tenga <code>ROLS_SMTP_HOST</code>, <code>ROLS_SMTP_USER</code> y <code>ROLS_SMTP_PASS</code> en su <code>.env</code> (o un <code>correo.json</code> en la carpeta de datos) no se envía nada; el resto funciona igual.`;
@@ -425,7 +426,7 @@
     $('an-avisos-res').textContent = 'Enviando…';
     try {
       const r = await api('/api/muestras/avisos/prueba', { method: 'POST', body: {} });
-      $('an-avisos-res').textContent = r.ok ? `Enviado a ${r.email}. Mira tu bandeja (y el correo no deseado).` : `No se pudo enviar: ${r.error}`;
+      $('an-avisos-res').textContent = r.ok ? `Enviado a ${r.email}${r.via ? ' por ' + r.via : ''}. Mira tu bandeja (y el correo no deseado).` : `No se pudo enviar: ${r.error}`;
     } catch (e) {
       $('an-avisos-res').textContent = 'Error: ' + e.message;
     } finally {

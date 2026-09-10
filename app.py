@@ -2068,7 +2068,8 @@ def api_muestras_avisos_prueba():
     if _user_rol() != "admin":
         return jsonify({"error": "solo el nivel Completo puede enviar el correo de prueba"}), 403
     ok, err, email = _avisos_module().correo_de_prueba(_actor(), _directorio_avisos(), _url_publica())
-    return jsonify({"ok": ok, "error": err, "email": email})
+    return jsonify({"ok": ok, "error": err, "email": email,
+                    "via": (_correo_module().ULTIMO or {}).get("via")})
 
 
 @app.route("/api/muestras/avisos/hitos", methods=["POST"])
