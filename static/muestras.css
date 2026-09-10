@@ -189,15 +189,34 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 .ms-bar > i.alt { background: #c9b8a0; }
 .ms-bar-row .n { text-align: right; font-variant-numeric: tabular-nums; color: #2a2a2a; font-weight: 600; }
-.ms-meses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0.35rem; align-items: end; height: 120px; margin-top: 0.4rem; }
-.ms-mes { display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; justify-content: flex-end; }
-.ms-mes .cols { display: flex; gap: 2px; align-items: flex-end; height: 92px; }
-.ms-mes .col { width: 10px; border-radius: 3px 3px 0 0; background: var(--accent); }
-.ms-mes .col.prev { background: #ddd2c2; }
-.ms-mes .lbl { font-size: 0.62rem; color: #9a9a9a; }
-.ms-leyenda { display: flex; gap: 1rem; font-size: 0.72rem; color: #7a7a7a; margin-top: 0.3rem; }
-.ms-leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.3rem; vertical-align: middle; background: var(--accent); }
-.ms-leyenda i.prev { background: #ddd2c2; }
+/* Gráfico de columnas: solicitudes por mes, año actual (ámbar) frente al
+   anterior (azul). Pareja validada para daltonismo y contraste; barras
+   finas, rejilla de hairline, valores solo sobre el año actual. */
+.ms-chart { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: 200px auto; column-gap: 0.45rem; margin-top: 0.8rem; }
+.ms-chart-y { position: relative; }
+.ms-chart-y span { position: absolute; right: 0; transform: translateY(50%); font-size: 0.66rem; color: #9a9a9a; font-variant-numeric: tabular-nums; line-height: 1; }
+.ms-chart-plot { position: relative; display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; border-bottom: 1px solid #e5dcd2; }
+.ms-chart-grid { position: absolute; left: 0; right: 0; height: 1px; background: #f0ebe3; pointer-events: none; }
+.ms-mes { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; padding: 0 7%; border-radius: 6px 6px 0 0; }
+.ms-mes.actual { background: #faf6ee; }
+.ms-col { position: relative; z-index: 1; width: 22px; max-width: 44%; min-height: 0; border-radius: 4px 4px 0 0; transition: filter 0.12s; cursor: default; }
+.ms-col.prev { background: #4B79B4; }
+.ms-col.act { background: #A8772F; }
+.ms-col.cero { background: #e5dcd2; height: 2px !important; border-radius: 0; }
+.ms-col:hover { filter: brightness(0.86); }
+.ms-col .val { position: absolute; z-index: 3; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 0.74rem; font-weight: 700; color: #2a2a2a; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
+.ms-col.cero .val { color: #b5b0a8; font-weight: 500; }
+.ms-chart-x { grid-column: 2; display: grid; grid-template-columns: repeat(12, 1fr); margin-top: 0.4rem; }
+.ms-chart-x span { text-align: center; font-size: 0.7rem; color: #8a857d; }
+.ms-chart-x span.actual { color: #2a2a2a; font-weight: 700; }
+.ms-chart-x span.futuro { color: #c9c3ba; }
+.ms-leyenda { margin-left: auto; display: inline-flex; gap: 1.1rem; font-size: 0.76rem; color: #4d4d4d; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ms-leyenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 0.4rem; vertical-align: -1px; }
+.ms-leyenda i.act { background: #A8772F; }
+.ms-leyenda i.prev { background: #4B79B4; }
+.ms-chart-foot { margin-top: 0.55rem; font-size: 0.74rem; color: #9a9a9a; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.ms-chart-foot .ms-link { font-size: 0.74rem; }
+#an-tabla td.pos { color: #2f6b29; } #an-tabla td.neg { color: #9b1c1c; }
 
 /* ---------- Ficha ---------- */
 .ms-hero { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 0.9rem; }

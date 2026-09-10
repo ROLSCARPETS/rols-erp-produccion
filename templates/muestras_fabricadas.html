@@ -213,10 +213,24 @@
       <div class="ms-section">
         <div class="ms-section-title">
           <span>Solicitudes por mes</span>
-          <span class="ms-hint" id="an-meses-hint"></span>
+          <span class="ms-hint" id="an-meses-hint">año actual frente al anterior · el valor va sobre la columna del año actual; pasa el ratón para ver el anterior</span>
+          <span class="ms-leyenda" id="an-leyenda"></span>
         </div>
-        <div class="ms-meses" id="an-meses"></div>
-        <div class="ms-leyenda"><span><i></i><span id="an-leg-actual"></span></span><span><i class="prev"></i><span id="an-leg-prev"></span></span></div>
+        <div class="ms-chart" id="an-chart">
+          <div class="ms-chart-y" id="an-chart-y"></div>
+          <div class="ms-chart-plot" id="an-meses"></div>
+          <div class="ms-chart-x" id="an-chart-x"></div>
+        </div>
+        <div class="ms-chart-foot">
+          <span id="an-chart-nota"></span>
+          <button type="button" class="ms-link" id="an-tabla-btn">Ver como tabla</button>
+        </div>
+        <div id="an-tabla-wrap" hidden style="margin-top:0.6rem; max-width:560px">
+          <table class="ms-tabla" id="an-tabla">
+            <thead><tr><th>Mes</th><th class="num" id="an-th-prev"></th><th class="num" id="an-th-act"></th><th class="num" title="Año actual menos año anterior">Diferencia</th></tr></thead>
+            <tbody id="an-tabla-body"></tbody>
+          </table>
+        </div>
       </div>
       <div class="ms-section">
         <div class="ms-section-title">

@@ -368,19 +368,7 @@
         <td class="num">${f.canceladas ? fmtNum(f.canceladas) : '<span class="ms-mudo">—</span>'}</td>
         <td class="num">${f.plazo_medio_dias != null ? `${fmtNum(f.plazo_medio_dias)} días <span class="ms-mudo" title="muestras con las dos fechas">(${fmtNum(f.n_plazos)})</span>` : '<span class="ms-mudo">—</span>'}</td>
       </tr>`).join('') || '<tr><td colspan="6" class="ms-vacio">Sin datos</td></tr>';
-    // Por mes (año actual vs anterior)
-    const anios = Object.keys(d.por_mes || {}).map(Number).sort((a, b) => b - a);
-    const actual = anios[0], prev = anios[1];
-    const va = (d.por_mes && d.por_mes[String(actual)]) || [], vp = (d.por_mes && d.por_mes[String(prev)]) || [];
-    const max = Math.max(1, ...va, ...vp);
-    $('an-meses').innerHTML = MESES.map((m, i) => `<div class="ms-mes">
-        <div class="cols">
-          <div class="col prev" style="height:${Math.round(((vp[i] || 0) / max) * 90)}px" title="${prev}: ${vp[i] || 0}"></div>
-          <div class="col" style="height:${Math.round(((va[i] || 0) / max) * 90)}px" title="${actual}: ${va[i] || 0}"></div>
-        </div><div class="lbl">${m}</div></div>`).join('');
-    $('an-leg-actual').textContent = `${actual} (${fmtNum(va.reduce((s, x) => s + x, 0))})`;
-    $('an-leg-prev').textContent = `${prev} (${fmtNum(vp.reduce((s, x) => s + x, 0))})`;
-    $('an-meses-hint').textContent = 'solicitudes de cada mes: año actual frente al anterior';
+    pintarMeses(d);
     // Reparto
     const barras = (lista, clave) => {
       const mx = Math.max(1, ...lista.map(x => x.n));
@@ -391,6 +379,66 @@
     $('an-persona').innerHTML = barras(d.por_persona || [], 'persona');
   }
   $('an-anio').addEventListener('change', cargarAnalisis);
+
+  // Escala "limpia" para el eje: máximo redondeado a un paso cómodo (2, 5, 10, 20…)
+  function escalaBonita(max) {
+    const pasos = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
+    const bruto = Math.max(1, max) / 4;
+    const paso = pasos.find(p => p >= bruto) || pasos[pasos.length - 1];
+    return { paso, max: Math.max(paso, Math.ceil(Math.max(1, max) / paso) * paso) };
+  }
+
+  const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  // Columnas agrupadas: año actual (ámbar) frente al anterior (azul), con
+  // rejilla, valores sobre el año actual, mes en curso resaltado y meses
+  // futuros vacíos. La tabla gemela lleva todos los valores.
+  function pintarMeses(d) {
+    const anios = Object.keys(d.por_mes || {}).map(Number).sort((a, b) => b - a);
+    const actual = anios[0], prev = anios[1];
+    const va = (d.por_mes && d.por_mes[String(actual)]) || [], vp = (d.por_mes && d.por_mes[String(prev)]) || [];
+    const hoy = new Date();
+    const mesHoy = (hoy.getFullYear() === actual) ? hoy.getMonth() : 11;
+    const esc_ = escalaBonita(Math.max(...va, ...vp, 1));
+    const pct = v => Math.max(0, Math.min(100, (v / esc_.max) * 100));
+    // Rejilla + eje
+    const ticks = [];
+    for (let t = 0; t <= esc_.max; t += esc_.paso) ticks.push(t);
+    $('an-chart-y').innerHTML = ticks.map(t => `<span style="bottom:${pct(t)}%">${fmtNum(t)}</span>`).join('');
+    const grid = ticks.filter(t => t > 0).map(t => `<div class="ms-chart-grid" style="bottom:${pct(t)}%"></div>`).join('');
+    // Columnas
+    const cols = MESES.map((m, i) => {
+      const p = vp[i] || 0, a = va[i] || 0;
+      const futuro = i > mesHoy;
+      const tPrev = `${MESES_LARGO[i]} ${prev}: ${fmtNum(p)} solicitud${p === 1 ? '' : 'es'}`;
+      const tAct = `${MESES_LARGO[i]} ${actual}: ${fmtNum(a)} solicitud${a === 1 ? '' : 'es'}`;
+      const barPrev = `<div class="ms-col prev ${p ? '' : 'cero'}" style="height:${pct(p)}%" title="${esc(tPrev)}"></div>`;
+      const barAct = futuro ? '' : `<div class="ms-col act ${a ? '' : 'cero'}" style="height:${pct(a)}%" title="${esc(tAct)}"><span class="val">${fmtNum(a)}</span></div>`;
+      return `<div class="ms-mes ${i === mesHoy ? 'actual' : ''}">${barPrev}${barAct}</div>`;
+    }).join('');
+    $('an-meses').innerHTML = grid + cols;
+    $('an-chart-x').innerHTML = MESES.map((m, i) => `<span class="${i === mesHoy ? 'actual' : (i > mesHoy ? 'futuro' : '')}">${m}</span>`).join('');
+    // Leyenda con totales
+    const totA = va.reduce((s, x) => s + x, 0), totP = vp.reduce((s, x) => s + x, 0);
+    const totPHasta = vp.slice(0, mesHoy + 1).reduce((s, x) => s + x, 0);
+    $('an-leyenda').innerHTML = `<span><i class="act"></i>${actual} · ${fmtNum(totA)}</span><span><i class="prev"></i>${prev} · ${fmtNum(totP)}</span>`;
+    const dif = totA - totPHasta;
+    $('an-chart-nota').textContent = mesHoy < 11
+      ? `Hasta ${MESES_LARGO[mesHoy]}: ${fmtNum(totA)} en ${actual} frente a ${fmtNum(totPHasta)} en ${prev} (${dif >= 0 ? '+' : '−'}${fmtNum(Math.abs(dif))}) · los meses en gris aún no han llegado`
+      : `${fmtNum(totA)} en ${actual} frente a ${fmtNum(totP)} en ${prev} (${dif >= 0 ? '+' : '−'}${fmtNum(Math.abs(dif))})`;
+    // Tabla gemela
+    $('an-th-prev').textContent = prev; $('an-th-act').textContent = actual;
+    $('an-tabla-body').innerHTML = MESES.map((m, i) => {
+      const p = vp[i] || 0, a = va[i] || 0, futuro = i > mesHoy, df = a - p;
+      return `<tr><td>${MESES_LARGO[i]}</td><td class="num">${fmtNum(p)}</td><td class="num">${futuro ? '<span class="ms-mudo">—</span>' : fmtNum(a)}</td>` +
+             `<td class="num ${futuro ? '' : (df > 0 ? 'pos' : (df < 0 ? 'neg' : ''))}">${futuro ? '<span class="ms-mudo">—</span>' : (df > 0 ? '+' : '') + fmtNum(df)}</td></tr>`;
+    }).join('');
+  }
+  $('an-tabla-btn').addEventListener('click', () => {
+    const w = $('an-tabla-wrap');
+    w.hidden = !w.hidden;
+    $('an-tabla-btn').textContent = w.hidden ? 'Ver como tabla' : 'Ocultar tabla';
+  });
 
   // ------------------------------------------------------------
   // NUEVA MUESTRA (modal)
