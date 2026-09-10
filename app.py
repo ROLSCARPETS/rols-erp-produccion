@@ -1975,6 +1975,15 @@ def api_muestras_clientes_navision():
     return jsonify({"clientes": lista, "disponible": ok})
 
 
+def _actor() -> dict | None:
+    """Quien hace el cambio, para apuntes e historial: {username, nombre}."""
+    u = _sso_user() or {}
+    if not u.get("username"):
+        return None
+    return {"username": (u.get("username") or "").strip().lower(),
+            "nombre": (u.get("nombre") or "").strip()}
+
+
 def _ctx_personas() -> dict:
     """Argumentos de personas para el modulo de muestras (lista viva de One +
     usuario de la sesion, que siempre puede encargar)."""
@@ -2026,7 +2035,7 @@ def api_muestras():
     mf = _muestras_module()
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
-        nueva, err = mf.crear(data, usuario=_user_name(), **_ctx_personas())
+        nueva, err = mf.crear(data, usuario=_actor(), **_ctx_personas())
         if err:
             return jsonify({"error": err}), 400
         return jsonify({"muestra": nueva}), 201
@@ -2102,7 +2111,7 @@ def api_muestra(mid):
             return jsonify({"error": err}), 404
         return jsonify({"ok": True})
     data = request.get_json(force=True, silent=True) or {}
-    m, err = mf.actualizar(mid, data, usuario=_user_name(), **_ctx_personas())
+    m, err = mf.actualizar(mid, data, usuario=_actor(), **_ctx_personas())
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m})
@@ -2116,7 +2125,7 @@ def api_muestra_estado(mid):
         return bl
     data = request.get_json(force=True, silent=True) or {}
     m, err = _muestras_module().cambiar_estado(
-        mid, data.get("estado") or "", usuario=_user_name(),
+        mid, data.get("estado") or "", usuario=_actor(),
         nota=data.get("nota") or "", fecha=data.get("fecha"))
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
@@ -2129,7 +2138,7 @@ def api_muestra_archivar(mid):
     if bl:
         return bl
     data = request.get_json(force=True, silent=True) or {}
-    m, err = _muestras_module().archivar(mid, usuario=_user_name(),
+    m, err = _muestras_module().archivar(mid, usuario=_actor(),
                                          valor=bool(data.get("archivada", True)))
     if err:
         return jsonify({"error": err}), 404
@@ -2144,7 +2153,7 @@ def api_muestra_apuntes(mid):
         return bl
     data = request.get_json(force=True, silent=True) or {}
     m, err = _muestras_module().anadir_apunte(
-        mid, data.get("texto") or "", usuario=_user_name(), fecha=data.get("fecha"))
+        mid, data.get("texto") or "", usuario=_actor(), fecha=data.get("fecha"))
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m}), 201
@@ -2157,11 +2166,11 @@ def api_muestra_apunte(mid, aid):
         return bl
     mf = _muestras_module()
     if request.method == "DELETE":
-        m, err = mf.borrar_apunte(mid, aid, usuario=_user_name())
+        m, err = mf.borrar_apunte(mid, aid, usuario=_actor())
     else:
         data = request.get_json(force=True, silent=True) or {}
         m, err = mf.editar_apunte(mid, aid, texto=data.get("texto"),
-                                  fecha=data.get("fecha"), usuario=_user_name())
+                                  fecha=data.get("fecha"), usuario=_actor())
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m})

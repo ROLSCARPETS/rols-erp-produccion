@@ -272,11 +272,14 @@ select.ms-prio-sel option { background: #fff; color: #2a2a2a; font-weight: 500; 
 .ms-ap-form textarea:focus, .ms-ap-form input:focus { outline: none; border-color: var(--accent); }
 .ms-ap-form .ayuda { font-size: 0.7rem; color: #9a9a9a; margin-top: 0.35rem; }
 .ms-diario { display: flex; flex-direction: column; }
-.ms-ap { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 0.7rem; padding: 0.55rem 0.2rem; border-bottom: 1px solid #f2ede6; align-items: start; }
+.ms-ap { display: grid; grid-template-columns: 118px minmax(0, 1fr) auto; gap: 0.7rem; padding: 0.55rem 0.2rem; border-bottom: 1px solid #f2ede6; align-items: start; }
 .ms-ap:last-child { border-bottom: none; }
 .ms-ap:hover { background: #fdfbf7; }
 .ms-ap-fecha { font-size: 0.74rem; font-weight: 700; color: #8a6d3b; font-variant-numeric: tabular-nums; padding-top: 0.1rem; white-space: nowrap; }
 .ms-ap-fecha.sin { color: #b5b0a8; font-weight: 500; font-style: italic; }
+/* Quién escribió el apunte (debajo de la fecha); "libro" = importado del Excel */
+.ms-ap-quien { font-size: 0.68rem; font-weight: 500; color: #7a7a7a; margin-top: 0.15rem; white-space: normal; line-height: 1.2; font-style: normal; }
+.ms-ap-quien.libro { color: #b5b0a8; font-style: italic; font-weight: 400; }
 .ms-ap-texto { font-size: 0.86rem; color: #2a2a2a; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 .ms-ap-meta { font-size: 0.68rem; color: #9a9a9a; margin-top: 0.15rem; }
 .ms-ap-acciones { display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.12s; }

@@ -177,7 +177,7 @@
       <td>${esc(m.telar) || mudo}</td>
       <td>${sel}</td>
       <td class="num"><span class="ms-dias ${(m.dias || 0) > 120 ? 'tarde' : ''}" title="Días desde la solicitud">${m.dias != null ? fmtNum(m.dias) : '—'}</span></td>
-      <td>${ult ? `<div class="ms-apunte-mini" title="${esc(ult.texto)}"><b>${esc(fmtFecha(ult.fecha, false) || 's/f')}</b>${esc(ult.texto)}</div>` : '<span class="ms-mudo">sin apuntes</span>'}</td>
+      <td>${ult ? `<div class="ms-apunte-mini" title="${esc(ult.texto)}${ult.usuario_nombre ? ' — ' + esc(ult.usuario_nombre) : ''}"><b>${esc(fmtFecha(ult.fecha, false) || 's/f')}</b>${esc(ult.texto)}${ult.usuario_nombre ? ` <span class="ms-mudo">— ${esc(ult.usuario_nombre)}</span>` : ''}</div>` : '<span class="ms-mudo">sin apuntes</span>'}</td>
       <td><span class="ms-ir" title="Abrir la ficha">→</span></td>
     </tr>`;
   }

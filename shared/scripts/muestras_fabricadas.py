@@ -521,9 +521,23 @@ def _recortar(s, n: int) -> str:
     return s if len(s) <= n else s[: n - 1].rstrip() + "…"
 
 
+def _actor_username(u) -> str | None:
+    """`usuario` puede ser el username (str) o {username, nombre} (app.py)."""
+    if isinstance(u, dict):
+        return (u.get("username") or u.get("usuario") or "").strip().lower() or None
+    return (str(u).strip().lower() or None) if u else None
+
+
+def _actor_nombre(u) -> str | None:
+    if isinstance(u, dict):
+        return (u.get("nombre") or "").strip() or None
+    return None
+
+
 def _historial(m: dict, usuario, tipo: str, **extra) -> None:
     m.setdefault("historial", []).append(
-        {"fecha": _ahora(), "usuario": usuario or None, "tipo": tipo, **extra})
+        {"fecha": _ahora(), "usuario": _actor_username(usuario),
+         "usuario_nombre": _actor_nombre(usuario), "tipo": tipo, **extra})
 
 
 def _texto_buscable(m: dict) -> str:
@@ -557,7 +571,8 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "fecha_lista": m.get("fecha_lista"), "archivada": bool(m.get("archivada")),
         "descripcion": _recortar(m.get("descripcion"), 220) if recortar_textos else (m.get("descripcion") or ""),
         "resultado": _recortar(m.get("resultado"), 160),
-        "ultimo_apunte": ({"fecha": ultimo.get("fecha"), "texto": _recortar(ultimo.get("texto"), 180)}
+        "ultimo_apunte": ({"fecha": ultimo.get("fecha"), "texto": _recortar(ultimo.get("texto"), 180),
+                           "usuario_nombre": ultimo.get("usuario_nombre") or ultimo.get("usuario")}
                           if ultimo else None),
         "n_apuntes": len(apuntes), "dias": dias, "dias_tipo": dias_tipo,
         "n_variantes": n_variantes,
@@ -952,7 +967,8 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "apuntes": [], "historial": [],
-            "creado_en": ahora, "actualizado_en": ahora, "creado_por": usuario or None,
+            "creado_en": ahora, "actualizado_en": ahora,
+            "creado_por": _actor_username(usuario), "creado_por_nombre": _actor_nombre(usuario),
         }
         _historial(nueva, usuario, "creacion",
                    texto=(f"Variante de M-{numero}" if sufijo else "Alta de la muestra"))
@@ -1063,7 +1079,8 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
                        nota=nota or "", fecha_efecto=fecha)
         if nota:
             m.setdefault("apuntes", []).append(
-                {"id": _nuevo_id_apunte(), "fecha": fecha, "texto": nota, "usuario": usuario or None})
+                {"id": _nuevo_id_apunte(), "fecha": fecha, "texto": nota,
+                 "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
         m["actualizado_en"] = _ahora()
         _guardar(data)
         return obtener(mid), ""
@@ -1103,7 +1120,7 @@ def anadir_apunte(mid: str, texto: str, usuario: str | None = None,
             return None, f"la muestra {mid!r} no existe"
         m.setdefault("apuntes", []).append(
             {"id": _nuevo_id_apunte(), "fecha": fecha or _hoy(), "texto": texto,
-             "usuario": usuario or None})
+             "usuario": _actor_username(usuario), "usuario_nombre": _actor_nombre(usuario)})
         m["actualizado_en"] = _ahora()
         _guardar(data)
         return obtener(mid), ""
@@ -1131,7 +1148,8 @@ def editar_apunte(mid: str, apunte_id: str, texto: str | None = None,
             if err:
                 return None, err
             ap["fecha"] = f
-        ap["editado_por"] = usuario or None
+        ap["editado_por"] = _actor_username(usuario)
+        ap["editado_por_nombre"] = _actor_nombre(usuario)
         ap["editado_en"] = _ahora()
         m["actualizado_en"] = _ahora()
         _guardar(data)

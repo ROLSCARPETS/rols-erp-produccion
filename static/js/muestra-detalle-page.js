@@ -238,7 +238,7 @@
       if (imp.numero_raw) origen += ` · número tal como estaba escrito: «${esc(imp.numero_raw)}»`;
       if (imp.solo_registro) origen += ' · solo estaba en el registro de números (sin seguimiento)';
     } else if (M.creado_en) {
-      origen = `Creada el ${fmtFechaHora(M.creado_en)}${M.creado_por ? ' por ' + esc(M.creado_por) : ''}`;
+      origen = `Creada el ${fmtFechaHora(M.creado_en)}${(M.creado_por_nombre || M.creado_por) ? ' por ' + esc(M.creado_por_nombre || M.creado_por) : ''}`;
     }
     if (M.actualizado_en && !imp) origen += ` · última modificación ${fmtFechaHora(M.actualizado_en)}`;
     $('md-origen').innerHTML = origen;
@@ -352,10 +352,13 @@
     }
     $('md-diario').innerHTML = aps.map(a => {
       const meta = [];
-      if (a.usuario) meta.push(esc(a.usuario));
-      if (a.editado_en) meta.push(`editado ${fmtFechaHora(a.editado_en)}`);
+      if (a.editado_en) meta.push(`editado ${fmtFechaHora(a.editado_en)}${(a.editado_por_nombre || a.editado_por) ? ' por ' + esc(a.editado_por_nombre || a.editado_por) : ''}`);
+      const autor = a.usuario_nombre || a.usuario || '';
+      const quien = autor
+        ? `<div class="ms-ap-quien" title="${esc(a.usuario || '')}">${esc(autor)}</div>`
+        : '<div class="ms-ap-quien libro" title="Importado del Libro de muestras (Excel)">del libro</div>';
       return `<div class="ms-ap" data-aid="${esc(a.id)}">
-        <div class="ms-ap-fecha ${a.fecha ? '' : 'sin'}">${a.fecha ? fmtFecha(a.fecha) : 'sin fecha'}</div>
+        <div class="ms-ap-fecha ${a.fecha ? '' : 'sin'}">${a.fecha ? fmtFecha(a.fecha) : 'sin fecha'}${quien}</div>
         <div><div class="ms-ap-texto">${esc(a.texto)}</div>${meta.length ? `<div class="ms-ap-meta">${meta.join(' · ')}</div>` : ''}</div>
         <div class="ms-ap-acciones">
           <button type="button" class="ms-ico-btn" data-accion="editar" title="Editar el apunte">✎</button>
@@ -454,7 +457,7 @@
     const hs = (M.historial || []).slice().reverse();
     $('md-hist-count').textContent = fmtNum(hs.length);
     $('md-historial').innerHTML = hs.length
-      ? hs.map(h => `<li><span class="f">${fmtFechaHora(h.fecha)}</span>${h.usuario ? `<span class="f">${esc(h.usuario)}</span>` : ''}${textoHistorial(h)}</li>`).join('')
+      ? hs.map(h => `<li><span class="f">${fmtFechaHora(h.fecha)}</span>${(h.usuario_nombre || h.usuario) ? `<span class="f">${esc(h.usuario_nombre || h.usuario)}</span>` : ''}${textoHistorial(h)}</li>`).join('')
       : '<li class="ms-mudo">Sin cambios registrados.</li>';
   }
 
