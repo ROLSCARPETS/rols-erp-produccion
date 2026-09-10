@@ -247,7 +247,12 @@
           <button type="button" class="ms-seg-btn" data-tipo="interna">Interna (desarrollo propio)</button>
         </div>
       </div>
-      <div class="full"><label id="ms-n-cliente-lbl">Cliente</label><input type="text" id="ms-n-cliente" list="ms-clientes" placeholder="Nombre del cliente" autocomplete="off" maxlength="160" /><datalist id="ms-clientes"></datalist></div>
+      <div class="full">
+        <label id="ms-n-cliente-lbl">Cliente <small style="font-weight:400;color:#9a9a9a">(escribe y elige de Navision, o déjalo tal cual si es un prospecto)</small></label>
+        <div class="ms-sug-wrap"><input type="text" id="ms-n-cliente" placeholder="Nombre del cliente" autocomplete="off" maxlength="160" /></div>
+        <div class="ms-nav-link" id="ms-n-nav" hidden><span class="tag">Navision</span><b id="ms-n-nav-no"></b><button type="button" class="ms-link" id="ms-n-nav-quitar">quitar vínculo</button></div>
+        <datalist id="ms-clientes"></datalist>
+      </div>
       <div><label>Encargada por <small style="font-weight:400;color:#9a9a9a">(usuario de Rols One)</small></label><select id="ms-n-persona"></select></div>
       <div><label>Telar / técnica</label><select id="ms-n-telar"></select></div>
       <div><label>Prioridad</label><select id="ms-n-prio"><option value="1">1 · Alta</option><option value="2" selected>2 · Media</option><option value="3">3 · Baja</option></select></div>

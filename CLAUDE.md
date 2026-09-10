@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v3). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v4). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -70,8 +70,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   (cache 5 min; si cuentas no responde, se usan los usuarios ya vistos en
   datos). v3 pasó los nombres cortos del libro a su cuenta (Fernando →
   Fernando Ferrández, JM → Jose Manuel Sánchez, Damián, Carmen, Romu, Victor);
-  Paco, Emilio, Blanca, Señor Gómez, Tano y Alberto quedan como "antiguos"
-  (`catalogos.personas_legacy`): filtran el histórico, no valen para altas.
+  v4: Alberto → Alberto Recio. Paco, Emilio, Blanca, Señor Gómez y Tano quedan
+  como "antiguos" (`catalogos.personas_legacy`): filtran el histórico, no
+  valen para altas.
+- **Cliente**: texto libre (prospectos) con buscador sobre el maestro de
+  clientes de Navision que tiene Rols One (`/api/navision/clientes`, copia
+  diaria de BC; el ERP lo proxya en `/api/muestras/clientes-navision`). Al
+  elegir uno se guarda también `cliente_navision` (código C6535...).
 
 ## La costura con Rols One (pendiente, por API)
 

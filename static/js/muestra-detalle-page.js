@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, estadoPill, prioPill, tipoTag, colorearPrio, api,
-          ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro } = window.MS;
+          ESTADOS_LABEL, ESTADOS_FLUJO, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -52,6 +52,7 @@
     $('md-cliente').textContent = M.cliente || (esInterna ? 'Interna' : '—');
     let chips = tipoTag(M) + estadoPill(M.estado, M.estado_label) + ' ' + prioPill(M.prioridad);
     if (M.telar) chips += ` <span class="ms-estado" style="background:#f1ece4;color:#6b5323">${esc(M.telar)}</span>`;
+    if (M.cliente_navision) chips += ` <span class="ms-estado" style="background:#dbeafe;color:#1e40af" title="Cliente vinculado a su ficha de Navision">Navision ${esc(M.cliente_navision)}</span>`;
     if (M.archivada && !TERMINALES.includes(M.estado)) chips += ' <span class="ms-tag-archivada">archivada</span>';
     $('md-chips').innerHTML = chips;
 
@@ -218,6 +219,7 @@
     $('md-f-cliente-lbl').textContent = esInterna ? 'Para quién / proyecto' : 'Cliente';
     $('md-f-cliente').placeholder = esInterna ? 'Ej. Marta · colección 2027' : 'Nombre del cliente';
     $('md-f-cliente').value = M.cliente || '';
+    pintarNavLink();
     rellenarPersona();
     llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
     $('md-f-prioridad').value = String(M.prioridad || 2);
@@ -242,6 +244,39 @@
     $('md-origen').innerHTML = origen;
   }
 
+  function pintarNavLink() {
+    $('md-nav-link').hidden = !M.cliente_navision;
+    $('md-nav-no').textContent = M.cliente_navision || '';
+  }
+
+  // El cliente se escribe o se elige de Navision; al elegir se guarda el
+  // nombre y el código; al editar el texto a mano se quita el vínculo.
+  let clienteEditadoAMano = false;
+  montarBuscadorCliente($('md-f-cliente'), {
+    clientesUsados: () => (CAT && CAT.clientes) || [],
+    onElegir: async (it) => {
+      clienteEditadoAMano = false;
+      const el = $('md-f-cliente');
+      marcar(el, 'saving');
+      try {
+        const d = await api(URL_API, { method: 'PUT', body: { cliente: it.nombre, cliente_navision: it.no || '' } });
+        M = d.muestra; marcar(el, 'saved-ok'); pintarHero(); pintarNavLink(); pintarHistorial();
+      } catch (e) {
+        marcar(el, 'saved-err');
+        await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
+      }
+    },
+    onTexto: () => { clienteEditadoAMano = true; },
+  });
+  $('md-nav-quitar').addEventListener('click', async () => {
+    try {
+      const d = await api(URL_API, { method: 'PUT', body: { cliente_navision: '' } });
+      M = d.muestra; pintarHero(); pintarNavLink(); pintarHistorial();
+    } catch (e) {
+      await window.mostrarAlerta({ titulo: 'No se pudo quitar el vínculo', mensaje: e.message, tipo: 'danger' });
+    }
+  });
+
   function rellenarPersona() {
     llenarSelectPersonas($('md-f-persona'), CAT.personas_activas,
       { vacio: '—', usuario: M.encargada_por_usuario || '', nombre: M.encargada_por || '' });
@@ -263,12 +298,15 @@
     const actual = M[campo] == null ? '' : M[campo];
     if (String(actual) === String(valor)) { marcar(el, null); return; }
     marcar(el, 'saving');
+    const body = { [campo]: valor };
+    if (campo === 'cliente' && clienteEditadoAMano && M.cliente_navision && valor !== (M.cliente || '')) body.cliente_navision = '';
     try {
-      const d = await api(URL_API, { method: 'PUT', body: { [campo]: valor } });
+      const d = await api(URL_API, { method: 'PUT', body });
       M = d.muestra;
       marcar(el, 'saved-ok');
       pintarHero(); pintarStepper(); pintarHistorial();
       if (campo === 'tipo') pintarFicha();
+      if (campo === 'cliente') { clienteEditadoAMano = false; pintarNavLink(); }
       if (campo === 'cliente' || campo === 'encargada_por' || campo === 'telar') {
         // catálogos pueden haber crecido (valor nuevo)
         CAT = await api('/api/muestras/catalogos');

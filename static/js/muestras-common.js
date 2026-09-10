@@ -162,6 +162,76 @@
     sel.value = valor;
   }
 
+  // Buscador de cliente sobre un <input>: sugiere clientes de Navision (copia
+  // de Rols One) y nombres ya usados en muestras; el texto libre sigue valiendo
+  // (prospectos). opts: { clientesUsados: () => [nombres], onElegir: (it) => {}, onTexto: () => {} }
+  // it = { nombre, no (código Navision o null), ciudad }
+  function montarBuscadorCliente(input, opts) {
+    const o = opts || {};
+    const box = document.createElement('div');
+    box.className = 'ms-sug';
+    box.hidden = true;
+    input.insertAdjacentElement('afterend', box);
+    let timer = null, items = [], activo = -1;
+    function cerrar() { box.hidden = true; box.innerHTML = ''; items = []; activo = -1; }
+    function marcar() {
+      [...box.querySelectorAll('.ms-sug-it')].forEach((el, i) => el.classList.toggle('activo', i === activo));
+    }
+    function elegir(it) {
+      if (!it) return;
+      input.value = it.nombre;
+      cerrar();
+      if (o.onElegir) o.onElegir(it);
+    }
+    function pintar(nav, usados, q, disponible) {
+      items = [];
+      let html = '';
+      nav.forEach(c => {
+        items.push({ nombre: c.nombre, no: c.no, ciudad: c.ciudad || '' });
+        html += `<div class="ms-sug-it" data-i="${items.length - 1}"><span class="ms-sug-tag">Navision</span>` +
+                `<span class="ms-sug-nom">${esc(c.nombre)}</span><span class="ms-sug-sub">${esc(c.no || '')}${c.ciudad ? ' · ' + esc(c.ciudad) : ''}${c.alias && c.alias.toLowerCase() !== c.nombre.toLowerCase() ? ' · ' + esc(c.alias) : ''}</span></div>`;
+      });
+      usados.forEach(n => {
+        items.push({ nombre: n, no: null, ciudad: '' });
+        html += `<div class="ms-sug-it" data-i="${items.length - 1}"><span class="ms-sug-tag usado">Ya usado</span><span class="ms-sug-nom">${esc(n)}</span></div>`;
+      });
+      html += `<div class="ms-sug-pie">${items.length ? '↑↓ y Intro para elegir · ' : ''}${disponible ? '' : 'Navision no responde ahora · '}se puede dejar «${esc(q)}» tal cual (prospecto)</div>`;
+      box.innerHTML = html;
+      box.hidden = false;
+      activo = -1;
+    }
+    async function buscar() {
+      const q = input.value.trim();
+      if (q.length < 2) { cerrar(); return; }
+      let nav = [], disponible = true;
+      try {
+        const d = await api('/api/muestras/clientes-navision?q=' + encodeURIComponent(q));
+        nav = d.clientes || []; disponible = d.disponible !== false;
+      } catch (e) { disponible = false; }
+      if (input.value.trim() !== q || document.activeElement !== input) return;
+      const qk = q.toLowerCase();
+      const usados = (o.clientesUsados ? o.clientesUsados() : [])
+        .filter(n => n.toLowerCase().includes(qk) && !nav.some(c => c.nombre.toLowerCase() === n.toLowerCase()))
+        .slice(0, 6);
+      pintar(nav.slice(0, 10), usados, q, disponible);
+    }
+    input.addEventListener('input', () => { clearTimeout(timer); if (o.onTexto) o.onTexto(); timer = setTimeout(buscar, 250); });
+    input.addEventListener('focus', () => { if (input.value.trim().length >= 2) buscar(); });
+    input.addEventListener('blur', () => setTimeout(cerrar, 150));
+    input.addEventListener('keydown', (e) => {
+      if (box.hidden || !items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); activo = Math.min(items.length - 1, activo + 1); marcar(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activo = Math.max(0, activo - 1); marcar(); }
+      else if (e.key === 'Enter' && activo >= 0) { e.preventDefault(); elegir(items[activo]); }
+      else if (e.key === 'Escape') { cerrar(); }
+    });
+    box.addEventListener('mousedown', (e) => {
+      const it = e.target.closest('.ms-sug-it');
+      if (it) { e.preventDefault(); elegir(items[Number(it.dataset.i)]); }
+    });
+    return { cerrar, buscar };
+  }
+
   // Al elegir "Otro…" en un select de catálogo: pide el valor, lo guarda y lo selecciona.
   async function gestionarOtro(sel, tipo, etiqueta) {
     if (sel.value !== '__otro__') return true;
@@ -180,5 +250,5 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
-    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro };
+    numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente };
 })();

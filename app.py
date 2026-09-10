@@ -1915,6 +1915,66 @@ def _usuarios_one_con_permiso(permiso: str):
     return hit[0] if hit else None
 
 
+# Maestro de clientes de Navision: Rols One guarda la copia diaria de BC
+# (rols-calculadora /api/navision/clientes). Se consulta con la sesion del
+# usuario; cache corta por texto buscado.
+_CLIENTES_NAV_CACHE: dict = {}
+_CLIENTES_NAV_TTL = 120.0
+
+
+def _clientes_navision(q: str) -> tuple[list, bool]:
+    """(clientes, disponible). clientes = [{no, nombre, alias, ciudad, pais}]."""
+    q = (q or "").strip()
+    key = q.lower()
+    now = time.time()
+    hit = _CLIENTES_NAV_CACHE.get(key)
+    if hit and (now - hit[1]) < _CLIENTES_NAV_TTL:
+        return hit[0], True
+    val = request.cookies.get(_SSO_COOKIE)
+    if not val:
+        return [], False
+    try:
+        import urllib.request
+        from urllib.parse import urlencode
+        req = urllib.request.Request(
+            _rols_one_base() + "/api/navision/clientes?" + urlencode({"q": q, "limite": 15}),
+            headers={"Cookie": f"{_SSO_COOKIE}={val}"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                lista = (json.loads(resp.read().decode("utf-8")) or {}).get("clientes") or []
+                out = []
+                for c in lista:
+                    nombre = (c.get("name") or "").strip()
+                    if not nombre:
+                        continue
+                    out.append({"no": c.get("customer_no"), "nombre": nombre,
+                                "alias": (c.get("alias") or "").strip(),
+                                "ciudad": (c.get("city") or "").strip(),
+                                "pais": (c.get("country_code") or "").strip()})
+                if len(_CLIENTES_NAV_CACHE) > 500:
+                    _CLIENTES_NAV_CACHE.clear()
+                _CLIENTES_NAV_CACHE[key] = (out, now)
+                return out, True
+    except Exception:
+        pass
+    return [], False
+
+
+@app.route("/api/muestras/clientes-navision")
+def api_muestras_clientes_navision():
+    """Sugerencias de cliente para el alta/ficha: busca en el maestro de
+    clientes de Navision que tiene Rols One. `disponible: false` si la copia
+    no responde (el campo sigue admitiendo texto libre)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify({"clientes": [], "disponible": True})
+    lista, ok = _clientes_navision(q)
+    return jsonify({"clientes": lista, "disponible": ok})
+
+
 def _ctx_personas() -> dict:
     """Argumentos de personas para el modulo de muestras (lista viva de One +
     usuario de la sesion, que siempre puede encargar)."""

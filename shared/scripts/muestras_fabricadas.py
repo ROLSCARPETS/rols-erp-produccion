@@ -91,7 +91,7 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 3
+_VERSION_SCHEMA = 4
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
@@ -110,11 +110,13 @@ _PERSONAS_LEGACY_A_ONE = {
     "carmen":   ("Carmen Ferrández", "carmen"),
     "romu":     ("Romu Más", "romu"),
     "victor":   ("Víctor Penalva", "víctor"),
+    "alberto":  ("Alberto Recio", "alberto"),      # v4
 }
 
 CAMPOS_EDITABLES = {
-    "tipo", "cliente", "descripcion", "encargada_por", "prioridad", "telar",
-    "fecha_solicitud", "fecha_lista", "resultado", "anotacion_registro",
+    "tipo", "cliente", "cliente_navision", "descripcion", "encargada_por",
+    "prioridad", "telar", "fecha_solicitud", "fecha_lista", "resultado",
+    "anotacion_registro",
 }
 _MAX_TEXTO = 6000
 
@@ -159,7 +161,9 @@ def cargar() -> dict:
             if v < _VERSION_SCHEMA:
                 if v < 2:
                     _migrar_v2(data)
-                if v < 3:
+                if v < 4:
+                    # v3 (usuarios de One) es idempotente; v4 solo amplia el
+                    # mapeo (Alberto → Alberto Recio), asi que se reaplica.
                     _migrar_v3(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
@@ -523,7 +527,7 @@ def _historial(m: dict, usuario, tipo: str, **extra) -> None:
 
 
 def _texto_buscable(m: dict) -> str:
-    partes = [m.get("id"), m.get("cliente"), m.get("descripcion"),
+    partes = [m.get("id"), m.get("cliente"), m.get("cliente_navision"), m.get("descripcion"),
               m.get("anotacion_registro"), m.get("resultado"),
               m.get("encargada_por"), m.get("telar"),
               ESTADOS_LABEL.get(m.get("estado") or "", ""),
@@ -544,6 +548,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "id": m.get("id"), "numero": m.get("numero"), "sufijo": m.get("sufijo") or "",
         "fecha_solicitud": m.get("fecha_solicitud"), "cliente": m.get("cliente") or "",
         "tipo": m.get("tipo") or "cliente",
+        "cliente_navision": m.get("cliente_navision"),
         "encargada_por": m.get("encargada_por") or "",
         "encargada_por_usuario": m.get("encargada_por_usuario"),
         "prioridad": m.get("prioridad"),
@@ -807,6 +812,18 @@ def _validar_texto(v, campo: str, maximo: int = _MAX_TEXTO) -> tuple[str, str]:
     return v, ""
 
 
+def _validar_codigo_navision(v) -> tuple[str | None, str]:
+    """Codigo de cliente de Navision (C6535, D2158...). Vacio = sin vincular."""
+    if v in (None, ""):
+        return None, ""
+    if not isinstance(v, str):
+        return None, "cliente_navision debe ser texto"
+    v = v.strip().upper()
+    if len(v) > 30 or not re.fullmatch(r"[A-Z0-9][A-Z0-9._/-]*", v):
+        return None, "cliente_navision no parece un codigo de cliente"
+    return v, ""
+
+
 def _validar_prioridad(v) -> tuple[int | None, str]:
     if v in (None, ""):
         return None, ""
@@ -865,6 +882,9 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         return None, err
     if tipo == "cliente" and not cliente:
         return None, "el cliente es obligatorio (o marca la muestra como interna)"
+    cliente_navision, err = _validar_codigo_navision(datos.get("cliente_navision"))
+    if err:
+        return None, err
     descripcion, err = _validar_texto(datos.get("descripcion"), "descripcion")
     if err:
         return None, err
@@ -926,6 +946,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         nueva = {
             "id": mid, "numero": numero, "sufijo": sufijo,
             "fecha_solicitud": fecha, "cliente": cliente, "tipo": tipo,
+            "cliente_navision": cliente_navision,
             "encargada_por": persona, "encargada_por_usuario": persona_usuario,
             "prioridad": prioridad if prioridad is not None else 2,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
@@ -963,6 +984,10 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
         for k, v in datos.items():
             if k == "tipo":
                 v = tipo_final
+            elif k == "cliente_navision":
+                v, err = _validar_codigo_navision(v)
+                if err:
+                    return None, err
             elif k in ("cliente", "descripcion", "resultado", "anotacion_registro"):
                 v, err = _validar_texto(v, k, 160 if k == "cliente" else _MAX_TEXTO)
                 if err:

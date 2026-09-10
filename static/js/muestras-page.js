@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
-          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, llenarSelectPersonas, gestionarOtro } = window.MS;
+          ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -397,6 +397,18 @@
   // ------------------------------------------------------------
   const modal = $('ms-modal-nueva');
   let tipoNuevo = 'cliente';
+  // Cliente elegido de Navision (código); se pierde si se edita el texto
+  let clienteNav = null;
+  function pintarNavLink() {
+    $('ms-n-nav').hidden = !clienteNav;
+    $('ms-n-nav-no').textContent = clienteNav || '';
+  }
+  montarBuscadorCliente($('ms-n-cliente'), {
+    clientesUsados: () => (ST.catalogos && ST.catalogos.clientes) || [],
+    onElegir: (it) => { clienteNav = it.no || null; pintarNavLink(); },
+    onTexto: () => { if (clienteNav) { clienteNav = null; pintarNavLink(); } },
+  });
+  $('ms-n-nav-quitar').addEventListener('click', () => { clienteNav = null; pintarNavLink(); });
   function ponerTipoNuevo(tipo) {
     tipoNuevo = tipo === 'interna' ? 'interna' : 'cliente';
     modal.querySelectorAll('#ms-n-tipo-seg .ms-seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tipo === tipoNuevo));
@@ -417,6 +429,7 @@
     llenarSelect($('ms-n-telar'), c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
+    clienteNav = null; pintarNavLink();
     colorearPrio($('ms-n-prio'));
     $('ms-n-fecha').value = hoyISO();
     $('ms-n-variante').value = ''; $('ms-n-manual').value = '';
@@ -444,7 +457,7 @@
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
     const body = {
-      cliente, tipo: tipoNuevo, descripcion: $('ms-n-desc').value.trim(),
+      cliente, tipo: tipoNuevo, cliente_navision: clienteNav || '', descripcion: $('ms-n-desc').value.trim(),
       encargada_por: $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
