@@ -1,20 +1,21 @@
-"""Envio de correo (SMTP) del ERP de Produccion.
+"""Envio de correo del ERP de Produccion (avisos de muestras).
 
-Misma convencion que `notificar.py` de Rols One, para poder copiar la misma
-configuracion al .env de este servidor (NUNCA al repo):
+Funciona igual que los avisos de Rols Muestras (muestras.rolscarpets.com):
+por defecto entrega al MTA local de Plesk (localhost:25, sin credenciales),
+que es quien reparte a los buzones de rolscarpets.com. No hace falta
+configurar nada en el servidor. Si hiciera falta otro servidor, se acepta
+cualquiera de las dos convenciones ya usadas en la suite (en el .env del
+servidor, NUNCA en el repo):
 
-  ROLS_SMTP_HOST   servidor SMTP (p.ej. smtp.office365.com)
-  ROLS_SMTP_PORT   587 por defecto (STARTTLS); 465 = SSL directo
-  ROLS_SMTP_USER   usuario (el buzon que envia)
-  ROLS_SMTP_PASS   contrasena (o contrasena de aplicacion)
-  ROLS_SMTP_FROM   remitente visible; por defecto "Rols Produccion <usuario>"
+  Rols One (notificar.py):   ROLS_SMTP_HOST / ROLS_SMTP_PORT / ROLS_SMTP_USER
+                             ROLS_SMTP_PASS / ROLS_SMTP_FROM
+  Rols Muestras:             SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS
 
-Alternativa sin variables de entorno (mismo patron que erp_api_token.txt):
-un fichero `correo.json` en ROLS_DATA_DIR con las claves host, port, user,
-pass, from.
+o un fichero `correo.json` en ROLS_DATA_DIR con host, port, user, pass, from.
 
-Sin configuracion, `configurado()` es False y `enviar()` devuelve
-(False, "correo no configurado") sin lanzar: los avisos son best-effort.
+Remitente por defecto: "Rols Producción <produccion@rolscarpets.com>"
+(ROLS_SMTP_FROM lo cambia). En local (Windows) no hay MTA: sin configuracion
+explicita `configurado()` es False y no se intenta nada.
 """
 from __future__ import annotations
 
@@ -22,10 +23,9 @@ import json
 import os
 import smtplib
 from email.message import EmailMessage
-from email.utils import formataddr
 from pathlib import Path
 
-_REMITENTE_DEFECTO = "Rols Producción"
+REMITENTE_DEFECTO = "Rols Producción <produccion@rolscarpets.com>"
 
 
 def _fichero_cfg() -> Path:
@@ -33,35 +33,48 @@ def _fichero_cfg() -> Path:
     return Path(base) / "correo.json"
 
 
+def _env(*claves) -> str:
+    for k in claves:
+        v = (os.environ.get(k) or "").strip()
+        if v:
+            return v
+    return ""
+
+
 def _cfg() -> dict | None:
-    host = (os.environ.get("ROLS_SMTP_HOST") or "").strip()
-    origen = "entorno"
-    port = os.environ.get("ROLS_SMTP_PORT")
-    user = (os.environ.get("ROLS_SMTP_USER") or "").strip()
-    password = os.environ.get("ROLS_SMTP_PASS") or ""
-    de = (os.environ.get("ROLS_SMTP_FROM") or "").strip()
-    if not host:
-        f = _fichero_cfg()
-        if not f.exists():
-            return None
-        try:
-            d = json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        host = (d.get("host") or "").strip()
-        if not host:
-            return None
-        origen = "fichero"
-        port = d.get("port")
-        user = (d.get("user") or "").strip()
-        password = d.get("pass") or d.get("password") or ""
-        de = (d.get("from") or "").strip()
+    host = _env("ROLS_SMTP_HOST")
+    if host:
+        origen = "entorno (ROLS_SMTP_*)"
+        port, user, password = _env("ROLS_SMTP_PORT"), _env("ROLS_SMTP_USER"), os.environ.get("ROLS_SMTP_PASS") or ""
+    else:
+        host = _env("SMTP_HOST")
+        if host:
+            origen = "entorno (SMTP_*, como Rols Muestras)"
+            port, user, password = _env("SMTP_PORT"), _env("SMTP_USER"), os.environ.get("SMTP_PASS") or ""
+        else:
+            port = user = password = ""
+            origen = ""
+            f = _fichero_cfg()
+            if f.exists():
+                try:
+                    d = json.loads(f.read_text(encoding="utf-8"))
+                    host = (d.get("host") or "").strip()
+                    if host:
+                        origen = "fichero correo.json"
+                        port = str(d.get("port") or "")
+                        user = (d.get("user") or "").strip()
+                        password = d.get("pass") or d.get("password") or ""
+                except (OSError, ValueError, AttributeError):
+                    host = ""
+            if not host:
+                if os.name == "nt":
+                    return None   # local Windows: sin MTA, no se intenta
+                host, port, origen = "localhost", "25", "MTA local de Plesk (como Rols Muestras)"
     try:
-        port_i = int(port or 587)
+        port_i = int(port or (25 if host in ("localhost", "127.0.0.1") else 587))
     except (TypeError, ValueError):
-        port_i = 587
-    if not de:
-        de = formataddr((_REMITENTE_DEFECTO, user)) if user else f"{_REMITENTE_DEFECTO} <produccion@rolscarpets.com>"
+        port_i = 25 if host in ("localhost", "127.0.0.1") else 587
+    de = _env("ROLS_SMTP_FROM", "AVISOS_FROM") or REMITENTE_DEFECTO
     return {"host": host, "port": port_i, "user": user, "password": password,
             "de": de, "origen": origen}
 
@@ -101,18 +114,18 @@ def enviar(para, asunto: str, texto: str, html: str | None = None,
         if html:
             msg.add_alternative(html, subtype="html")
         if cfg["port"] == 465:
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=20) as s:
+            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=25) as s:
                 if cfg["user"]:
                     s.login(cfg["user"], cfg["password"])
                 s.send_message(msg)
         else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as s:
+            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=25) as s:
                 s.ehlo()
-                try:
+                # TLS oportunista (igual que Rols Muestras): si el servidor lo
+                # ofrece se usa; obligatorio con Microsoft 365.
+                if s.has_extn("starttls"):
                     s.starttls()
                     s.ehlo()
-                except smtplib.SMTPException:
-                    pass  # servidor interno sin TLS
                 if cfg["user"]:
                     s.login(cfg["user"], cfg["password"])
                 s.send_message(msg)

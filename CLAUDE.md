@@ -79,8 +79,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   terminada/cancelada lo limpian.
 - **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
-  del próximo hito (`hito_avisado` evita repetir). SMTP con `ROLS_SMTP_*` del
-  `.env` del servidor (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
+  del próximo hito (`hito_avisado` evita repetir). Envío como Rols Muestras:
+  MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
+  `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
   chequeo de hitos corre en segundo plano como mucho cada 15 min desde
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).

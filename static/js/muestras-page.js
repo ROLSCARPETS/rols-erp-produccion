@@ -408,7 +408,7 @@
       const e = await api('/api/muestras/avisos/estado');
       if (e.configurado) {
         box.innerHTML = `<span class="ms-estado" style="background:#e8f3e1;color:#2f6b29">Correo configurado</span> ` +
-          `remitente <b>${esc(e.remitente)}</b> · servidor ${esc(e.host)} · e-mails conocidos de ${fmtNum(e.directorio_usuarios)} usuarios` +
+          `remitente <b>${esc(e.remitente)}</b> · servidor ${esc(e.host)}${e.origen ? ' — ' + esc(e.origen) : ''} · e-mails conocidos de ${fmtNum(e.directorio_usuarios)} usuarios` +
           (e.ultimo_chequeo_hitos ? ` · último chequeo de hitos ${esc(String(e.ultimo_chequeo_hitos).replace('T', ' ').slice(0, 16))}` : ' · el chequeo de hitos corre solo al usar la app (como mucho cada 15 min)');
       } else {
         box.innerHTML = `<span class="ms-estado" style="background:#fde2e2;color:#9b1c1c">Correo sin configurar</span> ` +
