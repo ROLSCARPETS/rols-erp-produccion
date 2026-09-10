@@ -141,7 +141,7 @@
               <th class="sortable" data-sort="numero">Nº M <span class="arrow">▲</span></th>
               <th class="sortable" data-sort="fecha_solicitud">Solicitud <span class="arrow">▲</span></th>
               <th class="sortable" data-sort="cliente">Cliente <span class="arrow">▲</span></th>
-              <th>Muestra</th>
+              <th title="Referencia de la muestra (si no tiene, se ve la descripción)">Referencia</th>
               <th>Encargada por</th>
               <th class="sortable" data-sort="prioridad">Prioridad <span class="arrow">▲</span></th>
               <th>Telar</th>
@@ -188,7 +188,7 @@
         <table class="ms-tabla">
           <thead>
             <tr>
-              <th>Nº M</th><th>Solicitud</th><th>Cliente</th><th>Muestra</th><th>Encargada por</th>
+              <th>Nº M</th><th>Solicitud</th><th>Cliente</th><th title="Referencia de la muestra (si no tiene, se ve la descripción)">Referencia</th><th>Encargada por</th>
               <th>Telar</th><th>Estado</th><th>Lista</th><th class="num" title="Días desde la solicitud hasta que estuvo lista">Plazo</th><th>Resultado</th>
             </tr>
           </thead>
@@ -294,6 +294,7 @@
           <div><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option></select></div>
         </div>
       </div>
+      <div class="full"><label>Referencia muestra <small style="font-weight:400;color:#9a9a9a">(resumen corto: es lo que sale en el listado)</small></label><input type="text" id="ms-n-ref" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" /></div>
       <div class="full"><label>Descripción de la muestra</label><textarea id="ms-n-desc" rows="3" placeholder="Ej. 2 MUESTRAS TEJIDAS - WILTON 30 - Lana 100 2/c - 2 cuerpos…"></textarea></div>
       <div class="full ms-numero-opts">
         <label><input type="radio" name="ms-n-tipo" value="auto" checked /> Nuevo número: <b id="ms-n-siguiente">M-…</b></label>

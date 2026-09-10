@@ -87,6 +87,8 @@ def _cabecera(m: dict) -> str:
 
 def _bloque_datos(m: dict) -> list[tuple[str, str]]:
     filas = [("Cliente", (m.get("cliente") or "") + ("  (interna)" if m.get("tipo") == "interna" else ""))]
+    if m.get("referencia"):
+        filas.append(("Referencia", m["referencia"]))
     if m.get("descripcion"):
         filas.append(("Muestra", mf._recortar(m.get("descripcion"), 300)))
     if m.get("telar"):

@@ -92,7 +92,7 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 4
+_VERSION_SCHEMA = 5
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
@@ -138,6 +138,9 @@ _PERSONAS_LEGACY_A_ONE = {
 
 CAMPOS_EDITABLES = {
     "tipo", "cliente", "cliente_navision", "descripcion", "encargada_por",
+    # Referencia muestra: resumen corto (una linea) que sale en el listado;
+    # `descripcion` sigue siendo el texto largo.
+    "referencia",
     "prioridad", "telar", "fecha_solicitud", "fecha_lista", "resultado",
     "anotacion_registro",
     # Fecha estimada de muestra lista (prevision mientras esta en curso;
@@ -196,6 +199,8 @@ def cargar() -> dict:
                     # v3 (usuarios de One) es idempotente; v4 solo amplia el
                     # mapeo (Alberto → Alberto Recio), asi que se reaplica.
                     _migrar_v3(data)
+                if v < 5:
+                    _migrar_v5(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -254,6 +259,45 @@ def _migrar_v3(data: dict) -> None:
     cat = data.setdefault("catalogos", {})
     cat.pop("personas", None)
     cat["personas_legacy"] = sorted(legacy, key=_clave)
+
+
+# v5 (sept 2026): "Referencia muestra" escrita a mano para las muestras que
+# estaban en curso al estrenar el campo (resumen de su descripcion del libro).
+_REFERENCIAS_V5 = {
+    "5486-B": "Print Colortec 1300 g, diseño pasillos y salientes adaptado, colores 025 y 075",
+    "5448-C": "2 muestras Wilton 30 TRAP, lana 100 3/c crema + 5/c caramel, picado doble",
+    "5448-D": "3 muestras Wilton 30 TRAP, lana 100 4/c + 6/c, picado doble",
+    "5448-E": "3 muestras Wilton 30 TRAP, lana 100 6/c + 8/c, picado doble",
+    "5448-F": "Muestra Wilton 30 TRAP, lana 100 4/c + 6/c, picado doble, comb. cream / mocha",
+    "5502": "Print Colortec 2.300 g",
+    "5505": "6 muestras tejido plano (rombos, cuadros, dunas), calidades Maya y Nórdica",
+    "5506": "Print Colortec 1400 g, 2 colores, diseño especial con logo del hotel",
+    "5507": "Kibby Colortec",
+    "5473-C": "4 muestras Lancetas 32x32, dib. 7516 jaspeado base latte, 4 combinaciones, calidad Manuela",
+    "5510": "2 muestras Lancetas 32x36, chevron doble espiga, crudo / caramel, lana 140/4",
+    "5512": "Prints",
+    "5515": "Pompones de laboratorio Stria (Capasso / Carabello), lana 65 2/c, sage green",
+    "5499-B": "Muestra Tufting 1/10 Paradise, nylon eco 1800/420, terciopelo suave termoendurecido",
+    "5516": "Muestra Lancetas 32x36, dib. Lite, fileta degradé lana 140 5/c y 6/c, trama enfeltrado",
+    "5517": "Muestras Palma, dibujo especial",
+    "5522": "Print Wilton 30, dibujo pindot",
+    "5525": "Print Colortec 1.100 g",
+    "5528": "Print Wilton 4 cuerpos",
+    "5530": "Print Wilton 4 cuerpos",
+}
+
+
+def _migrar_v5(data: dict) -> None:
+    """v4 → v5: estrena `referencia` (resumen corto). Las muestras que estaban
+    en curso reciben la referencia escrita a mano; el resto queda vacia (el
+    listado ensena la descripcion mientras no tengan). Idempotente: no pisa
+    una referencia ya puesta."""
+    for m in data.get("muestras", []):
+        if (m.get("referencia") or "").strip():
+            continue
+        ref = _REFERENCIAS_V5.get(str(m.get("id") or ""))
+        if ref:
+            m["referencia"] = ref
 
 
 def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:
@@ -578,7 +622,7 @@ def _historial(m: dict, usuario, tipo: str, **extra) -> None:
 
 
 def _texto_buscable(m: dict) -> str:
-    partes = [m.get("id"), m.get("cliente"), m.get("cliente_navision"), m.get("descripcion"),
+    partes = [m.get("id"), m.get("cliente"), m.get("cliente_navision"), m.get("referencia"), m.get("descripcion"),
               m.get("anotacion_registro"), m.get("resultado"),
               m.get("encargada_por"), m.get("telar"), m.get("material"),
               ESTADOS_LABEL.get(m.get("estado") or "", ""),
@@ -610,6 +654,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "proximo_hito_fecha": m.get("proximo_hito_fecha"),
         "proximo_hito": m.get("proximo_hito") or "",
         "hito_vencido": _hito_vencido(m, hoy),
+        "referencia": m.get("referencia") or "",
         "descripcion": _recortar(m.get("descripcion"), 220) if recortar_textos else (m.get("descripcion") or ""),
         "resultado": _recortar(m.get("resultado"), 160),
         "ultimo_apunte": ({"fecha": ultimo.get("fecha"), "texto": _recortar(ultimo.get("texto"), 180),
@@ -697,6 +742,7 @@ def obtener(mid: str) -> dict | None:
         return None
     out = dict(m)
     out["tipo"] = out.get("tipo") or "cliente"
+    out["referencia"] = out.get("referencia") or ""
     out["estado_label"] = ESTADOS_LABEL.get(out.get("estado") or "", out.get("estado") or "—")
     out["prioridad_label"] = PRIORIDADES.get(out.get("prioridad") or 0, "")
     out["activa"] = es_activa(m)
@@ -716,6 +762,7 @@ def obtener(mid: str) -> dict | None:
         {"id": v.get("id"), "sufijo": v.get("sufijo") or "", "estado": v.get("estado"),
          "estado_label": ESTADOS_LABEL.get(v.get("estado") or "", "—"),
          "cliente": v.get("cliente") or "", "fecha_solicitud": v.get("fecha_solicitud"),
+         "referencia": v.get("referencia") or "",
          "descripcion": _recortar(v.get("descripcion"), 120)}
         for v in data["muestras"]
         if v.get("numero") is not None and v.get("numero") == m.get("numero") and v is not m
@@ -916,6 +963,17 @@ def _validar_prioridad(v) -> tuple[int | None, str]:
     return p, ""
 
 
+def _validar_referencia(v) -> tuple[str, str]:
+    """Referencia muestra: una sola linea de hasta 120 caracteres."""
+    v, err = _validar_texto(v, "referencia", 400)
+    if err:
+        return "", err
+    v = " ".join(v.split())
+    if len(v) > 120:
+        return "", "referencia demasiado larga (max 120)"
+    return v, ""
+
+
 def _validar_opcion(v, campo: str, opciones) -> tuple[str, str]:
     """Selector cerrado: acepta el slug o la etiqueta (sin distinguir
     mayusculas ni acentos). Vacio = sin dato."""
@@ -1019,6 +1077,9 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
     descripcion, err = _validar_texto(datos.get("descripcion"), "descripcion")
     if err:
         return None, err
+    referencia, err = _validar_referencia(datos.get("referencia"))
+    if err:
+        return None, err
     resultado, err = _validar_texto(datos.get("resultado"), "resultado")
     if err:
         return None, err
@@ -1095,6 +1156,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "encargada_por": persona, "encargada_por_usuario": persona_usuario,
             "prioridad": prioridad if prioridad is not None else 2,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
+            "referencia": referencia,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
             "fecha_estimada": fecha_estimada,
@@ -1135,6 +1197,10 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v = tipo_final
             elif k == "cliente_navision":
                 v, err = _validar_codigo_navision(v)
+                if err:
+                    return None, err
+            elif k == "referencia":
+                v, err = _validar_referencia(v)
                 if err:
                     return None, err
             elif k in ("cliente", "descripcion", "resultado", "anotacion_registro"):

@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v4). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v5). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -61,6 +61,11 @@ laboratorio pueda llevar las muestras sin ver costes.
   quien la lleva (en rojo si se pasa). `fecha_lista` es la fecha REAL: la fija
   el paso a `terminada` y es la que usan plazos y análisis; en la ficha solo
   se enseña cuando la muestra está terminada.
+- `referencia` = "Referencia muestra": resumen corto de una línea (≤120) que
+  sale en la columna del listado, en el hero de la ficha y en los correos;
+  `descripcion` sigue siendo el texto largo (el listado la enseña si no hay
+  referencia). v5 rellenó a mano la referencia de las que estaban en curso
+  (`_REFERENCIAS_V5`).
 - **Datos técnicos** (solo con telar **Varilla**): `material`, `pasadas`,
   `altura_felpa` (texto corto), `pelo` (corte | bucle | corte_bucle) y
   `acabado` (latex | sin_aprestar). Van planos en la muestra; la ficha y el

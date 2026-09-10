@@ -56,6 +56,8 @@
     if (M.cliente_navision) chips += ` <span class="ms-estado" style="background:#dbeafe;color:#1e40af" title="Cliente vinculado a su ficha de Navision">Navision ${esc(M.cliente_navision)}</span>`;
     if (M.archivada && !TERMINALES.includes(M.estado)) chips += ' <span class="ms-tag-archivada">archivada</span>';
     $('md-chips').innerHTML = chips;
+    $('md-ref').textContent = M.referencia || '';
+    $('md-ref').hidden = !M.referencia;
 
     const partes = [];
     if (M.fecha_solicitud) partes.push(`Solicitada el ${fmtFecha(M.fecha_solicitud)}${M.encargada_por ? ' por ' + esc(M.encargada_por) : ''}`);
@@ -247,6 +249,7 @@
     $('md-f-hito-fecha').value = M.proximo_hito_fecha || '';
     $('md-f-hito-fecha').classList.toggle('vencido-campo', !!M.hito_vencido);
     $('md-f-hito').value = M.proximo_hito || '';
+    $('md-f-ref').value = M.referencia || '';
     $('md-f-desc').value = M.descripcion || '';
     $('md-f-resultado').value = M.resultado || '';
     const hayAnot = !!(M.anotacion_registro || '').trim();
@@ -559,7 +562,7 @@
     $('md-variantes').innerHTML = vs.map(v => `<a class="ms-variante" href="/muestras-fabricadas/${encodeURIComponent(v.id)}">
         <span class="ms-num"><span class="pre">M-</span>${esc(v.id)}</span>
         ${estadoPill(v.estado, v.estado_label)}
-        <span class="d" title="${esc(v.descripcion)}">${esc(v.cliente)}${v.descripcion ? ' · ' + esc(v.descripcion) : ''}</span>
+        <span class="d" title="${esc(v.descripcion)}">${esc(v.cliente)}${(v.referencia || v.descripcion) ? ' · ' + esc(v.referencia || v.descripcion) : ''}</span>
         <span class="ms-fecha ms-mudo">${fmtFecha(v.fecha_solicitud, false)}</span>
       </a>`).join('');
   }
@@ -569,7 +572,7 @@
     if (t === 'creacion') return h.texto || 'Alta de la muestra';
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', pelo: 'Pelo', acabado: 'Acabado' };
+      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', pelo: 'Pelo', acabado: 'Acabado' };
       const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;
     }

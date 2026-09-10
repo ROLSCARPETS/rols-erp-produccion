@@ -177,7 +177,7 @@
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
-      <td><div class="ms-desc" title="${esc(m.descripcion)}">${esc(m.descripcion) || mudo}</div></td>
+      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${prioPill(m.prioridad)}</td>
       <td>${esc(m.telar) || mudo}</td>
@@ -330,7 +330,7 @@
       <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
-      <td><div class="ms-desc" title="${esc(m.descripcion)}">${esc(m.descripcion) || mudo}</div></td>
+      <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
       <td>${esc(m.telar) || mudo}</td>
       <td>${estadoPill(m.estado, m.estado_label)}${arch}</td>
@@ -533,7 +533,7 @@
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
-    ['ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    ['ms-n-ref', 'ms-n-material', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
     $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
@@ -567,7 +567,7 @@
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
     const body = {
-      cliente, tipo: tipoNuevo, cliente_navision: clienteNav || '', descripcion: $('ms-n-desc').value.trim(),
+      cliente, tipo: tipoNuevo, cliente_navision: clienteNav || '', referencia: $('ms-n-ref').value.trim(), descripcion: $('ms-n-desc').value.trim(),
       encargada_por: $('ms-n-persona').value,
       telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
