@@ -2377,22 +2377,29 @@ def api_muestra_adjuntos(mid):
         return jsonify({"error": f"el fichero pasa de {maximo // (1024 * 1024)} MB"}), 413
     contenido = f.read(maximo + 1)
     m, err = mf.guardar_adjunto(mid, f.filename, contenido, usuario=_actor(),
-                                clase=request.form.get("clase") or "diseno")
+                                clase=request.form.get("clase") or "version")
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
     return jsonify({"muestra": m}), 201
 
 
-@app.route("/api/muestras/<mid>/adjuntos/<aid>", methods=["GET", "DELETE"])
+@app.route("/api/muestras/<mid>/adjuntos/<aid>", methods=["GET", "PUT", "DELETE"])
 def api_muestra_adjunto(mid, aid):
     """GET sirve el fichero (imagen/PDF en la pestaña, el resto se descarga;
-    `?dl=1` fuerza descarga). DELETE lo quita (queda rastro en el historial)."""
+    `?dl=1` fuerza descarga). PUT {clase} cambia la etiqueta (version / final /
+    otro). DELETE lo quita (queda rastro en el historial)."""
     bl = _requiere("muestras_fabricadas")
     if bl:
         return bl
     mf = _muestras_module()
     if request.method == "DELETE":
         m, err = mf.borrar_adjunto(mid, aid, usuario=_actor())
+        if err:
+            return jsonify({"error": err}), (404 if "no existe" in err else 400)
+        return jsonify({"muestra": m})
+    if request.method == "PUT":
+        data = request.get_json(force=True, silent=True) or {}
+        m, err = mf.etiquetar_adjunto(mid, aid, data.get("clase"), usuario=_actor())
         if err:
             return jsonify({"error": err}), (404 if "no existe" in err else 400)
         return jsonify({"muestra": m})

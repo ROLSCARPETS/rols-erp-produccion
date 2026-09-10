@@ -399,3 +399,11 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-adj-zona { display: flex; align-items: center; gap: 0.6rem; border: 1px dashed var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: #faf8f5; transition: border-color 0.12s, background 0.12s; }
 .ms-adj-zona.over { border-color: var(--accent); background: #fff8e1; }
 .ms-adj-ayuda { font-size: 0.74rem; color: #9a9a9a; }
+
+/* ---- Etiqueta de cada adjunto (versión / diseño final / otro) ---- */
+.ms-adj-linea { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; min-width: 0; }
+.ms-adj-clase { appearance: none; -webkit-appearance: none; border: 1px solid var(--border); border-radius: 999px; font-family: inherit; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; padding: 0.12rem 1.3rem 0.12rem 0.55rem; background: #f4f1ec url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%237a7a7a' stroke-width='2.2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 0.35rem center / 11px; color: #6b6b6b; cursor: pointer; line-height: 1.3; }
+.ms-adj-clase.final { background-color: #e8f3e1; color: #256b1f; border-color: #b9dcae; }
+.ms-adj-clase:focus { outline: none; border-color: var(--accent); }
+.ms-adj-clase-sel { border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.78rem; padding: 0.3rem 0.5rem; background: #fff; color: #2a2a2a; }
+.ms-adj-clase-sel:focus { outline: none; border-color: var(--accent); }

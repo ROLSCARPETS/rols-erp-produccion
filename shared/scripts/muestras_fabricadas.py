@@ -757,7 +757,7 @@ def obtener(mid: str) -> dict | None:
         out[k] = out.get(k) or ""
     out["es_varilla"] = _es_telar_tecnico(m.get("telar"))
     out["tecnica_resumen"] = resumen_tecnico(m)
-    out["adjuntos"] = [_adjunto_publico(a) for a in (m.get("adjuntos") or [])]
+    out["adjuntos"] = _adjuntos_publicos(m.get("adjuntos") or [])
     out["variantes"] = [
         {"id": v.get("id"), "sufijo": v.get("sufijo") or "", "estado": v.get("estado"),
          "estado_label": ESTADOS_LABEL.get(v.get("estado") or "", "—"),
@@ -1327,14 +1327,52 @@ def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "") -> str:
 # Adjuntos (el diseno de la muestra)
 # ---------------------------------------------------------------------------
 
+# Que es cada fichero adjunto: una version del diseno (se numeran por orden
+# de subida), el diseno final, u otra cosa (foto, referencia...).
+CLASES_ADJUNTO: tuple[tuple[str, str], ...] = (("version", "Versión"), ("final", "Diseño final"),
+                                              ("otro", "Otro"))
+CLASES_ADJUNTO_LABEL = dict(CLASES_ADJUNTO)
+
+
+def _validar_clase_adjunto(v) -> tuple[str, str]:
+    """Slug o etiqueta; vacio o el antiguo 'diseno' = version."""
+    if v is None:
+        return "version", ""
+    if not isinstance(v, str):
+        return "", "clase debe ser texto"
+    v = v.strip()
+    if not v or v.lower() == "diseno":
+        return "version", ""
+    for slug, label in CLASES_ADJUNTO:
+        if v.lower() == slug or _clave(v) == _clave(label):
+            return slug, ""
+    return "", f"clase no valida: {v!r} (version, final, otro)"
+
+
 def _adjunto_publico(a: dict) -> dict:
     """Metadatos del adjunto para la UI (sin nada del disco)."""
     ext = a.get("ext") or ""
+    clase, _ = _validar_clase_adjunto(a.get("clase"))
+    clase = clase or "otro"
     return {"id": a.get("id"), "nombre": a.get("nombre"), "ext": ext,
-            "tamano": a.get("tamano"), "fecha": a.get("fecha"), "clase": a.get("clase") or "diseno",
+            "tamano": a.get("tamano"), "fecha": a.get("fecha"),
+            "clase": clase, "clase_label": CLASES_ADJUNTO_LABEL.get(clase, clase),
             "usuario": a.get("usuario"), "usuario_nombre": a.get("usuario_nombre"),
             "inline": ext in ADJUNTO_INLINE,
             "imagen": ADJUNTO_INLINE.get(ext, "").startswith("image/")}
+
+
+def _adjuntos_publicos(lista) -> list[dict]:
+    """Lista para la UI; las versiones se numeran por orden de subida."""
+    out, n = [], 0
+    for a in lista or []:
+        pub = _adjunto_publico(a)
+        if pub["clase"] == "version":
+            n += 1
+            pub["version_n"] = n
+            pub["clase_label"] = f"Versión {n}"
+        out.append(pub)
+    return out
 
 
 def _carpeta_adjuntos(mid: str) -> Path:
@@ -1364,7 +1402,9 @@ def guardar_adjunto(mid: str, nombre, contenido: bytes, usuario: str | None = No
         return None, "el fichero esta vacio"
     if len(contenido) > ADJUNTO_MAX_BYTES:
         return None, f"el fichero pasa de {ADJUNTO_MAX_BYTES // (1024 * 1024)} MB"
-    clase = re.sub(r"[^a-z_]", "", (clase or "").strip().lower())[:20] or "diseno"
+    clase, err = _validar_clase_adjunto(clase)
+    if err:
+        return None, err
     with jsonstore.store().tx():
         data = cargar()
         m = _buscar(data, mid)
@@ -1398,6 +1438,29 @@ def ruta_adjunto(mid: str, aid: str) -> tuple[Path | None, dict | None, str]:
     if not ruta.is_file():
         return None, a, "el fichero del adjunto no esta en el servidor"
     return ruta, a, ""
+
+
+def etiquetar_adjunto(mid: str, aid: str, clase, usuario: str | None = None) -> tuple[dict | None, str]:
+    """Cambia que es el fichero (version / diseno final / otro)."""
+    clase, err = _validar_clase_adjunto(clase)
+    if err:
+        return None, err
+    with jsonstore.store().tx():
+        data = cargar()
+        m = _buscar(data, mid)
+        if not m:
+            return None, f"la muestra {mid!r} no existe"
+        a = next((x for x in (m.get("adjuntos") or []) if x.get("id") == aid), None)
+        if not a:
+            return None, "el adjunto no existe"
+        anterior, _ = _validar_clase_adjunto(a.get("clase"))
+        if anterior != clase:
+            a["clase"] = clase
+            _historial(m, usuario, "adjunto", a="etiqueta", nombre=a.get("nombre") or "",
+                       clase=clase, de=anterior)
+            m["actualizado_en"] = _ahora()
+            _guardar(data)
+        return obtener(mid), ""
 
 
 def borrar_adjunto(mid: str, aid: str, usuario: str | None = None) -> tuple[dict | None, str]:

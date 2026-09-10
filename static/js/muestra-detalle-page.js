@@ -403,7 +403,14 @@
       return `<div class="ms-adj" data-adj="${esc(a.id)}">
         <a class="ms-adj-vista" href="${abrir}" target="_blank" rel="noopener" title="${a.inline ? 'Abrir' : 'Descargar'}">${vista}</a>
         <div class="ms-adj-info">
-          <a class="ms-adj-nombre" href="${abrir}" target="_blank" rel="noopener">${esc(a.nombre)}</a>
+          <div class="ms-adj-linea">
+            <a class="ms-adj-nombre" href="${abrir}" target="_blank" rel="noopener">${esc(a.nombre)}</a>
+            <select class="ms-adj-clase ${esc(a.clase)}" data-adj="${esc(a.id)}" title="Qué es este fichero (se puede cambiar)">
+              <option value="version" ${a.clase === 'version' ? 'selected' : ''}>${a.clase === 'version' ? esc(a.clase_label) : 'Versión'}</option>
+              <option value="final" ${a.clase === 'final' ? 'selected' : ''}>Diseño final</option>
+              <option value="otro" ${a.clase === 'otro' ? 'selected' : ''}>Otro</option>
+            </select>
+          </div>
           <div class="ms-adj-meta">${fmtBytes(a.tamano)}${a.fecha ? ' · ' + fmtFechaHora(a.fecha) : ''}${quien ? ' · ' + esc(quien) : ''}</div>
         </div>
         <div class="ms-adj-acciones">
@@ -420,7 +427,7 @@
       for (const f of files) {
         const fd = new FormData();
         fd.append('fichero', f, f.name);
-        fd.append('clase', 'diseno');
+        fd.append('clase', $('md-adj-clase').value || 'version');
         btn.textContent = `Subiendo ${f.name}…`;
         const d = await api(URL_API + '/adjuntos', { method: 'POST', body: fd });
         M = d.muestra;
@@ -463,6 +470,20 @@
       pintarAdjuntos(); pintarHistorial();
     } catch (err) {
       await window.mostrarAlerta({ titulo: 'No se pudo quitar', mensaje: err.message, tipo: 'danger' });
+    }
+  });
+
+  $('md-adjuntos').addEventListener('change', async (e) => {
+    const sel = e.target.closest('.ms-adj-clase');
+    if (!sel) return;
+    sel.disabled = true;
+    try {
+      const d = await api(`${URL_API}/adjuntos/${encodeURIComponent(sel.dataset.adj)}`, { method: 'PUT', body: { clase: sel.value } });
+      M = d.muestra;
+      pintarAdjuntos(); pintarHistorial();
+    } catch (err) {
+      await window.mostrarAlerta({ titulo: 'No se pudo cambiar la etiqueta', mensaje: err.message, tipo: 'danger' });
+      pintarAdjuntos();
     }
   });
 
@@ -584,7 +605,13 @@
         ? `Aviso por correo a ${esc(h.a)} (${esc(por)})`
         : `Aviso por correo a ${esc(h.a)} (${esc(por)}) <b>no enviado</b>${h.detalle ? ': ' + esc(h.detalle) : ''}`;
     }
-    if (t === 'adjunto') return h.a === 'anadido' ? `Diseño adjuntado: «${esc(h.nombre || '')}»` : `Adjunto quitado: «${esc(h.nombre || '')}»`;
+    if (t === 'adjunto') {
+      const CL = { version: 'versión', final: 'diseño final', otro: 'otro', diseno: 'versión' };
+      const cl = CL[h.clase] || h.clase || '';
+      if (h.a === 'anadido') return `Fichero adjuntado: «${esc(h.nombre || '')}»${cl ? ' (' + esc(cl) + ')' : ''}`;
+      if (h.a === 'etiqueta') return `Adjunto «${esc(h.nombre || '')}» marcado como <b>${esc(cl)}</b>`;
+      return `Adjunto quitado: «${esc(h.nombre || '')}»`;
+    }
     if (t === 'apunte_borrado') return `Apunte borrado${h.fecha_apunte ? ' (' + fmtFecha(h.fecha_apunte) + ')' : ''}: «${esc(h.texto || '')}»`;
     if (t === 'importacion') return esc(h.texto || 'Importada del Libro de muestras');
     return esc(h.texto || t);

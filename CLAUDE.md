@@ -76,7 +76,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas
   `POST /api/muestras/<id>/adjuntos` (multipart `fichero`) y
   `GET|DELETE /api/muestras/<id>/adjuntos/<aid>` (`?dl=1` fuerza descarga;
-  imagen/PDF se abren en la pestaña). Rastro en el historial (`tipo: adjunto`).
+  imagen/PDF se abren en la pestaña). Cada adjunto lleva `clase`: `version`
+  (las versiones se numeran por orden de subida en la UI), `final` (diseño
+  final) u `otro`; `PUT …/adjuntos/<aid>` `{clase}` la cambia. Rastro en el
+  historial (`tipo: adjunto`, a = anadido | etiqueta | borrado).
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida. Cada cambio de
   etapa deja además un apunte automático (`tipo: "estado"`, "Pasa a «…»",
