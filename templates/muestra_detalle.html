@@ -112,10 +112,12 @@
           <div class="ms-campo">
             <label for="md-f-cliente" id="md-f-cliente-lbl">Cliente</label>
             <div class="ms-sug-wrap"><input type="text" id="md-f-cliente" data-campo="cliente" maxlength="160" autocomplete="off" /></div>
-            <div class="ms-nav-link" id="md-nav-link" hidden><span class="tag">Navision</span><b id="md-nav-no"></b><button type="button" class="ms-link" id="md-nav-quitar">quitar vínculo</button></div>
             <datalist id="md-clientes"></datalist>
           </div>
         </div>
+        <!-- El vínculo con Navision va FUERA de la fila: dentro estiraba la
+             casilla del cliente y las dos dejaban de cuadrar -->
+        <div class="ms-nav-link" id="md-nav-link" hidden><span class="tag">Navision</span><b id="md-nav-no"></b><button type="button" class="ms-link" id="md-nav-quitar">quitar vínculo</button></div>
         <div class="ms-campo-row">
           <div class="ms-campo">
             <label for="md-f-persona">Encargada por</label>
@@ -210,10 +212,6 @@
           <label>Anotación del registro de números</label>
           <div class="ms-readonly" id="md-anotacion"></div>
         </div>
-        <div class="ms-campo">
-          <label for="md-f-resultado">Resultado (comercial)</label>
-          <textarea id="md-f-resultado" data-campo="resultado" placeholder="Qué pasó después: pedido confirmado, no la escogen, a la espera…" style="min-height:64px"></textarea>
-        </div>
         <div class="ms-origen" id="md-origen"></div>
       </section>
 
@@ -270,6 +268,13 @@
             <summary>Historial de cambios (<span id="md-hist-count">0</span>)</summary>
             <ul class="ms-hist-lista" id="md-historial"></ul>
           </details>
+        </section>
+        <!-- Lo comercial cierra la ficha: qué pasó con la muestra una vez hecha -->
+        <section class="ms-section">
+          <div class="ms-section-title"><span>Resultado (comercial)</span><span class="ms-hint">qué pasó después · se guarda solo</span></div>
+          <div class="ms-campo" style="margin-bottom:0">
+            <textarea id="md-f-resultado" data-campo="resultado" aria-label="Resultado (comercial)" placeholder="Qué pasó después: pedido confirmado, no la escogen, a la espera…" style="min-height:64px"></textarea>
+          </div>
         </section>
       </div>
     </div>

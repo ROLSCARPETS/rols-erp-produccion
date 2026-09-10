@@ -179,6 +179,8 @@ tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 .ms-sug-pie { font-size: 0.7rem; color: #9a9a9a; padding: 0.4rem 0.55rem 0.25rem; border-top: 1px solid #f2ede6; margin-top: 0.15rem; }
 /* Vínculo con la ficha de Navision (debajo del campo cliente) */
 .ms-nav-link { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.3rem; font-size: 0.72rem; color: #4d4d4d; }
+/* Debajo de la fila tipo/cliente: se pega al cliente sin desencajar la fila */
+.ms-campo-row + .ms-nav-link { margin-top: -0.45rem; margin-bottom: 0.6rem; }
 .ms-nav-link .tag { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.1rem 0.45rem; border-radius: 999px; background: #dbeafe; color: #1e40af; }
 .ms-nav-link b { font-variant-numeric: tabular-nums; }
 .ms-nav-link .ms-link { font-size: 0.7rem; }
