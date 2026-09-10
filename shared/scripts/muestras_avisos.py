@@ -83,6 +83,8 @@ def _bloque_datos(m: dict) -> list[tuple[str, str]]:
     filas.append(("Prioridad", mf.PRIORIDADES.get(m.get("prioridad") or 0, "—")))
     if m.get("fecha_solicitud"):
         filas.append(("Solicitada", _fmt_fecha(m["fecha_solicitud"])))
+    if m.get("fecha_estimada") and m.get("estado") not in mf.ESTADOS_TERMINALES:
+        filas.append(("Lista prevista", _fmt_fecha(m["fecha_estimada"])))
     if m.get("proximo_hito_fecha"):
         filas.append(("Próximo hito", _fmt_fecha(m["proximo_hito_fecha"])
                       + (f" — {m['proximo_hito']}" if m.get("proximo_hito") else "")))

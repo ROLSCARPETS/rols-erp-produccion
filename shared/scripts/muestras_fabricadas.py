@@ -117,6 +117,9 @@ CAMPOS_EDITABLES = {
     "tipo", "cliente", "cliente_navision", "descripcion", "encargada_por",
     "prioridad", "telar", "fecha_solicitud", "fecha_lista", "resultado",
     "anotacion_registro",
+    # Fecha estimada de muestra lista (prevision mientras esta en curso;
+    # fecha_lista es la real, la fija 'terminada').
+    "fecha_estimada",
     # Proximo hito: fecha del siguiente paso previsto (llegan los colores,
     # entra a telar...) para que comercial y laboratorio sepan cuando mirar.
     "proximo_hito_fecha", "proximo_hito",
@@ -578,6 +581,7 @@ def _compacta(m: dict, hoy: str, recortar_textos: bool, n_variantes: int) -> dic
         "telar": m.get("telar") or "", "estado": estado,
         "estado_label": ESTADOS_LABEL.get(estado, estado or "—"),
         "fecha_lista": m.get("fecha_lista"), "archivada": bool(m.get("archivada")),
+        "fecha_estimada": m.get("fecha_estimada"),
         "proximo_hito_fecha": m.get("proximo_hito_fecha"),
         "proximo_hito": m.get("proximo_hito") or "",
         "hito_vencido": _hito_vencido(m, hoy),
@@ -933,6 +937,9 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
     hito_fecha, err = _validar_fecha(datos.get("proximo_hito_fecha"), "proximo_hito_fecha")
     if err:
         return None, err
+    fecha_estimada, err = _validar_fecha(datos.get("fecha_estimada"), "fecha_estimada")
+    if err:
+        return None, err
     hito_txt, err = _validar_texto(datos.get("proximo_hito"), "proximo_hito", 200)
     if err:
         return None, err
@@ -997,6 +1004,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             "telar": telar, "estado": estado, "fecha_lista": None, "archivada": False,
             "descripcion": descripcion, "anotacion_registro": "", "resultado": resultado,
             "proximo_hito_fecha": hito_fecha, "proximo_hito": hito_txt,
+            "fecha_estimada": fecha_estimada,
             "apuntes": [], "historial": [],
             "creado_en": ahora, "actualizado_en": ahora,
             "creado_por": _actor_username(usuario), "creado_por_nombre": _actor_nombre(usuario),
@@ -1053,7 +1061,7 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v, err = _validar_prioridad(v)
                 if err:
                     return None, err
-            elif k in ("fecha_solicitud", "fecha_lista"):
+            elif k in ("fecha_solicitud", "fecha_lista", "fecha_estimada"):
                 v, err = _validar_fecha(v, k)
                 if err:
                     return None, err

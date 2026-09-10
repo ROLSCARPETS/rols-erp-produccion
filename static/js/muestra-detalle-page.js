@@ -69,6 +69,10 @@
       partes.push(`<b>${fmtNum(M.dias)} días</b> en curso`);
     }
     if (M.sufijo && M.numero != null) partes.push(`variante de M-${M.numero}`);
+    if (M.fecha_estimada && !TERMINALES.includes(M.estado)) {
+      const retrasada = M.fecha_estimada < hoyISO();
+      partes.push(`<span class="${retrasada ? 'ms-hito-venc-inline' : ''}">lista prevista el ${fmtFecha(M.fecha_estimada)}${retrasada ? ' (fecha pasada)' : ''}</span>`);
+    }
     if (M.proximo_hito_fecha && !TERMINALES.includes(M.estado)) {
       partes.push(`<span class="${M.hito_vencido ? 'ms-hito-venc-inline' : ''}">próximo hito ${fmtFecha(M.proximo_hito_fecha)}${M.proximo_hito ? ' — ' + esc(M.proximo_hito) : ''}${M.hito_vencido ? ' (vencido)' : ''}</span>`);
     }
@@ -229,6 +233,10 @@
     colorearPrio($('md-f-prioridad'));
     $('md-f-fecha').value = M.fecha_solicitud || '';
     $('md-f-lista').value = M.fecha_lista || '';
+    // La fecha real de 'lista' solo tiene sentido cuando esta terminada
+    $('md-f-lista-wrap').hidden = !(M.estado === 'terminada' || M.fecha_lista);
+    $('md-f-estimada').value = M.fecha_estimada || '';
+    $('md-f-estimada').classList.toggle('vencido-campo', !!(M.fecha_estimada && !TERMINALES.includes(M.estado) && M.fecha_estimada < hoyISO()));
     $('md-f-hito-fecha').value = M.proximo_hito_fecha || '';
     $('md-f-hito-fecha').classList.toggle('vencido-campo', !!M.hito_vencido);
     $('md-f-hito').value = M.proximo_hito || '';
@@ -450,7 +458,7 @@
     if (t === 'creacion') return h.texto || 'Alta de la muestra';
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Fecha muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito' };
+      const nombres = { cliente: 'Cliente', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito' };
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(h.de || '—')}» → «${esc(h.a || '—')}»`;
     }
     if (t === 'archivo') return h.a === 'archivada' ? 'Archivada (fuera de En curso)' : 'Devuelta a En curso';

@@ -139,13 +139,17 @@
         </div>
         <div class="ms-campo-row" style="grid-template-columns: 1fr 1fr">
           <div class="ms-campo">
-            <label for="md-f-lista">Fecha muestra lista</label>
-            <input type="date" id="md-f-lista" data-campo="fecha_lista" />
+            <label for="md-f-estimada" title="Previsión: cuándo se espera tener la muestra lista">Fecha estimada muestra lista</label>
+            <input type="date" id="md-f-estimada" data-campo="fecha_estimada" />
           </div>
           <div class="ms-campo">
             <label for="md-f-hito-fecha" title="Fecha del siguiente paso previsto, para que comercial y laboratorio sepan cuándo mirar">Próximo hito</label>
             <input type="date" id="md-f-hito-fecha" data-campo="proximo_hito_fecha" />
           </div>
+        </div>
+        <div class="ms-campo" id="md-f-lista-wrap" hidden>
+          <label for="md-f-lista" title="Fecha real en que la muestra estuvo lista (la fija 'Terminada')">Muestra lista el (fecha real)</label>
+          <input type="date" id="md-f-lista" data-campo="fecha_lista" />
         </div>
         <div class="ms-campo">
           <label for="md-f-hito">Qué se espera en el hito</label>

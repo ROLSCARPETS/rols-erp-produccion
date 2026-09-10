@@ -182,7 +182,7 @@
       <td>${prioPill(m.prioridad)}</td>
       <td>${esc(m.telar) || mudo}</td>
       <td>${sel}</td>
-      <td class="num"><span class="ms-dias ${(m.dias || 0) > 120 ? 'tarde' : ''}" title="Días desde la solicitud">${m.dias != null ? fmtNum(m.dias) : '—'}</span></td>
+      <td class="num"><span class="ms-dias ${(m.dias || 0) > 120 ? 'tarde' : ''}" title="Días desde la solicitud">${m.dias != null ? fmtNum(m.dias) : '—'}</span>${m.fecha_estimada ? `<div class="ms-prev ${m.fecha_estimada < hoyISO() ? 'pasada' : ''}" title="Fecha estimada de muestra lista">prev. ${esc(fmtFecha(m.fecha_estimada, false))}</div>` : ''}</td>
       <td class="ms-hito-td"><input type="date" class="ms-hito-inp ${m.hito_vencido ? 'vencido' : ''}" data-id="${esc(m.id)}" value="${esc(m.proximo_hito_fecha || '')}" title="${esc(m.proximo_hito || 'Fecha del próximo hito (se guarda al cambiarla)')}" />${m.proximo_hito ? `<div class="ms-hito-txt" title="${esc(m.proximo_hito)}">${esc(m.proximo_hito)}</div>` : ''}${m.hito_vencido ? '<div class="ms-hito-venc">vencido</div>' : ''}</td>
       <td>${ult ? `<div class="ms-apunte-mini" title="${esc(ult.texto)}${ult.usuario_nombre ? ' — ' + esc(ult.usuario_nombre) : ''}"><b>${esc(fmtFecha(ult.fecha, false) || 's/f')}</b>${esc(ult.texto)}${ult.usuario_nombre ? ` <span class="ms-mudo">— ${esc(ult.usuario_nombre)}</span>` : ''}</div>` : '<span class="ms-mudo">sin apuntes</span>'}</td>
       <td><span class="ms-ir" title="Abrir la ficha">→</span></td>

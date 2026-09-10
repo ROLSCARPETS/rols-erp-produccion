@@ -57,6 +57,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   registro antiguo, no seleccionable).
 - `archivada` = fuera de "En curso" sin estar terminada (lo que en el Excel
   era mover la fila a la hoja de terminadas).
+- `fecha_estimada` = "Fecha estimada muestra lista": previsión que mantiene
+  quien la lleva (en rojo si se pasa). `fecha_lista` es la fecha REAL: la fija
+  el paso a `terminada` y es la que usan plazos y análisis; en la ficha solo
+  se enseña cuando la muestra está terminada.
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida.
 - `tipo` = `cliente` | `interna` (desarrollo propio; en el libro era el cliente
