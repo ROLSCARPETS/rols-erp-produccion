@@ -156,14 +156,18 @@ tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 
 /* Buscador de cliente (sugerencias Navision + ya usados) */
 .ms-sug-wrap { position: relative; }
-.ms-sug { position: absolute; left: 0; right: 0; top: calc(100% + 3px); background: #fff; border: 1px solid var(--border); border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 320; max-height: 280px; overflow-y: auto; padding: 0.25rem; }
+/* Mas ancho que el campo (en la ficha el campo es estrecho): se abre por
+   encima de lo que haya a la derecha; sin scroll horizontal. */
+.ms-sug { position: absolute; left: 0; top: calc(100% + 3px); width: max(100%, 480px); max-width: calc(100vw - 340px);
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 320; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 0.25rem; }
 .ms-sug-it { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.55rem; align-items: center; padding: 0.42rem 0.55rem; border-radius: 7px; cursor: pointer; }
 .ms-sug-it:hover, .ms-sug-it.activo { background: #faf6ee; }
-.ms-sug-tag { grid-row: span 2; align-self: start; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.12rem 0.4rem; border-radius: 999px; background: #dbeafe; color: #1e40af; margin-top: 0.15rem; }
+.ms-sug-tag { grid-row: span 2; align-self: start; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.12rem 0.4rem; border-radius: 999px; background: #dbeafe; color: #1e40af; margin-top: 0.15rem; white-space: nowrap; }
 .ms-sug-tag.usado { background: #f1ece4; color: #6b5323; }
 .ms-sug-nom { font-size: 0.86rem; color: #2a2a2a; font-weight: 500; }
-.ms-sug-sub { font-size: 0.72rem; color: #8a857d; font-variant-numeric: tabular-nums; }
+.ms-sug-sub { font-size: 0.72rem; color: #8a857d; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ms-sug-nom { overflow-wrap: anywhere; }
 .ms-sug-sub b { color: #4d4d4d; font-weight: 600; }
 .ms-sug-alias { display: inline-block; margin-left: 0.4rem; font-size: 0.7rem; font-weight: 600; color: #6b5323; background: #f1ece4; border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 1px; }
 .ms-sug-pie { font-size: 0.7rem; color: #9a9a9a; padding: 0.4rem 0.55rem 0.25rem; border-top: 1px solid #f2ede6; margin-top: 0.15rem; }
