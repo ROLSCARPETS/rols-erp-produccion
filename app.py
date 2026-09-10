@@ -29,6 +29,28 @@ from datetime import datetime
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
+
+
+def _cargar_dotenv(path: Path) -> None:
+    """Carga KEY=VALOR de un .env (sin dependencias) sin pisar variables ya
+    definidas. En el servidor el .env vive junto al codigo (gitignored) y
+    lleva, p.ej., el SMTP de los avisos (ROLS_SMTP_*)."""
+    try:
+        lineas = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for linea in lineas:
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        k, v = linea.split("=", 1)
+        k = k.strip()
+        v = v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+
+_cargar_dotenv(APP_DIR / ".env")
 # Los modulos de datos viven en shared/scripts y localizan sus JSON en
 # shared/data (parent.parent/data) o en ROLS_DATA_DIR si esta definido.
 sys.path.insert(0, str(APP_DIR / "shared" / "scripts"))
@@ -1896,6 +1918,17 @@ def _usuarios_one_con_permiso(permiso: str):
     hit = _USUARIOS_ONE_CACHE.get(permiso)
     if hit and (now - hit[1]) < _USUARIOS_ONE_TTL:
         return hit[0]
+    lista = _pedir_usuarios_one(permiso, now)
+    if lista is not None and permiso == "muestras_fabricadas":
+        # Snapshot con e-mails para el job de hitos (corre sin sesion).
+        try:
+            _muestras_module().guardar_directorio(lista)
+        except Exception:
+            pass
+    return lista if lista is not None else (hit[0] if hit else None)
+
+
+def _pedir_usuarios_one(permiso: str, now: float):
     val = request.cookies.get(_SSO_COOKIE)
     if val:
         try:
@@ -1912,7 +1945,143 @@ def _usuarios_one_con_permiso(permiso: str):
                         return lista
         except Exception:
             pass
-    return hit[0] if hit else None
+    return None
+
+
+# ---- Avisos por correo (muestras_avisos.py) ----
+# El chequeo de hitos corre en segundo plano como mucho cada 15 min, disparado
+# por la primera peticion que llegue (Passenger no garantiza un proceso vivo a
+# una hora fija); ademas POST /api/muestras/avisos/hitos para un cron.
+_AVISOS_ULTIMO: dict = {"t": 0.0, "en": None, "resultado": None}
+_AVISOS_CADA_S = 900.0
+
+
+def _correo_module():
+    rols_shared.ensure_shared_on_path()
+    import correo as _c
+    return _c
+
+
+def _avisos_module():
+    rols_shared.ensure_shared_on_path()
+    import muestras_avisos as _av
+    return _av
+
+
+def _en_segundo_plano(fn, *args, **kwargs):
+    """Ejecuta fn en un hilo (en tests, en linea, para poder comprobarlo)."""
+    if app.config.get("TESTING"):
+        return fn(*args, **kwargs)
+    import threading
+    threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
+    return None
+
+
+def _url_publica() -> str:
+    """Base de los enlaces que van en los correos."""
+    u = (os.environ.get("ROLS_ERP_PUBLIC_URL") or "").strip().rstrip("/")
+    if u:
+        return u
+    try:
+        if request:
+            return request.url_root.rstrip("/")
+    except RuntimeError:
+        pass
+    return "https://produccion.rolscarpets.com"
+
+
+def _directorio_avisos() -> list:
+    """Directorio {username, nombre, email}: la lista viva si hay sesion, si
+    no el snapshot guardado."""
+    lista = None
+    try:
+        lista = _usuarios_one_con_permiso("muestras_fabricadas")
+    except Exception:
+        lista = None
+    if lista:
+        try:
+            _muestras_module().guardar_directorio(lista)   # snapshot para el job sin sesion
+        except Exception:
+            pass
+        return lista
+    try:
+        return _muestras_module().directorio_guardado()
+    except Exception:
+        return []
+
+
+def _chequear_hitos_bg(directorio, base_url) -> dict | None:
+    try:
+        res = _avisos_module().chequear_hitos(directorio, base_url)
+        _AVISOS_ULTIMO["en"] = datetime.now().isoformat(timespec="seconds")
+        _AVISOS_ULTIMO["resultado"] = res
+        if res.get("enviados") or res.get("fallidos"):
+            log.info("avisos de hito: %s", res)
+        return res
+    except Exception as e:
+        log.warning("chequeo de hitos fallo: %s", e)
+        return None
+
+
+@app.before_request
+def _avisos_tick():
+    p = request.path or ""
+    if p.startswith("/static/") or p.startswith("/shared/") or p == "/health":
+        return
+    now = time.time()
+    if now - _AVISOS_ULTIMO["t"] < _AVISOS_CADA_S:
+        return
+    _AVISOS_ULTIMO["t"] = now
+    try:
+        if not _correo_module().configurado():
+            return
+        _en_segundo_plano(_chequear_hitos_bg, _muestras_module().directorio_guardado(), _url_publica())
+    except Exception:
+        pass
+
+
+@app.route("/api/muestras/avisos/estado")
+def api_muestras_avisos_estado():
+    """Si hay correo configurado y como va el directorio/chequeo (sin secretos)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    est = _correo_module().estado()
+    dirc = _muestras_module().cargar()["_meta"].get("directorio_one") or {}
+    est.update({
+        "directorio_usuarios": len(dirc.get("usuarios") or []),
+        "directorio_en": dirc.get("en"),
+        "ultimo_chequeo_hitos": _AVISOS_ULTIMO.get("en"),
+        "ultimo_resultado": _AVISOS_ULTIMO.get("resultado"),
+        "es_admin": _user_rol() == "admin",
+        "url_publica": _url_publica(),
+    })
+    return jsonify(est)
+
+
+@app.route("/api/muestras/avisos/prueba", methods=["POST"])
+def api_muestras_avisos_prueba():
+    """Correo de prueba a quien lo pide (solo Completo)."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    if _user_rol() != "admin":
+        return jsonify({"error": "solo el nivel Completo puede enviar el correo de prueba"}), 403
+    ok, err, email = _avisos_module().correo_de_prueba(_actor(), _directorio_avisos(), _url_publica())
+    return jsonify({"ok": ok, "error": err, "email": email})
+
+
+@app.route("/api/muestras/avisos/hitos", methods=["POST"])
+def api_muestras_avisos_hitos():
+    """Chequeo de hitos bajo demanda: un cron (X-Rols-Api-Token) o un Completo."""
+    if _requiere_api_token() is not None and _user_rol() != "admin":
+        return jsonify({"error": "no autorizado"}), 403
+    res = _chequear_hitos_bg(_directorio_avisos(), _url_publica())
+    if res is None:
+        return jsonify({"error": "el chequeo de hitos ha fallado; mira el log"}), 500
+    return jsonify(res)
+
+
 
 
 # Maestro de clientes de Navision: Rols One guarda la copia diaria de BC
@@ -2125,11 +2294,22 @@ def api_muestra_estado(mid):
     if bl:
         return bl
     data = request.get_json(force=True, silent=True) or {}
-    m, err = _muestras_module().cambiar_estado(
+    mf = _muestras_module()
+    previa = mf.obtener(mid)
+    m, err = mf.cambiar_estado(
         mid, data.get("estado") or "", usuario=_actor(),
         nota=data.get("nota") or "", fecha=data.get("fecha"))
     if err:
         return jsonify({"error": err}), (404 if "no existe" in err else 400)
+    anterior = (previa or {}).get("estado") or ""
+    if anterior != m.get("estado"):
+        # Aviso a quien la encargo (etapa nueva, terminada o cancelada), en
+        # segundo plano: el SMTP no retrasa la respuesta.
+        try:
+            _en_segundo_plano(_avisos_module().aviso_cambio_estado, mid, anterior, m.get("estado"),
+                              _actor(), data.get("nota") or "", _directorio_avisos(), _url_publica())
+        except Exception as e:
+            log.warning("no se pudo lanzar el aviso de estado de M-%s: %s", mid, e)
     return jsonify({"muestra": m})
 
 

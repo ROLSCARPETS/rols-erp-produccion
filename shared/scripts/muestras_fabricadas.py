@@ -1246,6 +1246,69 @@ def anadir_catalogo(tipo: str, valor: str) -> tuple[list | None, str]:
 
 
 # ---------------------------------------------------------------------------
+# Avisos por correo (muestras_avisos.py): rastro en el historial, hitos
+# pendientes de avisar y snapshot del directorio de usuarios de One (el job
+# de hitos corre sin sesion y necesita los e-mails).
+# ---------------------------------------------------------------------------
+
+def registrar_aviso(mid: str, motivo: str, destinatario: str, ok: bool,
+                    detalle: str = "", asunto: str = "") -> None:
+    with jsonstore.store().tx():
+        data = cargar()
+        m = _buscar(data, mid)
+        if not m:
+            return
+        _historial(m, None, "aviso", motivo=motivo, a=destinatario or "", ok=bool(ok),
+                   detalle=_recortar(detalle or "", 200), asunto=_recortar(asunto or "", 120))
+        _guardar(data)
+
+
+def hitos_pendientes(hoy: str | None = None) -> list[dict]:
+    """Muestras en curso cuyo proximo hito ha llegado (fecha <= hoy) y aun no
+    se ha avisado de ESA fecha."""
+    hoy = hoy or _hoy()
+    return [dict(m) for m in cargar()["muestras"]
+            if en_curso(m) and m.get("proximo_hito_fecha")
+            and m["proximo_hito_fecha"] <= hoy
+            and m.get("hito_avisado") != m["proximo_hito_fecha"]]
+
+
+def reclamar_hito(mid: str, fecha: str) -> bool:
+    """Marca el hito `fecha` como avisado. True si lo reclama esta llamada
+    (idempotente entre workers: solo uno envia)."""
+    with jsonstore.store().tx():
+        data = cargar()
+        m = _buscar(data, mid)
+        if not m or m.get("proximo_hito_fecha") != fecha or m.get("hito_avisado") == fecha:
+            return False
+        m["hito_avisado"] = fecha
+        _guardar(data)
+        return True
+
+
+def guardar_directorio(usuarios) -> None:
+    """Snapshot [{username, nombre, email}] del directorio de cuentas. Solo
+    escribe si cambia."""
+    if not isinstance(usuarios, list):
+        return
+    limpio = [{"username": (u.get("username") or "").strip().lower(),
+               "nombre": (u.get("nombre") or "").strip(),
+               "email": (u.get("email") or "").strip().lower()}
+              for u in usuarios if isinstance(u, dict) and u.get("username")]
+    with jsonstore.store().tx():
+        data = cargar()
+        actual = data["_meta"].get("directorio_one") or {}
+        if actual.get("usuarios") == limpio:
+            return
+        data["_meta"]["directorio_one"] = {"en": _ahora(), "usuarios": limpio}
+        _guardar(data)
+
+
+def directorio_guardado() -> list[dict]:
+    return list((cargar()["_meta"].get("directorio_one") or {}).get("usuarios") or [])
+
+
+# ---------------------------------------------------------------------------
 # CLI util
 # ---------------------------------------------------------------------------
 

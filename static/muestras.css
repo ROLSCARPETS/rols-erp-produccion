@@ -232,6 +232,11 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-chart-foot .ms-link { font-size: 0.74rem; }
 #an-tabla td.pos { color: #2f6b29; } #an-tabla td.neg { color: #9b1c1c; }
 
+/* Avisos por correo (pestaña Análisis) */
+.ms-avisos-txt { font-size: 0.84rem; color: #4d4d4d; line-height: 1.5; margin: 0 0 0.7rem; max-width: 70rem; }
+.ms-avisos-estado { font-size: 0.82rem; color: #4d4d4d; line-height: 1.6; }
+.ms-avisos-estado code { background: #f1ece4; border-radius: 4px; padding: 0 0.3rem; font-size: 0.78rem; }
+
 /* ---------- Ficha ---------- */
 .ms-hero { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 0.9rem; }
 .ms-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }

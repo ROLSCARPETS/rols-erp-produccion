@@ -77,6 +77,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   paso previsto, la ponen comercial o laboratorio (columna editable en En curso
   y campos en la ficha); en rojo si ya pasó, contador en el KPI En curso;
   terminada/cancelada lo limpian.
+- **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
+  quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
+  del próximo hito (`hito_avisado` evita repetir). SMTP con `ROLS_SMTP_*` del
+  `.env` del servidor (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
+  chequeo de hitos corre en segundo plano como mucho cada 15 min desde
+  `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
+  API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).
 - **Cliente**: texto libre (prospectos) con buscador sobre el maestro de
   clientes de Navision que tiene Rols One (`/api/navision/clientes`, copia
   diaria de BC; el ERP lo proxya en `/api/muestras/clientes-navision`). Al

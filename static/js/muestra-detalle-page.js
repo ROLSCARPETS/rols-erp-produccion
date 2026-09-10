@@ -454,6 +454,13 @@
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(h.de || '—')}» → «${esc(h.a || '—')}»`;
     }
     if (t === 'archivo') return h.a === 'archivada' ? 'Archivada (fuera de En curso)' : 'Devuelta a En curso';
+    if (t === 'aviso') {
+      const motivos = { estado: 'cambio de etapa', terminada: 'terminada', cancelada: 'cancelada', hito: 'próximo hito' };
+      const por = motivos[h.motivo] || h.motivo || '';
+      return h.ok
+        ? `Aviso por correo a ${esc(h.a)} (${esc(por)})`
+        : `Aviso por correo a ${esc(h.a)} (${esc(por)}) <b>no enviado</b>${h.detalle ? ': ' + esc(h.detalle) : ''}`;
+    }
     if (t === 'apunte_borrado') return `Apunte borrado${h.fecha_apunte ? ' (' + fmtFecha(h.fecha_apunte) + ')' : ''}: «${esc(h.texto || '')}»`;
     if (t === 'importacion') return esc(h.texto || 'Importada del Libro de muestras');
     return esc(h.texto || t);

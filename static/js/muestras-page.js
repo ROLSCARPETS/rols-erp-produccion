@@ -398,7 +398,40 @@
     };
     $('an-telar').innerHTML = barras(d.por_telar || [], 'telar');
     $('an-persona').innerHTML = barras(d.por_persona || [], 'persona');
+    cargarAvisosEstado();
   }
+
+  // Estado de los avisos por correo (pestaña Análisis) + correo de prueba
+  async function cargarAvisosEstado() {
+    const box = $('an-avisos-estado');
+    try {
+      const e = await api('/api/muestras/avisos/estado');
+      if (e.configurado) {
+        box.innerHTML = `<span class="ms-estado" style="background:#e8f3e1;color:#2f6b29">Correo configurado</span> ` +
+          `remitente <b>${esc(e.remitente)}</b> · servidor ${esc(e.host)} · e-mails conocidos de ${fmtNum(e.directorio_usuarios)} usuarios` +
+          (e.ultimo_chequeo_hitos ? ` · último chequeo de hitos ${esc(String(e.ultimo_chequeo_hitos).replace('T', ' ').slice(0, 16))}` : ' · el chequeo de hitos corre solo al usar la app (como mucho cada 15 min)');
+      } else {
+        box.innerHTML = `<span class="ms-estado" style="background:#fde2e2;color:#9b1c1c">Correo sin configurar</span> ` +
+          `hasta que el servidor tenga <code>ROLS_SMTP_HOST</code>, <code>ROLS_SMTP_USER</code> y <code>ROLS_SMTP_PASS</code> en su <code>.env</code> (o un <code>correo.json</code> en la carpeta de datos) no se envía nada; el resto funciona igual.`;
+      }
+      $('an-avisos-prueba').hidden = !e.es_admin;
+    } catch (err) {
+      box.textContent = 'No se pudo consultar el estado de los avisos: ' + err.message;
+    }
+  }
+  $('an-avisos-prueba').addEventListener('click', async () => {
+    const b = $('an-avisos-prueba');
+    b.disabled = true;
+    $('an-avisos-res').textContent = 'Enviando…';
+    try {
+      const r = await api('/api/muestras/avisos/prueba', { method: 'POST', body: {} });
+      $('an-avisos-res').textContent = r.ok ? `Enviado a ${r.email}. Mira tu bandeja (y el correo no deseado).` : `No se pudo enviar: ${r.error}`;
+    } catch (e) {
+      $('an-avisos-res').textContent = 'Error: ' + e.message;
+    } finally {
+      b.disabled = false;
+    }
+  });
   $('an-anio').addEventListener('change', cargarAnalisis);
 
   // Escala "limpia" para el eje: máximo redondeado a un paso cómodo (2, 5, 10, 20…)
