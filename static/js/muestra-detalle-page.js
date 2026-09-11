@@ -263,7 +263,9 @@
     $('md-f-hito').value = M.proximo_hito || '';
     $('md-f-ref').value = M.referencia || '';
     $('md-f-desc').value = M.descripcion || '';
-    $('md-f-resultado').value = M.resultado || '';
+    const hayRes = !!(M.resultado || '').trim();
+    $('md-resultado-wrap').hidden = !hayRes;
+    $('md-resultado').textContent = M.resultado || '';
     const hayAnot = !!(M.anotacion_registro || '').trim();
     $('md-anotacion-wrap').hidden = !hayAnot;
     $('md-anotacion').textContent = M.anotacion_registro || '';

@@ -141,6 +141,11 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`catalogos.telares_alta` = el catálogo sin ellas; `telares` sigue completo
   para los filtros). No hay veto en el backend: las variantes de una muestra
   antigua copian su telar.
+- `resultado` («Resultado (comercial)») **ya no se rellena**: la tarjeta salió
+  de la ficha. Las 171 muestras del libro antiguo que lo traen escrito lo
+  siguen enseñando en un bloque de solo lectura (como la anotación del
+  registro), en la columna del histórico y en el PDF. El campo sigue en el
+  modelo y en el `PUT`.
 - **Resumen en PDF** (`shared/scripts/pdf_muestra.py`, reportlab): una hoja A4
   para imprimir y meter en la caja de la muestra física — nº de M, cliente,
   referencia, los datos de la ficha, tejeduría, la tabla de materias,

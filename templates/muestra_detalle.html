@@ -200,10 +200,16 @@
           <label>Anotación del registro de números</label>
           <div class="ms-readonly" id="md-anotacion"></div>
         </div>
+        <!-- Resultado comercial: ya no se rellena, pero 171 muestras del libro
+             antiguo lo traen escrito y se sigue leyendo -->
+        <div class="ms-campo" id="md-resultado-wrap" hidden>
+          <label>Resultado (comercial) <span class="ms-hint">del libro antiguo</span></label>
+          <div class="ms-readonly" id="md-resultado"></div>
+        </div>
         <div class="ms-origen" id="md-origen"></div>
       </section>
 
-      <!-- ===== Columna derecha: seguimiento, diario, diseño, variantes, resultado e historial ===== -->
+      <!-- ===== Columna derecha: seguimiento, diario, diseño, variantes e historial ===== -->
       <div>
         <!-- Seguimiento: fechas para que comercial y laboratorio sepan cuándo mirar
              (mismos ids y data-campo que antes: el autoguardado es el mismo) -->
@@ -273,13 +279,6 @@
           <div class="ms-variantes" id="md-variantes"></div>
         </section>
 
-        <!-- Lo comercial cierra la ficha: qué pasó con la muestra una vez hecha -->
-        <section class="ms-section">
-          <div class="ms-section-title"><span>Resultado (comercial)</span><span class="ms-hint">qué pasó después · se guarda solo</span></div>
-          <div class="ms-campo" style="margin-bottom:0">
-            <textarea id="md-f-resultado" data-campo="resultado" aria-label="Resultado (comercial)" placeholder="Qué pasó después: pedido confirmado, no la escogen, a la espera…" style="min-height:64px"></textarea>
-          </div>
-        </section>
         <section class="ms-section">
           <details class="ms-hist" id="md-hist">
             <summary>Historial de cambios (<span id="md-hist-count">0</span>)</summary>
