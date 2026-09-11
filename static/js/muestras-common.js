@@ -11,7 +11,9 @@
     ['revision_diseno', 'Listo para revisión diseño'],   // Print y Varilla
     ['diseno_listo', 'Diseño listo'],                    // solo Varilla
     ['en_hilatura', 'En hilatura'],
-    ['en_tintoreria', 'En tintorería'], ['bobinando', 'Bobinando'], ['esperando_telar', 'Esperando a telar'],
+    ['en_tintoreria', 'En tintorería'],
+    ['revisar_color', 'Revisar color'],                  // solo Pompón
+    ['bobinando', 'Bobinando'], ['esperando_telar', 'Esperando a telar'],
     ['en_telar', 'En telar'], ['en_aprestos', 'En aprestos'], ['terminada', 'Terminada'],
     ['cancelada', 'Cancelada'], ['sin_seguimiento', 'Sin seguimiento'],
   ];
@@ -24,16 +26,24 @@
   const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
   const FLUJO_VARILLA = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
     'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
+  // Los pompones no se tejen: tintorería, revisar el color a la vuelta y listo
+  const FLUJO_POMPON = ['por_empezar', 'en_tintoreria', 'revisar_color', 'terminada'];
+  const FLUJOS_PROPIOS = { 'Print': FLUJO_PRINT, 'Varilla': FLUJO_VARILLA, 'Pompón': FLUJO_POMPON };
   const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
   const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';
-  const flujoDe = (telar) => esPrint(telar) ? FLUJO_PRINT : esVarilla(telar) ? FLUJO_VARILLA : ESTADOS_FLUJO;
+  function flujoDe(telar) {
+    const k = sinAcentos(telar);
+    const hit = Object.keys(FLUJOS_PROPIOS).sort((a, b) => b.length - a.length)
+      .find(n => k.startsWith(sinAcentos(n)));
+    return hit ? FLUJOS_PROPIOS[hit] : ESTADOS_FLUJO;
+  }
   // Flujo con el que se pinta una muestra: el de su técnica y, si la etapa
   // actual no está en él (una Print histórica parada en etapa textil, o una
   // etapa de diseño con otro telar), el primero que SÍ la contiene.
   function flujoQueContiene(telar, estado) {
     const propio = flujoDe(telar);
     if (propio.includes(estado)) return propio;
-    return [ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA].find(f => f.includes(estado)) || propio;
+    return [ESTADOS_FLUJO, ...Object.values(FLUJOS_PROPIOS)].find(f => f.includes(estado)) || propio;
   }
   const etiquetaEstado = (slug, telar) =>
     (esPrint(telar) && ETIQUETAS_PRINT[slug]) || ESTADOS_LABEL[slug] || slug || '—';
@@ -457,7 +467,7 @@
     return true;
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, FLUJO_POMPON, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente,

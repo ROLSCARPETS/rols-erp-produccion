@@ -131,6 +131,7 @@ tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 .ms-estado-diseno_listo    { background: #c9e9f2; color: #0b4f63; }  /* Varilla */
 .ms-estado-en_hilatura     { background: #dbeafe; color: #1e40af; }
 .ms-estado-en_tintoreria   { background: #fce7f3; color: #9d174d; }
+.ms-estado-revisar_color   { background: #fde8d7; color: #8a4b12; }  /* Pompón */
 .ms-estado-bobinando       { background: #d5f0ea; color: #0f5e52; }
 .ms-estado-esperando_telar { background: #fff1d6; color: #8a6d3b; }
 .ms-estado-en_telar        { background: #ffe4cc; color: #9a4b12; }
@@ -141,7 +142,7 @@ tr.ms-fila:hover .ms-ir { color: var(--accent-hover); }
 .ms-dot-por_empezar { background: #b5b5b5; } .ms-dot-en_diseno { background: #8b5fb0; }
 .ms-dot-listo_diseno { background: #b39ddb; } .ms-dot-revision_diseno { background: #2d9cbf; } .ms-dot-diseno_listo { background: #1b7f9e; }
 .ms-dot-en_hilatura { background: #3b6fd6; } .ms-dot-en_tintoreria { background: #d6478f; }
-.ms-dot-bobinando { background: #2a9d8f; } .ms-dot-esperando_telar { background: #d5a03c; }
+.ms-dot-revisar_color { background: #e0803c; } .ms-dot-bobinando { background: #2a9d8f; } .ms-dot-esperando_telar { background: #d5a03c; }
 .ms-dot-en_telar { background: #e07a2a; } .ms-dot-en_aprestos { background: #5b5fd6; }
 .ms-dot-terminada { background: #4e9a3a; } .ms-dot-cancelada { background: #c9302c; }
 .ms-dot-sin_seguimiento { background: #d0d0d0; }

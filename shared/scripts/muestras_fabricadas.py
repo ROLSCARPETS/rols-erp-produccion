@@ -76,6 +76,7 @@ ESTADOS: tuple[tuple[str, str], ...] = (
     ("diseno_listo",     "Diseño listo"),                 # solo Varilla
     ("en_hilatura",      "En hilatura"),
     ("en_tintoreria",    "En tintorería"),
+    ("revisar_color",    "Revisar color"),             # solo Pompón (a la vuelta de tintorería)
     ("bobinando",        "Bobinando"),
     ("esperando_telar",  "Esperando a telar"),
     ("en_telar",         "En telar"),
@@ -103,7 +104,10 @@ ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
 FLUJO_VARILLA = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "diseno_listo",
                  "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
                  "en_aprestos", "terminada")
-FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA}
+# Los POMPONES no se tejen: van a tintoreria, se revisa el color a la vuelta
+# y se terminan.
+FLUJO_POMPON = ("por_empezar", "en_tintoreria", "revisar_color", "terminada")
+FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA, "Pompón": FLUJO_POMPON}
 # Etapas que solo existen en un flujo propio (no en el textil): el backend las
 # rechaza para las tecnicas cuyo flujo no las recorre.
 ESTADOS_EXCLUSIVOS = frozenset(s for f in FLUJOS_PROPIOS.values() for s in f if s not in ESTADOS_FLUJO)
@@ -115,15 +119,16 @@ def es_print(telar) -> bool:
 
 
 def es_varilla(telar) -> bool:
-    """Telar de varilla: lleva datos tecnicos y el flujo con etapas de diseno."""
+    """Telar de varilla: lleva el flujo con las etapas de diseno por delante."""
     return (telar or "").strip().lower().startswith("varilla")
 
 
 def flujo_de(telar) -> tuple[str, ...]:
-    if es_print(telar):
-        return FLUJO_PRINT
-    if es_varilla(telar):
-        return FLUJO_VARILLA
+    """El flujo propio de la tecnica, o el textil completo."""
+    k = _clave(telar)
+    for nombre in sorted(FLUJOS_PROPIOS, key=len, reverse=True):
+        if k.startswith(_clave(nombre)):
+            return FLUJOS_PROPIOS[nombre]
     return ESTADOS_FLUJO
 
 
@@ -134,7 +139,7 @@ def flujo_que_contiene(telar, estado) -> tuple[str, ...]:
     propio = flujo_de(telar)
     if estado in propio:
         return propio
-    for f in (ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA):
+    for f in (ESTADOS_FLUJO, *FLUJOS_PROPIOS.values()):
         if estado in f:
             return f
     return propio
@@ -669,6 +674,7 @@ _ESTADO_POR_CLAVE = {
     "en hilatura": "en_hilatura",
     "hilatura": "en_hilatura",
     "en tintoreria": "en_tintoreria",
+    "revisar color": "revisar_color",                 # etapa de Pompón
     "tintoreria": "en_tintoreria",
     "lana tintada en laboratorio": "en_tintoreria",
     "bobinando": "bobinando",

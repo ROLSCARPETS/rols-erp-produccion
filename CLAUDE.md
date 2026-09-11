@@ -60,8 +60,11 @@ laboratorio pueda llevar las muestras sin ver costes.
   Las de **Varilla** llevan el diseño por delante del textil (`FLUJO_VARILLA`):
   por_empezar → `listo_diseno` («Listo para empezar diseño») → en_diseno →
   `revision_diseno` → `diseno_listo` («Diseño listo») → en_hilatura → … →
-  terminada. Las etapas que solo existen en un flujo propio
-  (`ESTADOS_EXCLUSIVOS`: listo_diseno, revision_diseno, diseno_listo) se
+  terminada. Los **Pompones** no se tejen (`FLUJO_POMPON`): por_empezar →
+  en_tintoreria → `revisar_color` («Revisar color», a la vuelta de tintorería)
+  → terminada. Las etapas que solo existen en un flujo propio
+  (`ESTADOS_EXCLUSIVOS`: listo_diseno, revision_diseno, diseno_listo,
+  revisar_color) se
   rechazan en backend para las técnicas que no las recorren
   (`etapa_permitida`), también al cambiar de telar estando en una de ellas.
   `etiqueta_estado(estado, telar)` / `MS.etiquetaEstado` dan el label que
