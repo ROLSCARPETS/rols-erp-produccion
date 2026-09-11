@@ -180,7 +180,7 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 7
+_VERSION_SCHEMA = 8
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
@@ -414,6 +414,8 @@ def cargar() -> dict:
                     _migrar_v6(data)
                 if v < 7:
                     _migrar_v7(data)
+                if v < 8:
+                    _migrar_v8(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -534,6 +536,18 @@ def _migrar_v7(data: dict) -> None:
     de los dos era). Idempotente."""
     for t in ("Tufting Bucle", "Tufting Corte"):
         _anadir_a_catalogo(data, "telares", t)
+
+
+def _migrar_v8(data: dict) -> None:
+    """v7 → v8: saca del catalogo de telares lo que se colo por error (un valor
+    tecleado en «Otro…» que no llego a usarse: la UI lo guardaba nada mas
+    escribirlo). Se queda lo que esta en TELARES_DEFAULT y lo que use alguna
+    muestra. Idempotente."""
+    cat = data.setdefault("catalogos", {})
+    usados = {_clave(m.get("telar")) for m in data.get("muestras", []) if (m.get("telar") or "").strip()}
+    base = {_clave(t) for t in TELARES_DEFAULT}
+    cat["telares"] = [t for t in (cat.get("telares") or [])
+                      if _clave(t) in base or _clave(t) in usados]
 
 
 def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:

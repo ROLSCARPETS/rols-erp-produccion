@@ -362,7 +362,7 @@
       el.addEventListener('change', async () => {
         if (el.value === '__otro__') {
           const tipo = el.dataset.campo === 'encargada_por' ? 'personas' : 'telares';
-          const ok = await gestionarOtro(el, tipo, tipo === 'personas' ? 'nombre' : 'telar / técnica');
+          const ok = await gestionarOtro(el, tipo === 'personas' ? 'nombre' : 'telar / técnica');
           if (!ok) { el.value = M[el.dataset.campo] || ''; return; }
         }
         if (el.dataset.campo === 'prioridad') colorearPrio(el);
@@ -396,8 +396,8 @@
     // Los valores se conservan aunque cambie el telar; solo se esconden
     const cfg = configTecnica(M.telar);
     $('md-tecnica').hidden = !esTecnico(M.telar);
-    // Pompón, Kibby y Festón no son telares
-    $('md-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : 'técnica ') + (M.telar || '');
+    // Pompón, Kibby y Festón no son telares: va solo el nombre
+    $('md-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : '') + (M.telar || '');
     // Pompón no teje: solo lleva materias
     $('md-tejeduria').hidden = !cfg.tejeduria;
     $('md-tecnica').classList.toggle('sin-tejeduria', !cfg.tejeduria);

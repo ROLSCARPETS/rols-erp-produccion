@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v7). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v8). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -119,6 +119,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   Acabado está la opción «Pendiente». Es un control del modal de alta (marca en
   rojo lo que falte); el backend no lo exige, para no romper las variantes
   (se crean desde la ficha copiando cliente y telar) ni el histórico.
+- **Catálogo de telares**: el de `TELARES_DEFAULT` más los que use alguna
+  muestra. La opción «Otro…» del selector **solo añade la opción a ese
+  selector** (`MS.gestionarOtro`); el telar entra en el catálogo cuando se
+  guarda la muestra (`_anadir_a_catalogo` desde `crear`/`actualizar`). Antes se
+  guardaba nada más escribirlo y un valor tecleado por error se quedaba para
+  siempre; v8 limpió lo que había caído así (lo que no está en
+  `TELARES_DEFAULT` ni usa ninguna muestra).
 - **Técnicas retiradas** (`TELARES_RETIRADOS`: Raschel y el **Tufting** a
   secas, que v7 partió en «Tufting Bucle» y «Tufting Corte» — las muestras
   antiguas se quedan como estaban, no se puede saber cuál de los dos era):

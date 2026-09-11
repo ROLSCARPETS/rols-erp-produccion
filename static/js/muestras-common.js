@@ -442,21 +442,19 @@
     return { pintar, leer, utiles: () => materiasUtiles(leer()), configurar };
   }
 
-  // Al elegir "Otro…" en un select de catálogo: pide el valor, lo guarda y lo selecciona.
-  async function gestionarOtro(sel, tipo, etiqueta) {
+  // Al elegir "Otro…": pide el valor y lo deja como UNA OPCIÓN MÁS del propio
+  // selector. No lo guarda en el catálogo compartido: antes se guardaba nada
+  // más escribirlo y un telar tecleado por error se quedaba para siempre.
+  // Entra en el catálogo cuando se guarda la muestra con él.
+  async function gestionarOtro(sel, etiqueta) {
     if (sel.value !== '__otro__') return true;
     const r = await window.mostrarPrompt({ titulo: `Nuevo ${etiqueta}`, etiqueta: etiqueta, placeholder: '…',
       validador: v => (!v ? 'Escribe un valor' : '') });
     if (!r.ok) { sel.value = ''; return false; }
-    try {
-      const data = await api(`/api/muestras/catalogos/${tipo}`, { method: 'POST', body: { valor: r.valor } });
-      llenarSelect(sel, data[tipo], { valor: r.valor, otro: true, vacio: sel.dataset.vacio });
-      return true;
-    } catch (e) {
-      await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
-      sel.value = '';
-      return false;
-    }
+    const valores = [...sel.options].map(o => o.value).filter(v => v && v !== '__otro__');
+    if (!valores.some(v => v.toLowerCase() === r.valor.toLowerCase())) valores.push(r.valor);
+    llenarSelect(sel, valores, { valor: r.valor, otro: true, vacio: sel.dataset.vacio });
+    return true;
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
