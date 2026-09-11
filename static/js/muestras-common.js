@@ -69,7 +69,8 @@
       ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']],
     Lancetas: [['raya', 'Raya'], ['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
       ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']],
-    Rapier: [['tejido_plano', 'Tejido plano']],
+    Rapier: [['tejido_plano', 'Tejido plano']],     // fijo: no se elige
+    Colortec: [['corte', 'Corte']],                 // fijo: no se elige
   };
   const PELO_LABEL = Object.fromEntries([].concat(...Object.values(PELOS_POR_TELAR)));
   function telarTecnico(telar) {

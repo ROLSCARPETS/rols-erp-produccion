@@ -547,7 +547,7 @@
     const u = window.__rolsUser || {};
     // Por defecto, quien está logueado (si tiene acceso a muestras)
     llenarSelectPersonas($('ms-n-persona'), c.personas_activas, { vacio: '— quién la encarga —', usuario: u.username || '' });
-    llenarSelect($('ms-n-telar'), c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
+    llenarSelect($('ms-n-telar'), c.telares_alta || c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');

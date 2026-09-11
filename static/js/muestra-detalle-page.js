@@ -243,7 +243,8 @@
     $('md-f-cliente').value = M.cliente || '';
     pintarNavLink();
     rellenarPersona();
-    llenarSelect($('md-f-telar'), CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
+    // sin las técnicas retiradas; si la muestra lleva una, llenarSelect la añade
+    llenarSelect($('md-f-telar'), CAT.telares_alta || CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
     pintarTecnica();
     $('md-f-prioridad').value = String(M.prioridad || 2);
     colorearPrio($('md-f-prioridad'));

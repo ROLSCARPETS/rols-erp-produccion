@@ -186,6 +186,16 @@ _VERSION_SCHEMA = 6
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
 TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
                    "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
+# Tecnicas que ya no se fabrican: siguen valiendo para el historico y para las
+# muestras que ya las llevan, pero no se ofrecen al dar de alta ni al cambiar
+# de telar. No se tocan los datos: es solo lo que ofrece la UI.
+TELARES_RETIRADOS = ("Raschel",)
+
+
+def telares_para_alta(catalogo) -> list[str]:
+    """El catalogo de telares sin los retirados."""
+    fuera = {_clave(t) for t in TELARES_RETIRADOS}
+    return [t for t in (catalogo or []) if _clave(t) not in fuera]
 
 # Datos tecnicos de la muestra cuando el telar es Varilla. En la UI van en dos
 # bloques: TEJEDURIA (pasadas, altura de felpa, n de cuerpos, construccion =
@@ -198,15 +208,18 @@ TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
 # Telares que llevan datos tecnicos. Los campos son los mismos en los tres;
 # lo que cambia son las CONSTRUCCIONES (`pelo`) que ofrece cada uno, y que
 # Rapier no elige: siempre es tejido plano.
-TELARES_TECNICOS = ("Varilla", "Lancetas", "Rapier")
+TELARES_TECNICOS = ("Varilla", "Lancetas", "Rapier", "Colortec")
 PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
                                               ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
                                               ("pendiente", "Pendiente"))
 PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("raya", "Raya"), ("bucle_sencillo", "Bucle sencillo"),
                                                ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
                                                ("pendiente", "Pendiente"))
+# Telares de construccion unica: no se elige, la pone el servidor
 PELOS_RAPIER: tuple[tuple[str, str], ...] = (("tejido_plano", "Tejido plano"),)
-PELOS_POR_TELAR = {"Varilla": PELOS_VARILLA, "Lancetas": PELOS_LANCETAS, "Rapier": PELOS_RAPIER}
+PELOS_COLORTEC: tuple[tuple[str, str], ...] = (("corte", "Corte"),)
+PELOS_POR_TELAR = {"Varilla": PELOS_VARILLA, "Lancetas": PELOS_LANCETAS,
+                   "Rapier": PELOS_RAPIER, "Colortec": PELOS_COLORTEC}
 # Union (en orden, sin repetir): vale para validar venga del telar que venga y
 # para traducir el slug a su etiqueta en la ficha y en el historial.
 PELOS: tuple[tuple[str, str], ...] = tuple(
@@ -969,6 +982,9 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "prioridades": [{"valor": k, "label": v} for k, v in PRIORIDADES.items()],
         "tipos": [{"valor": "cliente", "label": "Cliente"}, {"valor": "interna", "label": "Interna"}],
         "telares": list(cat.get("telares") or []),
+        # para el alta y para la ficha: sin las tecnicas retiradas
+        "telares_alta": telares_para_alta(cat.get("telares")),
+        "telares_retirados": list(TELARES_RETIRADOS),
         # activas = pueden encargar muestras nuevas; legacy = solo para filtrar
         "personas_activas": activas,
         "personas_legacy": legacy,
@@ -1887,7 +1903,7 @@ def anadir_catalogo(tipo: str, valor: str) -> tuple[list | None, str]:
         data = cargar()
         _anadir_a_catalogo(data, tipo, valor)
         _guardar(data)
-        return list(data["catalogos"][tipo]), ""
+        return telares_para_alta(data["catalogos"][tipo]), ""
 
 
 # ---------------------------------------------------------------------------

@@ -80,8 +80,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   `descripcion` sigue siendo el texto largo (el listado la enseña si no hay
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
-- **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**
-  y **Rapier**), en dos bloques en la UI:
+- **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
+  **Rapier** y **Colortec**), en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
   cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
   sin_aprestar | resina | latex_resina | pendiente) y
@@ -91,21 +91,29 @@ laboratorio pueda llevar las muestras sin ver costes.
   cambia, se conservan). Las **construcciones** dependen del telar
   (`PELOS_POR_TELAR` / `MS.PELOS_POR_TELAR`): Varilla (corte, bucle,
   corte_bucle, estructurado, pendiente), Lancetas (raya, bucle_sencillo,
-  tejido_plano, bucle_saltillo, pendiente) y Rapier, que **no elige**: es
-  siempre `tejido_plano` (`pelo_fijo()` lo pone al crear y al pasar a Rapier,
-  y la UI enseña el valor fijo en vez del selector). `pelo` se valida contra la
-  unión de todas, así que cambiar de telar nunca deja un valor no válido. La tabla se guarda **entera** en cada cambio (`PUT` con
+  tejido_plano, bucle_saltillo, pendiente). Rapier y Colortec **no eligen**:
+  son siempre `tejido_plano` y `corte` (`pelo_fijo()` la pone al crear y al
+  cambiar a ese telar, y la UI enseña el valor fijo en vez del selector).
+  `pelo` se valida contra la unión de todas, así que cambiar de telar nunca
+  deja un valor no válido.
+  La tabla de materias se guarda **entera** en cada cambio (`PUT` con
   `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
   nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`
   por posición. v6 pasó los campos planos `material` / `hilos_pua` a una
   primera fila de la tabla. `resumen_tecnico()` junta materias y tejeduría
   para el hero y los correos; `materiales` y `coloridos` de `catalogos` salen
-  de las filas ya escritas (datalist). **El alta de una Varilla exige los
-  datos técnicos rellenos** (los cinco campos de tejeduría y todas las casillas
+  de las filas ya escritas (datalist). **El alta de un telar técnico exige los
+  datos técnicos rellenos** (los campos de tejeduría y todas las casillas
   de cada materia): lo que no se sepa se escribe «Pdte», y en Construcción y
   Acabado está la opción «Pendiente». Es un control del modal de alta (marca en
   rojo lo que falte); el backend no lo exige, para no romper las variantes
   (se crean desde la ficha copiando cliente y telar) ni el histórico.
+- **Técnicas retiradas** (`TELARES_RETIRADOS`: Raschel): siguen en el
+  histórico, en los filtros y en las muestras que ya las llevan, pero no se
+  ofrecen al dar de alta ni en el selector de la ficha
+  (`catalogos.telares_alta` = el catálogo sin ellas; `telares` sigue completo
+  para los filtros). No hay veto en el backend: las variantes de una muestra
+  antigua copian su telar.
 - **Diseño adjunto** (`adjuntos[]`): ficheros en
   `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
   ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas
