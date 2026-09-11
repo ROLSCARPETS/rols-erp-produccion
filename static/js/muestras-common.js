@@ -6,10 +6,10 @@
 
   const ESTADOS = [
     ['por_empezar', 'Por empezar'],
-    ['listo_diseno', 'Listo para empezar diseño'],       // solo Varilla (en Print es la etiqueta de por_empezar)
+    ['listo_diseno', 'Listo para empezar diseño'],       // telares y Print
     ['en_diseno', 'En diseño'],
-    ['revision_diseno', 'Listo para revisión diseño'],   // Print y Varilla
-    ['diseno_listo', 'Diseño listo'],                    // solo Varilla
+    ['revision_diseno', 'Listo para revisión diseño'],   // telares y Print
+    ['diseno_listo', 'Diseño listo'],                    // solo los telares
     ['en_hilatura', 'En hilatura'],
     ['en_tintoreria', 'En tintorería'],
     ['revisar_color', 'Revisar color'],                  // solo Pompón
@@ -18,12 +18,11 @@
     ['cancelada', 'Cancelada'], ['sin_seguimiento', 'Sin seguimiento'],
   ];
   const ESTADOS_LABEL = Object.fromEntries(ESTADOS);
-  // Flujo textil completo; las muestras de Print (solo diseño) llevan el suyo,
-  // más corto (su "por_empezar" se lee "Listo para empezar diseño"), y las de
-  // Varilla el textil con las etapas de diseño por delante.
+  // Flujo textil completo; las de Print (solo diseño) llevan el suyo, más
+  // corto, y los telares el textil con las etapas de diseño por delante.
   const ESTADOS_FLUJO = ['por_empezar', 'en_diseno', 'en_hilatura', 'en_tintoreria',
     'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
-  const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
+  const FLUJO_PRINT = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'terminada'];
   // Los telares llevan las etapas de diseño por delante del flujo textil
   const FLUJO_TELAR = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
     'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
@@ -33,8 +32,6 @@
     'Varilla': FLUJO_TELAR, 'Colortec': FLUJO_TELAR, 'Lancetas': FLUJO_TELAR,
     'Rapier': FLUJO_TELAR, 'Tufting Bucle': FLUJO_TELAR, 'Tufting Corte': FLUJO_TELAR,
     'Pompón': FLUJO_POMPON, 'Festón': FLUJO_POMPON };
-  const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
-  const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';
   function flujoDe(telar) {
     const k = sinAcentos(telar);
     const hit = Object.keys(FLUJOS_PROPIOS).sort((a, b) => b.length - a.length)
@@ -49,8 +46,8 @@
     if (propio.includes(estado)) return propio;
     return [ESTADOS_FLUJO, ...Object.values(FLUJOS_PROPIOS)].find(f => f.includes(estado)) || propio;
   }
-  const etiquetaEstado = (slug, telar) =>
-    (esPrint(telar) && ETIQUETAS_PRINT[slug]) || ESTADOS_LABEL[slug] || slug || '—';
+  // `telar` se mantiene por si alguna técnica vuelve a renombrar una etapa
+  const etiquetaEstado = (slug, telar) => ESTADOS_LABEL[slug] || slug || '—';
   const PRIO_LABEL = { 1: 'Alta', 2: 'Media', 3: 'Baja' };
 
   function esc(s) {
@@ -453,7 +450,7 @@
     return { pintar, leer, utiles: () => materiasUtiles(leer()), configurar };
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_TELAR, FLUJO_POMPON, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_TELAR, FLUJO_POMPON, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, montarBuscadorCliente,

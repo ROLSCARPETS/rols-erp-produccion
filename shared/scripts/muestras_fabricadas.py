@@ -70,9 +70,9 @@ _KEY = "muestras_fabricadas"
 # (slug, label). El orden es el del proceso de fabricacion.
 ESTADOS: tuple[tuple[str, str], ...] = (
     ("por_empezar",      "Por empezar"),
-    ("listo_diseno",     "Listo para empezar diseño"),    # solo Varilla (en Print es la etiqueta de por_empezar)
+    ("listo_diseno",     "Listo para empezar diseño"),    # telares y Print
     ("en_diseno",        "En diseño"),
-    ("revision_diseno",  "Listo para revisión diseño"),   # Print y Varilla
+    ("revision_diseno",  "Listo para revisión diseño"),   # telares y Print
     ("diseno_listo",     "Diseño listo"),                 # solo Varilla
     ("en_hilatura",      "En hilatura"),
     ("en_tintoreria",    "En tintorería"),
@@ -93,11 +93,9 @@ ESTADOS_FLUJO = ("por_empezar", "en_diseno", "en_hilatura", "en_tintoreria",
 ESTADOS_TERMINALES = {"terminada", "cancelada", "sin_seguimiento"}
 ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS if s != "sin_seguimiento")
 
-# Las muestras de PRINT no pasan por fabrica: su flujo es solo el del diseno
-# (y "por_empezar" se lee "Listo para empezar diseño"). El slug de cada etapa
-# sigue siendo unico y estable; cambia que etapas se recorren y una etiqueta.
-FLUJO_PRINT = ("por_empezar", "en_diseno", "revision_diseno", "terminada")
-ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
+# Las muestras de PRINT no pasan por fabrica: su flujo es solo el del diseno,
+# con las mismas dos primeras etapas que los telares.
+FLUJO_PRINT = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "terminada")
 # Los TELARES llevan el diseno por delante del flujo textil: por_empezar →
 # listo_diseno («Listo para empezar diseño») → en_diseno → revision_diseno →
 # diseno_listo («Diseño listo») → en_hilatura → ... → terminada.
@@ -116,11 +114,6 @@ FLUJOS_PROPIOS = {"Print": FLUJO_PRINT,
 # Etapas que solo existen en un flujo propio (no en el textil): el backend las
 # rechaza para las tecnicas cuyo flujo no las recorre.
 ESTADOS_EXCLUSIVOS = frozenset(s for f in FLUJOS_PROPIOS.values() for s in f if s not in ESTADOS_FLUJO)
-
-
-def es_print(telar) -> bool:
-    """La tecnica Print (solo diseno) lleva su propio flujo de etapas."""
-    return normalizar_telar(telar) == "Print"
 
 
 def flujo_de(telar) -> tuple[str, ...]:
@@ -165,13 +158,9 @@ def _msg_etapa_no_permitida(estado, telar=None) -> str:
 
 
 def etiqueta_estado(estado, telar=None) -> str:
-    """Label del estado; con telar Print, la etiqueta propia de ese flujo."""
-    s = estado or ""
-    if telar is not None and es_print(telar):
-        propio = ETIQUETAS_PRINT.get(s)
-        if propio:
-            return propio
-    return ESTADOS_LABEL.get(s, s or "—")
+    """Label del estado. `telar` se mantiene porque una tecnica podria querer
+    renombrar una etapa (Print lo hacia con «Por empezar»); hoy ninguna lo hace."""
+    return ESTADOS_LABEL.get(estado or "", estado or "—")
 
 
 def es_retroceso(anterior, nuevo, telar=None) -> bool:
@@ -681,7 +670,7 @@ def normalizar_numero(raw) -> tuple[str | None, int | None, str]:
 
 _ESTADO_POR_CLAVE = {
     "por empezar": "por_empezar",
-    "listo para empezar diseno": "listo_diseno",      # etapa de Varilla (en Print es la etiqueta de por_empezar)
+    "listo para empezar diseno": "listo_diseno",
     "listo para revision diseno": "revision_diseno",  # Print y Varilla
     "diseno listo": "diseno_listo",                   # etapa de Varilla
     "en diseno": "en_diseno",

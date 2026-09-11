@@ -55,8 +55,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   en_tintoreria → bobinando → esperando_telar → en_telar → en_aprestos →
   terminada; además cancelada y `sin_seguimiento` (solo histórico del
   registro antiguo, no seleccionable). Las muestras de **Print** llevan su
-  flujo corto (`FLUJO_PRINT`): por_empezar («Listo para empezar diseño») →
-  en_diseno → `revision_diseno` («Listo para revisión diseño») → terminada.
+  flujo corto (`FLUJO_PRINT`): por_empezar → `listo_diseno` («Listo para
+  empezar diseño») → en_diseno → `revision_diseno` → terminada.
   Los **telares** (Varilla, Colortec, Lancetas, Rapier y los dos Tufting)
   llevan el diseño por delante del textil (`FLUJO_TELAR`): por_empezar →
   `listo_diseno` («Listo para empezar diseño») → en_diseno → `revision_diseno`
@@ -191,14 +191,14 @@ laboratorio pueda llevar las muestras sin ver costes.
   cambio, salvo en los `HITOS_CLAVE` («Listo para revisión diseño», que pide
   marcar la Verificación de diseño, y «Terminada»), que avisan siempre. Las
   **etapas de diseño** suman destinatarios (sale un único correo con todos):
-  «Listo para empezar diseño» (`listo_diseno` de Varilla y el `por_empezar` de
-  Print, `listo_para_disenar()`) al buzón de diseño
+  «Listo para empezar diseño» (`listo_diseno`, la misma etapa en todas las
+  técnicas) al buzón de diseño
   (`ROLS_MUESTRAS_DISENO_EMAIL`, por defecto `diseno@rolscarpets.com`, sin eñe
   a propósito: una ñ en la parte local exige SMTPUTF8); «Listo para revisión
   diseño» también a quien **creó** la muestra (`creado_por`); «Diseño listo» al
   buzón del laboratorio. Y al **crear** una muestra,
   resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`), a
-  quien la crea y, si nace lista para empezar diseño (una Print), a diseño
+  quien la crea y, si nace directamente en «Listo para empezar diseño», a diseño
   (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
@@ -208,8 +208,7 @@ laboratorio pueda llevar las muestras sin ver costes.
   `salvo_actor` | `siempre`), si va a **quien la creó** y qué **buzones** fijos
   la reciben. `muestras_avisos.avisos_por_defecto()` son los valores de fábrica
   (los de arriba) y `config_avisos()` les pega encima lo guardado en la muestra
-  doc (`avisos_destinatarios`, solo las filas tocadas); `clave_aviso()` manda
-  el `por_empezar` de Print a la fila de «Listo para empezar diseño».
+  doc (`avisos_destinatarios`, solo las filas tocadas).
   El chequeo de hitos corre en segundo plano como mucho cada 15 min desde
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).

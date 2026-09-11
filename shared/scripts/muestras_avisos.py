@@ -95,9 +95,8 @@ def config_avisos() -> dict:
 
 
 def clave_aviso(estado, telar=None) -> str:
-    """La fila de configuracion que toca a esa etapa. El «por empezar» de Print
-    se lee «Listo para empezar diseño», asi que se configura con esa fila."""
-    return "listo_diseno" if listo_para_disenar(estado, telar) else (estado or "")
+    """La fila de configuracion que toca a esa etapa."""
+    return estado or ""
 
 
 def _asunto_ejemplo(estado: str) -> str:
@@ -121,9 +120,7 @@ def filas_aviso() -> list[dict]:
     for s in mf.ESTADOS_SELECCIONABLES:
         nota = ""
         if s == "listo_diseno":
-            nota = "también el alta de una Print, que nace en esta etapa"
-        elif s == "por_empezar":
-            nota = "en Print esta etapa se lee «Listo para empezar diseño»"
+            nota = "también las Print, que ahora pasan por aquí"
         out.append({"clave": s, "etiqueta": mf.ESTADOS_LABEL.get(s, s), "tipo": "etapa",
                     "nota": nota, "asunto": _asunto_ejemplo(s)})
     out.append({"clave": "hito", "etiqueta": "Llega la fecha del próximo hito", "tipo": "hito",
@@ -191,10 +188,9 @@ def email_diseno() -> str:
     return (os.environ.get("ROLS_MUESTRAS_DISENO_EMAIL") or DISENO_EMAIL_DEFECTO).strip().lower()
 
 
-def listo_para_disenar(estado, telar) -> bool:
-    """«Listo para empezar diseño», sea cual sea la técnica: la etapa propia de
-    Varilla (`listo_diseno`) y, en Print, la inicial, que se lee igual."""
-    return estado == "listo_diseno" or (estado == "por_empezar" and mf.es_print(telar))
+def listo_para_disenar(estado, telar=None) -> bool:
+    """«Listo para empezar diseño»: la misma etapa en todas las técnicas."""
+    return estado == "listo_diseno"
 
 
 def buzon_de_etapa(estado, telar) -> str:
@@ -460,9 +456,9 @@ def aviso_nueva_muestra(mid: str, actor, directorio, base_url: str) -> dict:
         _anadir(email_actor)
     if cfg.get("encargada", "no") != "no":
         _anadir(email_de_usuario(m.get("encargada_por_usuario"), directorio)[0])
-    # Una Print nace ya en «Listo para empezar diseño»: quien reciba esa etapa
-    # se entera aquí, porque nunca llega como cambio de etapa.
-    if listo_para_disenar(m.get("estado"), m.get("telar")):
+    # Si la muestra nace directamente en «Listo para empezar diseño», quien
+    # reciba esa etapa se entera aquí: nunca llegará como cambio de etapa.
+    if listo_para_disenar(m.get("estado")):
         for b in (cfg_todo.get("listo_diseno", {}).get("buzones") or []):
             _anadir(b)
     asunto = f"[Muestras] Nueva muestra {_cabecera(m)}"
