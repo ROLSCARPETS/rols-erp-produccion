@@ -246,9 +246,69 @@
       <div class="ms-section" id="an-avisos">
         <div class="ms-section-title">
           <span>Avisos automáticos por correo</span>
-          <span class="ms-hint">a quien encargó la muestra</span>
+          <span class="ms-hint">quién recibe cada uno y en qué etapa</span>
         </div>
-        <p class="ms-avisos-txt">Se avisa por e-mail a quien encargó la muestra cuando <b>cambia de etapa</b>, cuando se marca <b>terminada</b> o <b>cancelada</b>, y el día que <b>llega la fecha del próximo hito</b>. No se avisa a quien hace el cambio, salvo en <b>Listo para revisión diseño</b> y <b>Terminada</b>, que avisan siempre a quien la encargó. Las etapas de diseño avisan además: <b>Listo para empezar diseño</b> a <b>diseño</b>, <b>Listo para revisión diseño</b> también a quien creó la muestra, y <b>Diseño listo</b> al <b>laboratorio</b>. Al <b>crear una muestra</b> llega un resumen a <b>laboratorio@rolscarpets.com</b>, a quien la ha creado y, si nace lista para empezar diseño, a diseño. Cada aviso queda en el historial de la muestra.</p>
+        <p class="ms-avisos-txt">En cada cambio de etapa se avisa a <b>quien encargó la muestra</b>, salvo que el
+          cambio lo haga esa misma persona. <b>Listo para revisión diseño</b> y <b>Terminada</b> le llegan siempre.
+          Los buzones de diseño y laboratorio reciben su etapa pase lo que pase. Si coinciden varios destinatarios
+          sale un solo correo con todos, y cada intento queda en el historial de la muestra.</p>
+        <div class="ms-avisos-tabla">
+          <table class="ms-tabla">
+            <thead>
+              <tr><th>Cuándo</th><th>Quién lo recibe</th><th>Asunto del correo</th></tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td><span class="ms-estado ms-estado-por_empezar">Se crea la muestra</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Laboratorio <code>laboratorio@</code></span><span class="ms-quien">Quien la crea</span><span class="ms-quien buzon">Diseño <code>diseno@</code></span><span class="ms-marca salvo">diseño solo si nace lista para diseñar</span></div></td>
+              <td class="ms-avisos-asunto">[Muestras] Nueva muestra M-… · Cliente</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-listo_diseno">Listo para empezar diseño</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Diseño <code>diseno@</code></span><span class="ms-marca siempre">siempre</span><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
+              <td class="ms-avisos-asunto">… · LISTO PARA EMPEZAR DISEÑO</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-en_diseno">En diseño</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
+              <td class="ms-avisos-asunto">… · ahora en En diseño</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-revision_diseno">Listo para revisión diseño</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-quien">Quien la creó</span><span class="ms-marca siempre">siempre</span></div></td>
+              <td class="ms-avisos-asunto">… · DISEÑO LISTO PARA TU REVISIÓN</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-diseno_listo">Diseño listo</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Laboratorio <code>laboratorio@</code></span><span class="ms-marca siempre">siempre</span><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
+              <td class="ms-avisos-asunto">… · DISEÑO LISTO</td>
+            </tr>
+            <tr>
+              <td><span class="ms-avisos-otras">Las demás etapas del proceso<br/><span class="ms-hint">hilatura, tintorería, bobinando, esperando a telar, en telar, aprestos, revisar color</span></span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
+              <td class="ms-avisos-asunto">… · ahora en «la etapa»</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-terminada">Terminada</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca siempre">siempre</span></div></td>
+              <td class="ms-avisos-asunto">… · TERMINADA (lista el 11/09/2026)</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-cancelada">Cancelada</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
+              <td class="ms-avisos-asunto">… · CANCELADA</td>
+            </tr>
+            <tr>
+              <td><span class="ms-estado ms-estado-esperando_telar">Llega la fecha del próximo hito</span></td>
+              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">una sola vez por fecha</span></div></td>
+              <td class="ms-avisos-asunto">… · hito 15/10/2026: llegan los colores</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ms-avisos-txt ms-avisos-no"><b>No manda correo:</b> guardar campos de la ficha, adjuntar o borrar
+          un diseño, marcar la verificación, escribir en el diario, ni volver a pulsar la etapa en la que ya está.
+          Una muestra sin nadie en «Encargada por» no avisa a ninguna persona; los buzones sí reciben lo suyo.</p>
         <div class="ms-avisos-estado" id="an-avisos-estado">Consultando…</div>
         <div class="ms-chart-foot">
           <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="an-avisos-prueba" hidden>Enviarme un correo de prueba</button>

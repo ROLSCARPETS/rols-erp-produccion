@@ -202,7 +202,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
-  chequeo de hitos corre en segundo plano como mucho cada 15 min desde
+  La pestaña **Análisis** lleva la chuleta: una tabla con cada momento, quién
+  lo recibe (personas vs. buzones, y si el aviso se salta o no a quien hace el
+  cambio) y el asunto del correo. Al tocar las reglas, actualizarla.
+  El chequeo de hitos corre en segundo plano como mucho cada 15 min desde
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).
 - **Cliente**: texto libre (prospectos) con buscador sobre el maestro de

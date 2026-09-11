@@ -248,6 +248,24 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 /* Avisos por correo (pestaña Análisis) */
 .ms-avisos-txt { font-size: 0.84rem; color: #4d4d4d; line-height: 1.5; margin: 0 0 0.7rem; max-width: 70rem; }
 .ms-avisos-estado { font-size: 0.82rem; color: #4d4d4d; line-height: 1.6; }
+/* Chuleta de avisos: quién recibe cada correo y en qué etapa */
+.ms-avisos-tabla { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.7rem; }
+.ms-avisos-tabla table.ms-tabla { min-width: 640px; font-size: 0.8rem; }
+.ms-avisos-tabla th { background: #faf6ee; }
+.ms-avisos-tabla td { padding: 0.5rem 0.6rem; vertical-align: middle; }
+.ms-avisos-quien { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.ms-quien { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 500; color: #2a2a2a; border: 1px solid var(--border); border-radius: 7px; padding: 0.14rem 0.45rem; background: #fff; white-space: nowrap; }
+.ms-quien::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-hover); flex: 0 0 auto; }
+.ms-quien.buzon { border-style: dashed; background: transparent; }
+.ms-quien.buzon::before { border-radius: 2px; background: #4d4d4d; }
+.ms-quien code { font-size: 0.7rem; color: #7a7a7a; background: none; padding: 0; }
+.ms-marca { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 4px; padding: 0.12rem 0.32rem; white-space: nowrap; }
+.ms-marca.siempre { color: #2f6b29; background: #e8f3e1; border: 1px solid #c8e2bd; }
+.ms-marca.salvo { color: #8a857d; border: 1px dotted #d8d0c6; }
+.ms-avisos-asunto { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.72rem; color: #4d4d4d; }
+.ms-avisos-otras { font-size: 0.78rem; color: #2a2a2a; font-weight: 500; }
+.ms-avisos-otras .ms-hint { display: block; font-weight: 400; }
+.ms-avisos-no { color: #7a7a7a; }
 .ms-avisos-estado code { background: #f1ece4; border-radius: 4px; padding: 0 0.3rem; font-size: 0.78rem; }
 
 /* ---------- Ficha ---------- */
