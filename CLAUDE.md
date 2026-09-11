@@ -60,7 +60,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   Las de **Varilla** llevan el diseño por delante del textil (`FLUJO_VARILLA`):
   por_empezar → `listo_diseno` («Listo para empezar diseño») → en_diseno →
   `revision_diseno` → `diseno_listo` («Diseño listo») → en_hilatura → … →
-  terminada. Los **Pompones** no se tejen (`FLUJO_POMPON`): por_empezar →
+  terminada. Los **Pompones** y los **Festones** no se tejen (`FLUJO_POMPON`):
+  por_empezar →
   en_tintoreria → `revisar_color` («Revisar color», a la vuelta de tintorería)
   → terminada. Las etapas que solo existen en un flujo propio
   (`ESTADOS_EXCLUSIVOS`: listo_diseno, revision_diseno, diseno_listo,
