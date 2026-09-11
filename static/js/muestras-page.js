@@ -635,7 +635,7 @@
       const faltan = faltanTecnicos();
       if (faltan.length) {
         $('ms-n-tecnica').scrollIntoView({ block: 'center', behavior: 'smooth' });
-        return fallo(`Una muestra de varilla se da de alta con sus datos técnicos. Falta: ${faltan.join(', ')}. Si todavía no se sabe, escribe «Pdte».`);
+        return fallo(`Una muestra de ${telarNuevo} se da de alta con sus datos técnicos. Falta: ${faltan.join(', ')}. Si todavía no se sabe, escribe «Pdte».`);
       }
     }
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
