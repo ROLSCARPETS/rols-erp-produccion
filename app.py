@@ -18,6 +18,7 @@ Estructura autonoma (no depende del arbol de Rols One):
 """
 from __future__ import annotations
 
+import io
 import logging
 import json
 import math
@@ -2412,6 +2413,28 @@ def api_muestra_adjunto(mid, aid):
     return send_file(ruta, mimetype=mime or "application/octet-stream",
                      as_attachment=descargar, download_name=meta.get("nombre") or "adjunto",
                      max_age=0, conditional=True)
+
+
+@app.route("/api/muestras/<mid>/pdf")
+def api_muestra_pdf(mid):
+    """Resumen de la muestra en PDF, para imprimirlo y meterlo en la caja de la
+    muestra física. Se abre en la pestaña; `?dl=1` lo descarga."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    m = _muestras_module().obtener(mid)
+    if not m:
+        return jsonify({"error": f"la muestra {mid!r} no existe"}), 404
+    rols_shared.ensure_shared_on_path()
+    import pdf_muestra
+    try:
+        datos = pdf_muestra.generar_pdf_muestra(m, base_url=_url_publica())
+    except RuntimeError as e:          # reportlab no instalado en el servidor
+        return jsonify({"error": str(e)}), 503
+    from flask import send_file
+    return send_file(io.BytesIO(datos), mimetype="application/pdf",
+                     as_attachment=request.args.get("dl") == "1",
+                     download_name=f"M-{m.get('id')}.pdf", max_age=0)
 
 
 # Cache busting: url_for('static', ...) añade ?v=<mtime> al final.

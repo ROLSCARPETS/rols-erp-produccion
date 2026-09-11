@@ -141,6 +141,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`catalogos.telares_alta` = el catálogo sin ellas; `telares` sigue completo
   para los filtros). No hay veto en el backend: las variantes de una muestra
   antigua copian su telar.
+- **Resumen en PDF** (`shared/scripts/pdf_muestra.py`, reportlab): una hoja A4
+  para imprimir y meter en la caja de la muestra física — nº de M, cliente,
+  referencia, los datos de la ficha, tejeduría, la tabla de materias,
+  descripción, resultado y el diario (los últimos `MAX_APUNTES`), con un QR
+  que abre la ficha. `GET /api/muestras/<id>/pdf` lo sirve en la pestaña
+  (`?dl=1` lo descarga); botón «PDF» en la cabecera de la ficha. Sin reportlab
+  en el servidor devuelve 503 con el motivo.
 - **Diseño adjunto** (`adjuntos[]`): ficheros en
   `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
   ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas

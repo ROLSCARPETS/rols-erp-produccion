@@ -84,6 +84,11 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
             Nueva variante
           </button>
+          <a href="/api/muestras/{{ muestra_id | urlencode }}/pdf" target="_blank" rel="noopener"
+             class="ms-btn ms-btn-ghost" id="md-btn-pdf" title="Resumen en PDF para imprimir y meter en la caja de la muestra">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+            PDF
+          </a>
           <button type="button" class="ms-btn ms-btn-ghost" id="md-btn-archivar" hidden>Archivar</button>
           <button type="button" class="ms-btn ms-btn-danger" id="md-btn-borrar" hidden title="Solo para altas por error: borra la muestra y su diario">Borrar</button>
         </div>
