@@ -656,10 +656,17 @@
       encargada_por: $('ms-n-persona').value,
       telar: telarNuevo,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
-      pasadas: $('ms-n-pasadas').value.trim(), altura_felpa: $('ms-n-altura').value.trim(),
-      n_cuerpos: $('ms-n-cuerpos').value.trim(), materias: tablaMaterias.utiles(),
-      pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
+      materias: tablaMaterias.utiles(),
     };
+    // La tejeduría solo va en los telares que la llevan: así un telar sin ella
+    // (Pompón) no se lleva lo que quedara escrito de otro telar.
+    if (configTecnica(telarNuevo).tejeduria) {
+      Object.assign(body, {
+        pasadas: $('ms-n-pasadas').value.trim(), altura_felpa: $('ms-n-altura').value.trim(),
+        n_cuerpos: $('ms-n-cuerpos').value.trim(),
+        pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
+      });
+    }
     if (tipo === 'variante') {
       const v = $('ms-n-variante').value.trim();
       if (!v) return fallo('Indica de qué número de M es variante.');
