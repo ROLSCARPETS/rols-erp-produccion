@@ -442,12 +442,22 @@
   }
   function urlAdjunto(a) { return `${URL_API}/adjuntos/${encodeURIComponent(a.id)}`; }
   function pintarVerificacion() {
-    $('md-verif').checked = !!M.diseno_verificado;
+    const el = $('md-verif');
+    el.checked = !!M.diseno_verificado;
     $('md-verif-wrap').classList.toggle('ok', !!M.diseno_verificado);
     const quien = M.diseno_verificado_por_nombre || M.diseno_verificado_por || '';
     $('md-verif-quien').textContent = M.diseno_verificado
       ? `verificado por ${quien}${M.diseno_verificado_en ? ' el ' + fmtFechaHora(M.diseno_verificado_en) : ''}`
       : '';
+    // quitarla solo puede quien la marcó (o un admin)
+    const yo = ((window.__rolsUser || {}).username || '').trim().toLowerCase();
+    const suya = !M.diseno_verificado || !M.diseno_verificado_por
+      || M.diseno_verificado_por === yo || esAdmin();
+    el.disabled = !suya;
+    $('md-verif-wrap').classList.toggle('ajena', !suya);
+    $('md-verif-wrap').title = suya
+      ? 'Marca cuando el diseño esté revisado y aprobado'
+      : `Solo ${quien} puede quitar su verificación`;
   }
   $('md-verif').addEventListener('change', async () => {
     const el = $('md-verif');

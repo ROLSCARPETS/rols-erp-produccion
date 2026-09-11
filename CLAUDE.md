@@ -164,7 +164,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   historial (`tipo: adjunto`, a = anadido | etiqueta | borrado). Check
   **Verificación de diseño** (`diseno_verificado` + `_por`, `_por_nombre`,
   `_en`, que pone el servidor con el actor al marcarlo y limpia al quitarlo);
-  chip "Diseño verificado" en el hero.
+  chip "Diseño verificado" en el hero. **Solo la quita quien la puso** (o un
+  admin, por si esa persona ya no está): el backend lo rechaza con un mensaje
+  que dice de quién es, y en la ficha la casilla sale bloqueada para el resto.
 - El diario del laboratorio son apuntes fechados (`apuntes[]`); el texto del
   Excel se troceó por fechas (`parsear_diario`) sin pérdida. Cada cambio de
   etapa deja además un apunte automático (`tipo: "estado"`, "Pasa a «…»",
@@ -217,6 +219,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   El chequeo de hitos corre en segundo plano como mucho cada 15 min desde
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).
+- El **código de Navision** del cliente sale en el listado bajo su nombre
+  (`MS.clienteHtml`), en el hero de la ficha, bajo el campo Cliente y en el PDF.
 - **Cliente**: texto libre (prospectos) con buscador sobre el maestro de
   clientes de Navision que tiene Rols One (`/api/navision/clientes`, copia
   diaria de BC; el ERP lo proxya en `/api/muestras/clientes-navision`). Al

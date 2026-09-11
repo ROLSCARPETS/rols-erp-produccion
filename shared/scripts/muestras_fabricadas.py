@@ -1583,6 +1583,16 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                 v = _a_bool(v)
                 if bool(m.get("diseno_verificado")) == v:
                     continue
+                if not v:
+                    # La verificacion solo la quita quien la puso (o un admin,
+                    # por si esa persona ya no esta).
+                    quien = (m.get("diseno_verificado_por") or "").strip().lower()
+                    actor = (_actor_username(usuario) or "").strip().lower()
+                    es_admin = isinstance(usuario, dict) and usuario.get("rol") == "admin"
+                    if quien and quien != actor and not es_admin:
+                        nombre = m.get("diseno_verificado_por_nombre") or quien
+                        return None, (f"la verificación del diseño la marcó {nombre}: "
+                                      "solo esa persona puede quitarla")
                 m["diseno_verificado_por"] = _actor_username(usuario) if v else None
                 m["diseno_verificado_por_nombre"] = _actor_nombre(usuario) if v else None
                 m["diseno_verificado_en"] = _ahora() if v else None

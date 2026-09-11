@@ -193,8 +193,11 @@
   function clienteHtml(m) {
     const tag = tipoTag(m);
     const txt = esc((m && m.cliente) || '');
-    if (!txt) return tag || '<span class="ms-mudo">—</span>';
-    return tag + txt;
+    // el código de Navision, debajo del nombre, si el cliente lo tiene
+    const cod = (m && m.cliente_navision)
+      ? `<span class="ms-cli-nav" title="Cliente vinculado a su ficha de Navision">${esc(m.cliente_navision)}</span>` : '';
+    if (!txt) return (tag || '<span class="ms-mudo">—</span>') + cod;
+    return tag + txt + cod;
   }
 
   // El <select> de prioridad toma el color de su pill (1 rojo, 2 azul, 3 verde).

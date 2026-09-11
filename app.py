@@ -2168,12 +2168,14 @@ def api_muestras_clientes_navision():
 
 
 def _actor() -> dict | None:
-    """Quien hace el cambio, para apuntes e historial: {username, nombre}."""
+    """Quien hace el cambio, para apuntes e historial: {username, nombre, rol}.
+    El rol solo lo mira la verificación de diseño (un admin puede quitarla)."""
     u = _sso_user() or {}
     if not u.get("username"):
         return None
     return {"username": (u.get("username") or "").strip().lower(),
-            "nombre": (u.get("nombre") or "").strip()}
+            "nombre": (u.get("nombre") or "").strip(),
+            "rol": (u.get("rol") or "").strip().lower()}
 
 
 def _ctx_personas() -> dict:
