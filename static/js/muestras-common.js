@@ -24,14 +24,14 @@
   const ESTADOS_FLUJO = ['por_empezar', 'en_diseno', 'en_hilatura', 'en_tintoreria',
     'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
   const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
-  const FLUJO_VARILLA = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
-    'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
-  // Colortec: las etapas de diseño por delante del textil, como Varilla pero sin «Diseño listo»
-  const FLUJO_COLORTEC = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno',
+  // Los telares llevan las etapas de diseño por delante del flujo textil
+  const FLUJO_TELAR = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
     'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
   // Pompones y festones no se tejen: tintorería, revisar el color a la vuelta y listo
   const FLUJO_POMPON = ['por_empezar', 'en_tintoreria', 'revisar_color', 'terminada'];
-  const FLUJOS_PROPIOS = { 'Print': FLUJO_PRINT, 'Varilla': FLUJO_VARILLA, 'Colortec': FLUJO_COLORTEC,
+  const FLUJOS_PROPIOS = { 'Print': FLUJO_PRINT,
+    'Varilla': FLUJO_TELAR, 'Colortec': FLUJO_TELAR, 'Lancetas': FLUJO_TELAR,
+    'Rapier': FLUJO_TELAR, 'Tufting Bucle': FLUJO_TELAR, 'Tufting Corte': FLUJO_TELAR,
     'Pompón': FLUJO_POMPON, 'Festón': FLUJO_POMPON };
   const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
   const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';
@@ -72,9 +72,6 @@
     if (!m) return fmtFecha(iso);
     return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
   }
-
-  // Telar de varilla: manda en el flujo de etapas (las de diseño por delante)
-  function esVarilla(telar) { return (telar || '').trim().toLowerCase().startsWith('varilla'); }
 
   // Telares con datos técnicos y en qué se diferencian (espejo de
   // TECNICOS_POR_TELAR en muestras_fabricadas.py):
@@ -471,8 +468,8 @@
     return true;
   }
 
-  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, FLUJO_POMPON, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
-    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
+  window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_TELAR, FLUJO_POMPON, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
+    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente,
     materiasUtiles, montarTablaMaterias, MAX_MATERIAS };

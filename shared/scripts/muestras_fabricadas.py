@@ -98,21 +98,20 @@ ESTADOS_SELECCIONABLES = tuple(s for s, _ in ESTADOS if s != "sin_seguimiento")
 # sigue siendo unico y estable; cambia que etapas se recorren y una etiqueta.
 FLUJO_PRINT = ("por_empezar", "en_diseno", "revision_diseno", "terminada")
 ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
-# Las de VARILLA llevan el diseno por delante del flujo textil: por_empezar →
+# Los TELARES llevan el diseno por delante del flujo textil: por_empezar →
 # listo_diseno («Listo para empezar diseño») → en_diseno → revision_diseno →
 # diseno_listo («Diseño listo») → en_hilatura → ... → terminada.
-FLUJO_VARILLA = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "diseno_listo",
-                 "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
-                 "en_aprestos", "terminada")
-# COLORTEC lleva las etapas de diseno por delante del flujo textil, como
-# Varilla pero sin «Diseño listo».
-FLUJO_COLORTEC = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno",
-                  "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
-                  "en_aprestos", "terminada")
+FLUJO_TELAR = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "diseno_listo",
+               "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
+               "en_aprestos", "terminada")
 # Los POMPONES y los FESTONES no se tejen: van a tintoreria, se revisa el
 # color a la vuelta y se terminan.
 FLUJO_POMPON = ("por_empezar", "en_tintoreria", "revisar_color", "terminada")
-FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA, "Colortec": FLUJO_COLORTEC,
+FLUJOS_PROPIOS = {"Print": FLUJO_PRINT,
+                  # los telares, todos con las etapas de diseno por delante
+                  "Varilla": FLUJO_TELAR, "Colortec": FLUJO_TELAR, "Lancetas": FLUJO_TELAR,
+                  "Rapier": FLUJO_TELAR, "Tufting Bucle": FLUJO_TELAR, "Tufting Corte": FLUJO_TELAR,
+                  # las que no se tejen
                   "Pompón": FLUJO_POMPON, "Festón": FLUJO_POMPON}
 # Etapas que solo existen en un flujo propio (no en el textil): el backend las
 # rechaza para las tecnicas cuyo flujo no las recorre.
@@ -122,11 +121,6 @@ ESTADOS_EXCLUSIVOS = frozenset(s for f in FLUJOS_PROPIOS.values() for s in f if 
 def es_print(telar) -> bool:
     """La tecnica Print (solo diseno) lleva su propio flujo de etapas."""
     return normalizar_telar(telar) == "Print"
-
-
-def es_varilla(telar) -> bool:
-    """Telar de varilla: lleva el flujo con las etapas de diseno por delante."""
-    return (telar or "").strip().lower().startswith("varilla")
 
 
 def flujo_de(telar) -> tuple[str, ...]:
@@ -161,9 +155,13 @@ def etapa_permitida(estado, telar) -> bool:
     return estado not in ESTADOS_EXCLUSIVOS or estado in flujo_de(telar)
 
 
-def _msg_etapa_no_permitida(estado) -> str:
-    return (f"«{ESTADOS_LABEL.get(estado, estado)}» es una etapa solo de las muestras de "
-            + " o ".join(tecnicas_de_etapa(estado)))
+def _msg_etapa_no_permitida(estado, telar=None) -> str:
+    """Con pocas tecnicas se dice de cuales es; con muchas, de cual NO."""
+    lbl = ESTADOS_LABEL.get(estado, estado)
+    tec = tecnicas_de_etapa(estado)
+    if len(tec) <= 3:
+        return f"«{lbl}» es una etapa solo de las muestras de " + " o ".join(tec)
+    return f"«{lbl}» no es una etapa de {telar or 'esta técnica'}"
 
 
 def etiqueta_estado(estado, telar=None) -> str:
@@ -180,7 +178,7 @@ def es_retroceso(anterior, nuevo, telar=None) -> bool:
     """True si el cambio de etapa va hacia atras DENTRO del flujo que toca
     (el de la tecnica o, si no las contiene, el primero que recorra las dos
     etapas); entre flujos distintos no hay orden."""
-    candidatos = ((flujo_de(telar),) if telar is not None else ()) + (ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA)
+    candidatos = ((flujo_de(telar),) if telar is not None else ()) + (ESTADOS_FLUJO, *FLUJOS_PROPIOS.values())
     for f in candidatos:
         if anterior in f and nuevo in f:
             return f.index(nuevo) < f.index(anterior)
@@ -1068,7 +1066,8 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
     return {
         "estados": [{"slug": s, "label": l, "terminal": s in ESTADOS_TERMINALES,
                      "seleccionable": s in ESTADOS_SELECCIONABLES} for s, l in ESTADOS],
-        "flujos": {"textil": list(ESTADOS_FLUJO), "print": list(FLUJO_PRINT), "varilla": list(FLUJO_VARILLA)},
+        "flujos": {"textil": list(ESTADOS_FLUJO), "print": list(FLUJO_PRINT),
+                   "telar": list(FLUJO_TELAR), "pompon": list(FLUJO_POMPON)},
         "prioridades": [{"valor": k, "label": v} for k, v in PRIORIDADES.items()],
         "tipos": [{"valor": "cliente", "label": "Cliente"}, {"valor": "interna", "label": "Interna"}],
         "telares": list(cat.get("telares") or []),
@@ -1486,7 +1485,7 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         # Rapier no elige construccion: va siempre tejido plano
         tecnicos["pelo"] = pelo_fijo(telar) or tecnicos["pelo"]
         if not etapa_permitida(estado, telar):
-            return None, _msg_etapa_no_permitida(estado)
+            return None, _msg_etapa_no_permitida(estado, telar)
         persona, persona_usuario, err = _resolver_persona(
             persona_raw, _personas_conocidas(data, usuarios_one, usuario_actual))
         if err:
@@ -1626,9 +1625,9 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                     # Etapa exclusiva de un flujo propio (Print / Varilla):
                     # sacarla de esa tecnica la dejaria varada en una etapa
                     # que el resto del backend prohibe.
-                    return None, (f"la muestra está en «{etiqueta_estado(m.get('estado'), m.get('telar'))}» "
-                                  f"(etapa de {' o '.join(tecnicas_de_etapa(m.get('estado')))}): "
-                                  "cámbiala antes de etapa para pasarla a otra técnica")
+                    return None, (f"la muestra está en «{etiqueta_estado(m.get('estado'), m.get('telar'))}», "
+                                  f"que no es una etapa de {v}: cámbiala antes de etapa "
+                                  "para pasarla a esa técnica")
                 # Telar de construccion unica (Rapier): se la pone el servidor
                 fijo = pelo_fijo(v)
                 if fijo and m.get("pelo") != fijo and "pelo" not in datos:
@@ -1686,7 +1685,7 @@ def cambiar_estado(mid: str, estado: str, usuario: str | None = None,
         # nota) siempre se permite; lo que se veta es mover aquí una muestra
         # cuya técnica no recorre esta etapa (las de diseño: Print / Varilla).
         if anterior != slug and not etapa_permitida(slug, m.get("telar")):
-            return None, _msg_etapa_no_permitida(slug)
+            return None, _msg_etapa_no_permitida(slug, m.get("telar"))
         if anterior != slug:
             m["estado"] = slug
             if slug == "terminada":
