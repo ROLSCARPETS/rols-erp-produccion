@@ -83,7 +83,8 @@ laboratorio pueda llevar las muestras sin ver costes.
 - **Datos técnicos** (solo con telar **Varilla**), en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
   cortos —, `pelo` con etiqueta "Construcción": corte | bucle | corte_bucle |
-  estructurado, y `acabado`: latex | sin_aprestar | resina | latex_resina) y
+  estructurado | pendiente, y `acabado`: latex | sin_aprestar | resina |
+  latex_resina | pendiente) y
   *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
   (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
   La ficha y el alta los enseñan solo si el telar es de varilla (si cambia, se
@@ -93,7 +94,12 @@ laboratorio pueda llevar las muestras sin ver costes.
   por posición. v6 pasó los campos planos `material` / `hilos_pua` a una
   primera fila de la tabla. `resumen_tecnico()` junta materias y tejeduría
   para el hero y los correos; `materiales` y `coloridos` de `catalogos` salen
-  de las filas ya escritas (datalist).
+  de las filas ya escritas (datalist). **El alta de una Varilla exige los
+  datos técnicos rellenos** (los cinco campos de tejeduría y todas las casillas
+  de cada materia): lo que no se sepa se escribe «Pdte», y en Construcción y
+  Acabado está la opción «Pendiente». Es un control del modal de alta (marca en
+  rojo lo que falte); el backend no lo exige, para no romper las variantes
+  (se crean desde la ficha copiando cliente y telar) ni el histórico.
 - **Diseño adjunto** (`adjuntos[]`): ficheros en
   `ROLS_DATA_DIR/muestras_adjuntos/<id>/<aid>.<ext>` (imagen, PDF, AI/EPS/PSD,
   ZIP, 25 MB máx.); metadatos en la muestra, nunca la ruta. Rutas
@@ -124,6 +130,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   v4: Alberto → Alberto Recio. Paco, Emilio, Blanca, Señor Gómez y Tano quedan
   como "antiguos" (`catalogos.personas_legacy`): filtran el histórico, no
   valen para altas.
+- **Orden del listado**: las dos vistas (En curso e Histórico) van por
+  `fecha_solicitud` descendente, la más reciente arriba, con la fecha como
+  primera columna; en En curso se puede reordenar pulsando una cabecera.
 - **Próximo hito** (`proximo_hito_fecha` + `proximo_hito`): fecha del siguiente
   paso previsto, la ponen comercial o laboratorio (columna editable en En curso
   y campos en la ficha); en rojo si ya pasó, contador en el KPI En curso;

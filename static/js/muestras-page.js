@@ -14,7 +14,8 @@
     tab: 'en-curso',
     catalogos: null,
     resumen: null,
-    ec: { rows: [], estados: new Set(), sort: { campo: null, dir: 1 }, cargado: false },
+    // por defecto, por fecha de solicitud descendente (la más reciente arriba)
+    ec: { rows: [], estados: new Set(), sort: { campo: 'fecha_solicitud', dir: -1 }, cargado: false },
     hi: { rows: [], total: 0, limite: 0, cargado: false },
     an: { cargado: false },
   };
@@ -168,6 +169,7 @@
     if (!campo) return rows;
     const val = m => {
       if (campo === 'numero') return [(m.numero == null ? 1e9 : m.numero), m.sufijo || ''];
+      if (campo === 'fecha_solicitud') return [m.fecha_solicitud || '', (m.numero == null ? 0 : m.numero)];
       if (campo === 'prioridad') return [m.prioridad == null ? 9 : m.prioridad];
       if (campo === 'dias') return [m.dias == null ? -1 : m.dias];
       if (campo === 'proximo_hito_fecha') return [m.proximo_hito_fecha || '9999-12-31'];
@@ -188,8 +190,8 @@
     const sel = `<select class="ms-sel-estado ms-estado-${esc(m.estado)}" data-id="${esc(m.id)}" data-estado="${esc(m.estado)}" title="Cambiar el estado">${opcionesEstado(m)}</select>`;
     const mudo = '<span class="ms-mudo">—</span>';
     return `<tr class="ms-fila" data-id="${esc(m.id)}">
-      <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
+      <td>${numeroHtml(m)}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
       <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.referencia ? (m.descripcion ? m.referencia + '\n\n' + m.descripcion : m.referencia) : m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
@@ -341,8 +343,8 @@
     const terminal = ['terminada', 'cancelada', 'sin_seguimiento'].includes(m.estado);
     const arch = (m.archivada && !terminal) ? '<span class="ms-tag-archivada" title="Archivada sin marcar como terminada (en el Excel estaba en la hoja de terminadas)">archivada</span>' : '';
     return `<tr class="ms-fila" data-id="${esc(m.id)}">
-      <td>${numeroHtml(m)}</td>
       <td class="ms-fecha">${fmtFecha(m.fecha_solicitud, false) || mudo}</td>
+      <td>${numeroHtml(m)}</td>
       <td class="ms-cliente">${clienteHtml(m)}</td>
       <td><div class="ms-desc${m.referencia ? ' ref' : ''}" title="${esc(m.referencia ? (m.descripcion ? m.referencia + '\n\n' + m.descripcion : m.referencia) : m.descripcion)}">${esc(m.referencia || m.descripcion) || mudo}</div></td>
       <td>${esc(m.encargada_por) || mudo}</td>
@@ -552,6 +554,7 @@
     $('ms-coloridos').innerHTML = (c.coloridos || []).map(x => `<option value="${esc(x)}"></option>`).join('');
     ['ms-n-ref', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
     tablaMaterias.pintar([]);
+    modal.querySelectorAll('.ms-falta').forEach(el => el.classList.remove('ms-falta'));
     $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
@@ -569,6 +572,41 @@
   modal.addEventListener('click', (e) => { if (e.target === modal) cerrarNueva(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) cerrarNueva(); });
   $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
+  // Al escribir en un campo que faltaba, se le quita la marca de rojo
+  ['input', 'change'].forEach(ev => $('ms-n-tecnica').addEventListener(ev, (e) => {
+    if (e.target.matches('input, select')) e.target.classList.remove('ms-falta');
+  }));
+
+  // Una muestra de varilla se da de alta con sus datos técnicos rellenos: lo
+  // que todavía no se sepa se escribe «Pdte» (o «Pendiente» en los dos selectores).
+  const TECNICOS_OBLIGATORIOS = [['ms-n-pasadas', 'Pasadas'], ['ms-n-altura', 'Altura felpa'],
+    ['ms-n-cuerpos', 'Nº de cuerpos'], ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
+  function faltanTecnicos() {
+    const faltan = [];
+    TECNICOS_OBLIGATORIOS.forEach(([id, etiqueta]) => {
+      const el = $(id);
+      const vacio = !el.value.trim();
+      el.classList.toggle('ms-falta', vacio);
+      if (vacio) faltan.push(etiqueta);
+    });
+    // Una fila cuenta cuando dice algo de la materia (igual que en el servidor):
+    // la que solo lleva el nº de cuerpo propuesto está sin usar y no estorba.
+    const filas = [...$('ms-n-materias').querySelectorAll('.ms-materia')];
+    const usada = f => ['.materia', '.hilos', '.colorido'].some(s => f.querySelector(s).value.trim());
+    const usadas = filas.filter(usada);
+    let incompletas = 0;
+    filas.forEach(f => {
+      const cuenta = usadas.includes(f) || (!usadas.length && f === filas[0]);
+      f.querySelectorAll('input').forEach(inp => {
+        const vacio = cuenta && !inp.value.trim();
+        inp.classList.toggle('ms-falta', vacio);
+        if (vacio) incompletas++;
+      });
+    });
+    if (incompletas) faltan.push('las materias (cuerpo, materia, hilos púa y colorido)');
+    return faltan;
+  }
+
   $('ms-n-telar').addEventListener('change', async () => {
     await gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica');
     $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
@@ -583,11 +621,19 @@
     err.classList.remove('show');
     const cliente = $('ms-n-cliente').value.trim();
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
+    const telarNuevo = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
+    if (esVarilla(telarNuevo)) {
+      const faltan = faltanTecnicos();
+      if (faltan.length) {
+        $('ms-n-tecnica').scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return fallo(`Una muestra de varilla se da de alta con sus datos técnicos. Falta: ${faltan.join(', ')}. Si todavía no se sabe, escribe «Pdte».`);
+      }
+    }
     const tipo = modal.querySelector('input[name="ms-n-tipo"]:checked').value;
     const body = {
       cliente, tipo: tipoNuevo, cliente_navision: clienteNav || '', referencia: $('ms-n-ref').value.trim(), descripcion: $('ms-n-desc').value.trim(),
       encargada_por: $('ms-n-persona').value,
-      telar: $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value,
+      telar: telarNuevo,
       prioridad: Number($('ms-n-prio').value), fecha_solicitud: $('ms-n-fecha').value || undefined,
       pasadas: $('ms-n-pasadas').value.trim(), altura_felpa: $('ms-n-altura').value.trim(),
       n_cuerpos: $('ms-n-cuerpos').value.trim(), materias: tablaMaterias.utiles(),

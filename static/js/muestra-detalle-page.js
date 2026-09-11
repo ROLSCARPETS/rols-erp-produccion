@@ -378,8 +378,8 @@
   // ------------------------------------------------------------
   // Datos técnicos (solo telar de varilla)
   // ------------------------------------------------------------
-  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado' };
-  const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina' };
+  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado', pendiente: 'Pendiente' };
+  const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina', pendiente: 'Pendiente' };
   // Tabla de materias: una fila por cuerpo. Se guarda entera en cada cambio
   // (misma marca de guardado que el resto de campos de la ficha).
   const tablaMaterias = montarTablaMaterias($('md-materias'), {

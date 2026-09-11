@@ -192,10 +192,15 @@ TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
 # `pelo`, acabado) y MATERIAS (material, hilos por pua). Van planos en la
 # muestra y solo se ensenan con telar de varilla (si cambia de telar se
 # conservan, no se borran).
+# "pendiente" existe para poder dar de alta una varilla sin saber aun la
+# construccion o el acabado (el alta los exige rellenos: lo que no se sabe se
+# deja como pendiente, igual que el "Pdte" de los campos de texto).
 PELOS: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
-                                      ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"))
+                                      ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
+                                      ("pendiente", "Pendiente"))
 ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"),
-                                         ("resina", "Resina"), ("latex_resina", "Látex + resina"))
+                                         ("resina", "Resina"), ("latex_resina", "Látex + resina"),
+                                         ("pendiente", "Pendiente"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
 CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "n_cuerpos", "pelo", "acabado")
@@ -844,12 +849,10 @@ def listar(vista: str = "en-curso", q: str = "", anio=None, estado: str = "",
         if qk and qk not in _texto_buscable(m):
             continue
         out.append(m)
-    if vista == "en-curso":
-        out.sort(key=lambda m: (m.get("prioridad") or 9, m.get("fecha_solicitud") or "9999",
-                                m.get("numero") or 0, m.get("sufijo") or ""))
-    else:
-        out.sort(key=lambda m: (m.get("fecha_solicitud") or "0000", m.get("numero") or 0,
-                                m.get("sufijo") or ""), reverse=True)
+    # Las dos vistas van por fecha de solicitud, la mas reciente arriba (la
+    # prioridad se ve en su columna y se puede ordenar por ella en la tabla).
+    out.sort(key=lambda m: (m.get("fecha_solicitud") or "0000", m.get("numero") or 0,
+                            m.get("sufijo") or ""), reverse=True)
     total = len(out)
     if limite:
         out = out[:limite]
