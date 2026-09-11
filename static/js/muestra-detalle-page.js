@@ -74,7 +74,6 @@
       partes.push(`<b>${fmtNum(M.dias)} días</b> en curso`);
     }
     if (M.sufijo && M.numero != null) partes.push(`variante de M-${M.numero}`);
-    if (M.tecnica_resumen) partes.push(`<span class="ms-tec-inline" title="Datos técnicos (telar de varilla)">${esc(M.tecnica_resumen)}</span>`);
     if (M.fecha_estimada && !TERMINALES.includes(M.estado)) {
       const retrasada = M.fecha_estimada < hoyISO();
       partes.push(`<span class="${retrasada ? 'ms-hito-venc-inline' : ''}">lista prevista el ${fmtFecha(M.fecha_estimada)}${retrasada ? ' (fecha pasada)' : ''}</span>`);

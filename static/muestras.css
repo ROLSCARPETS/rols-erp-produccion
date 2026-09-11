@@ -417,7 +417,6 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-tecnica-title { font-size: 0.72rem; font-weight: 700; color: #8a6d3b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem; display: flex; align-items: baseline; gap: 0.5rem; }
 .ms-tecnica-title .ms-hint, .ms-campo label .ms-hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .ms-campo label .ms-hint { margin-left: 0.3rem; }
-.ms-tec-inline { color: #6b6b6b; }
 .ms-n-tecnica { background: #faf6ee; border: 1px solid #efe2cd; border-radius: 10px; padding: 0.6rem 0.8rem; }
 /* En el alta, la rejilla interior va a 6 columnas para poder mezclar tercios (c2) y mitades (c3) */
 .ms-n-tecnica .ms-form-grid-inner { margin-bottom: 0; grid-template-columns: repeat(6, minmax(0, 1fr)); }
