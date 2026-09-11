@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import html as _html
 import logging
+import re
 import os
 from datetime import date, datetime
 
@@ -42,9 +43,137 @@ log = logging.getLogger("muestras.avisos")
 LAB_EMAIL_DEFECTO = "laboratorio@rolscarpets.com"
 DISENO_EMAIL_DEFECTO = "diseno@rolscarpets.com"
 # Hitos clave: al llegar a ellos se avisa SIEMPRE a quien encargo la muestra,
-# aunque el cambio lo haga esa misma persona (en el resto de etapas no se
-# avisa a quien hace el cambio).
+# aunque el cambio lo haga esa misma persona. Es el valor de fabrica de esas
+# dos etapas; se puede cambiar desde Analisis (ver config_avisos).
 HITOS_CLAVE = ("revision_diseno", "terminada")
+
+# ---------------------------------------------------------------------------
+# Quien recibe cada aviso (configurable desde la pestana Analisis)
+# ---------------------------------------------------------------------------
+# Una fila por momento: el alta ("nueva"), cada etapa y el proximo hito
+# ("hito"). De cada fila:
+#   encargada → "no" | "salvo_actor" (no si el cambio lo hace ella) | "siempre"
+#   creador   → si tambien se avisa a quien creo la muestra
+#   buzones   → e-mails fijos que reciben esa fila pase lo que pase
+MODOS_ENCARGADA = ("no", "salvo_actor", "siempre")
+MAX_BUZONES = 5
+_RE_EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]{2,}$")
+
+
+def claves_aviso() -> list[str]:
+    return ["nueva", *mf.ESTADOS_SELECCIONABLES, "hito"]
+
+
+def _fila(encargada: str = "salvo_actor", creador: bool = False, buzones=()) -> dict:
+    return {"encargada": encargada, "creador": bool(creador), "buzones": [b for b in buzones if b]}
+
+
+def avisos_por_defecto() -> dict:
+    """Los valores de fabrica: los que llevaba el ERP antes de poder cambiarlos."""
+    lab, dis = email_laboratorio(), email_diseno()
+    cfg = {c: _fila() for c in claves_aviso()}
+    cfg["nueva"] = _fila("no", True, [lab])
+    cfg["listo_diseno"] = _fila("salvo_actor", False, [dis])
+    cfg["revision_diseno"] = _fila("siempre", True)
+    cfg["diseno_listo"] = _fila("salvo_actor", False, [lab])
+    cfg["terminada"] = _fila("siempre")
+    cfg["hito"] = _fila("siempre")
+    return cfg
+
+
+def config_avisos() -> dict:
+    """Los defectos con lo que se haya cambiado a mano por encima."""
+    cfg = avisos_por_defecto()
+    for k, v in (mf.avisos_guardados() or {}).items():
+        if k in cfg and isinstance(v, dict):
+            fila = dict(cfg[k])
+            for campo in ("encargada", "creador", "buzones"):
+                if campo in v:
+                    fila[campo] = v[campo]
+            cfg[k] = fila
+    return cfg
+
+
+def clave_aviso(estado, telar=None) -> str:
+    """La fila de configuracion que toca a esa etapa. El «por empezar» de Print
+    se lee «Listo para empezar diseño», asi que se configura con esa fila."""
+    return "listo_diseno" if listo_para_disenar(estado, telar) else (estado or "")
+
+
+def _asunto_ejemplo(estado: str) -> str:
+    if estado == "terminada":
+        return "[Muestras] M-… · TERMINADA (lista el 11/09/2026)"
+    if estado == "cancelada":
+        return "[Muestras] M-… · CANCELADA"
+    if estado == "revision_diseno":
+        return "[Muestras] M-… · DISEÑO LISTO PARA TU REVISIÓN"
+    if estado == "diseno_listo":
+        return "[Muestras] M-… · DISEÑO LISTO"
+    if estado == "listo_diseno":
+        return "[Muestras] M-… · LISTO PARA EMPEZAR DISEÑO"
+    return f"[Muestras] M-… · ahora en {mf.ESTADOS_LABEL.get(estado, estado)}"
+
+
+def filas_aviso() -> list[dict]:
+    """Para la UI: cada fila configurable, en orden, con su etiqueta y asunto."""
+    out = [{"clave": "nueva", "etiqueta": "Se crea la muestra", "tipo": "alta",
+            "nota": "el resumen de alta", "asunto": "[Muestras] Nueva muestra M-… · Cliente"}]
+    for s in mf.ESTADOS_SELECCIONABLES:
+        nota = ""
+        if s == "listo_diseno":
+            nota = "también el alta de una Print, que nace en esta etapa"
+        elif s == "por_empezar":
+            nota = "en Print esta etapa se lee «Listo para empezar diseño»"
+        out.append({"clave": s, "etiqueta": mf.ESTADOS_LABEL.get(s, s), "tipo": "etapa",
+                    "nota": nota, "asunto": _asunto_ejemplo(s)})
+    out.append({"clave": "hito", "etiqueta": "Llega la fecha del próximo hito", "tipo": "hito",
+                "nota": "una sola vez por fecha",
+                "asunto": "[Muestras] M-… · hito 15/10/2026: llegan los colores"})
+    return out
+
+
+def guardar_config_avisos(cambios: dict) -> tuple[dict | None, str]:
+    """Valida y guarda las filas que vengan. Devuelve (config completa, error)."""
+    if not isinstance(cambios, dict) or not cambios:
+        return None, "no hay nada que cambiar"
+    validas = set(claves_aviso())
+    limpio = {}
+    for clave, fila in cambios.items():
+        if clave not in validas:
+            return None, f"momento desconocido: {clave!r}"
+        if not isinstance(fila, dict):
+            return None, f"{clave}: la fila debe ser un objeto"
+        out = {}
+        if "encargada" in fila:
+            if fila["encargada"] not in MODOS_ENCARGADA:
+                return None, f"{clave}: «quien la encargó» no válido ({fila['encargada']!r})"
+            out["encargada"] = fila["encargada"]
+        if "creador" in fila:
+            out["creador"] = bool(fila["creador"])
+        if "buzones" in fila:
+            crudos = fila["buzones"]
+            if isinstance(crudos, str):
+                crudos = re.split(r"[,;\s]+", crudos)
+            if not isinstance(crudos, list):
+                return None, f"{clave}: los buzones deben ser una lista"
+            buzones = []
+            for b in crudos:
+                b = str(b or "").strip().lower()
+                if not b:
+                    continue
+                if not _RE_EMAIL.match(b):
+                    return None, f"{clave}: «{b}» no parece un e-mail"
+                if b not in buzones:
+                    buzones.append(b)
+            if len(buzones) > MAX_BUZONES:
+                return None, f"{clave}: como mucho {MAX_BUZONES} buzones"
+            out["buzones"] = buzones
+        if out:
+            limpio[clave] = out
+    if not limpio:
+        return None, "no hay nada que cambiar"
+    mf.guardar_avisos(limpio)
+    return config_avisos(), ""
 PIE_DEFECTO = ("Aviso automático a quien encargó la muestra. Se envía al cambiar de etapa, "
                "al terminar o cancelar, y el día del próximo hito.")
 PIES_ETAPA = {
@@ -236,21 +365,24 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
             nombres.append(nombre)
         return True
 
-    # 1) quien la encargo (no a quien hace el cambio, salvo en los hitos clave)
+    cfg = config_avisos().get(clave_aviso(nuevo, telar), {})
+    # 1) quien la encargo, segun lo configurado para esta etapa
     dest_u = (m.get("encargada_por_usuario") or "").strip().lower()
     sin_email_de = ""
-    if dest_u and (dest_u != actor_u or nuevo in HITOS_CLAVE):
+    modo = cfg.get("encargada", "salvo_actor")
+    if dest_u and (modo == "siempre" or (modo == "salvo_actor" and dest_u != actor_u)):
         email, nombre = email_de_usuario(dest_u, directorio)
         if not anadir(email, nombre or m.get("encargada_por") or dest_u):
             sin_email_de = dest_u
-    # 2) en la revision del diseno, tambien quien la creo
-    if nuevo == "revision_diseno":
+    # 2) quien la creo
+    if cfg.get("creador"):
         cre_u = (m.get("creado_por") or "").strip().lower()
         if cre_u:
             email, nombre = email_de_usuario(cre_u, directorio)
             anadir(email, nombre or m.get("creado_por_nombre") or cre_u)
-    # 3) el buzon de la etapa
-    anadir(buzon_de_etapa(nuevo, telar))
+    # 3) los buzones de la etapa
+    for b in cfg.get("buzones") or []:
+        anadir(b)
 
     motivo = motivo_de_etapa(nuevo, telar)
     asunto = _asunto_estado(m, nuevo)
@@ -261,6 +393,8 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
             return {"enviado": False, "motivo": "sin e-mail"}
         if not dest_u:
             return {"enviado": False, "motivo": "la muestra no tiene usuario que la encargue"}
+        if modo == "no":
+            return {"enviado": False, "motivo": "esta etapa no avisa a nadie"}
         return {"enviado": False, "motivo": "el cambio lo hace quien la encargó"}
 
     de_lbl = mf.etiqueta_estado(anterior, telar) if anterior else "—"
@@ -311,18 +445,26 @@ def aviso_nueva_muestra(mid: str, actor, directorio, base_url: str) -> dict:
     actor_n = (actor.get("nombre") if isinstance(actor, dict) else "") or ""
     email_actor, nombre_actor = email_de_usuario(actor_u, directorio)
     nombre_actor = nombre_actor or actor_n or actor_u or "—"
+    cfg_todo = config_avisos()
+    cfg = cfg_todo.get("nueva", {})
     destinos = []
-    lab = email_laboratorio()
-    if lab:
-        destinos.append(lab)
-    if email_actor and email_actor not in destinos:
-        destinos.append(email_actor)
-    # Una Print nace ya en «Listo para empezar diseño»: diseño se entera aquí,
-    # porque esa etapa no llega nunca como cambio de etapa.
+
+    def _anadir(e):
+        e = (e or "").strip().lower()
+        if e and e not in destinos:
+            destinos.append(e)
+
+    for b in cfg.get("buzones") or []:
+        _anadir(b)
+    if cfg.get("creador", True):
+        _anadir(email_actor)
+    if cfg.get("encargada", "no") != "no":
+        _anadir(email_de_usuario(m.get("encargada_por_usuario"), directorio)[0])
+    # Una Print nace ya en «Listo para empezar diseño»: quien reciba esa etapa
+    # se entera aquí, porque nunca llega como cambio de etapa.
     if listo_para_disenar(m.get("estado"), m.get("telar")):
-        dis = email_diseno()
-        if dis and dis not in destinos:
-            destinos.append(dis)
+        for b in (cfg_todo.get("listo_diseno", {}).get("buzones") or []):
+            _anadir(b)
     asunto = f"[Muestras] Nueva muestra {_cabecera(m)}"
     if not destinos:
         mf.registrar_aviso(mid, "nueva", "", False, "sin destinatarios", asunto=asunto)
@@ -359,10 +501,18 @@ def chequear_hitos(directorio, base_url: str, hoy: str | None = None) -> dict:
         if not mf.reclamar_hito(mid, fecha):
             res["saltados"] += 1
             continue
+        cfg_hito = config_avisos().get("hito", {})
         dest_u = (m.get("encargada_por_usuario") or "").strip().lower()
         email, nombre = email_de_usuario(dest_u, directorio)
         nombre = nombre or m.get("encargada_por") or dest_u
-        if not email:
+        if cfg_hito.get("encargada", "siempre") == "no":
+            email = ""
+        extras = [b for b in (cfg_hito.get("buzones") or []) if b]
+        if cfg_hito.get("creador"):
+            cre_e, _ = email_de_usuario((m.get("creado_por") or "").strip().lower(), directorio)
+            if cre_e and cre_e != email:
+                extras.append(cre_e)
+        if not email and not extras:
             res["sin_email"] += 1
             mf.registrar_aviso(mid, "hito", dest_u or "(sin usuario)", False,
                                "sin e-mail conocido para quien la encargó")
@@ -374,14 +524,15 @@ def chequear_hitos(directorio, base_url: str, hoy: str | None = None) -> dict:
         lineas = [f"Previsto: {que}" if que else "Fecha de próximo hito alcanzada.",
                   f"Estado actual: {mf.etiqueta_estado(m.get('estado'), m.get('telar'))}."]
         asunto = f"[Muestras] {_cabecera(m)} · hito {_fmt_fecha(fecha)}" + (f": {mf._recortar(que, 60)}" if que else "")
-        texto, html = _render(titulo, lineas, m, base_url, nombre)
-        ok, err = correo.enviar(email, asunto, texto, html)
-        mf.registrar_aviso(mid, "hito", email, ok, err, asunto=asunto)
+        destinos_h = ([email] if email else []) + [b for b in extras if b != email]
+        texto, html = _render(titulo, lineas, m, base_url, nombre if len(destinos_h) == 1 else "")
+        ok, err = correo.enviar(destinos_h, asunto, texto, html)
+        mf.registrar_aviso(mid, "hito", ", ".join(destinos_h), ok, err, asunto=asunto)
         if ok:
             res["enviados"] += 1
         else:
             res["fallidos"] += 1
-            log.warning("aviso de hito de M-%s a %s fallo: %s", mid, email, err)
+            log.warning("aviso de hito de M-%s a %s fallo: %s", mid, destinos_h, err)
     return res
 
 

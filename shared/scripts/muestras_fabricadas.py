@@ -2004,6 +2004,22 @@ def borrar(mid: str) -> tuple[bool, str]:
         return True, ""
 
 
+def avisos_guardados() -> dict:
+    """Destinatarios de los avisos que se han cambiado a mano. Lo que no esta
+    aqui usa el valor por defecto (ver `muestras_avisos.avisos_por_defecto`)."""
+    return dict(cargar().get("avisos_destinatarios") or {})
+
+
+def guardar_avisos(config: dict) -> None:
+    """Mete las filas de `config` (ya validadas) en la configuracion guardada."""
+    with jsonstore.store().tx():
+        data = cargar()
+        guardado = dict(data.get("avisos_destinatarios") or {})
+        guardado.update(config)
+        data["avisos_destinatarios"] = guardado
+        _guardar(data)
+
+
 def anadir_catalogo(tipo: str, valor: str) -> tuple[list | None, str]:
     if tipo != "telares":
         return None, "catalogo desconocido"

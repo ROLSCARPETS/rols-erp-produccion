@@ -253,58 +253,24 @@
           Los buzones de diseño y laboratorio reciben su etapa pase lo que pase. Si coinciden varios destinatarios
           sale un solo correo con todos, y cada intento queda en el historial de la muestra.</p>
         <div class="ms-avisos-tabla">
-          <table class="ms-tabla">
+          <table class="ms-tabla" id="an-avisos-tabla">
             <thead>
-              <tr><th>Cuándo</th><th>Quién lo recibe</th><th>Asunto del correo</th></tr>
+              <tr>
+                <th style="min-width:190px">Cuándo</th>
+                <th style="min-width:200px">Quien la encargó</th>
+                <th>Quien la creó</th>
+                <th style="min-width:230px">Otros destinatarios</th>
+                <th>Asunto del correo</th>
+              </tr>
             </thead>
-            <tbody>
-            <tr>
-              <td><span class="ms-estado ms-estado-por_empezar">Se crea la muestra</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Laboratorio <code>laboratorio@</code></span><span class="ms-quien">Quien la crea</span><span class="ms-quien buzon">Diseño <code>diseno@</code></span><span class="ms-marca salvo">diseño solo si nace lista para diseñar</span></div></td>
-              <td class="ms-avisos-asunto">[Muestras] Nueva muestra M-… · Cliente</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-listo_diseno">Listo para empezar diseño</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Diseño <code>diseno@</code></span><span class="ms-marca siempre">siempre</span><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
-              <td class="ms-avisos-asunto">… · LISTO PARA EMPEZAR DISEÑO</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-en_diseno">En diseño</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
-              <td class="ms-avisos-asunto">… · ahora en En diseño</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-revision_diseno">Listo para revisión diseño</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-quien">Quien la creó</span><span class="ms-marca siempre">siempre</span></div></td>
-              <td class="ms-avisos-asunto">… · DISEÑO LISTO PARA TU REVISIÓN</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-diseno_listo">Diseño listo</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien buzon">Laboratorio <code>laboratorio@</code></span><span class="ms-marca siempre">siempre</span><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
-              <td class="ms-avisos-asunto">… · DISEÑO LISTO</td>
-            </tr>
-            <tr>
-              <td><span class="ms-avisos-otras">Las demás etapas del proceso<br/><span class="ms-hint">hilatura, tintorería, bobinando, esperando a telar, en telar, aprestos, revisar color</span></span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
-              <td class="ms-avisos-asunto">… · ahora en «la etapa»</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-terminada">Terminada</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca siempre">siempre</span></div></td>
-              <td class="ms-avisos-asunto">… · TERMINADA (lista el 11/09/2026)</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-cancelada">Cancelada</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">salvo que lo marque ella</span></div></td>
-              <td class="ms-avisos-asunto">… · CANCELADA</td>
-            </tr>
-            <tr>
-              <td><span class="ms-estado ms-estado-esperando_telar">Llega la fecha del próximo hito</span></td>
-              <td><div class="ms-avisos-quien"><span class="ms-quien">Quien la encargó</span><span class="ms-marca salvo">una sola vez por fecha</span></div></td>
-              <td class="ms-avisos-asunto">… · hito 15/10/2026: llegan los colores</td>
-            </tr>
+            <tbody id="an-avisos-filas">
+              <tr><td colspan="5" class="ms-vacio">Cargando…</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="ms-avisos-pie">
+          <span id="an-avisos-quien-manda"></span>
+          <button type="button" class="ms-limpiar" id="an-avisos-reset" hidden>Volver a los valores de fábrica</button>
         </div>
         <p class="ms-avisos-txt ms-avisos-no"><b>No manda correo:</b> guardar campos de la ficha, adjuntar o borrar
           un diseño, marcar la verificación, escribir en el diario, ni volver a pulsar la etapa en la que ya está.

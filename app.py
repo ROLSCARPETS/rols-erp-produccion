@@ -2060,6 +2060,26 @@ def api_muestras_avisos_estado():
     return jsonify(est)
 
 
+@app.route("/api/muestras/avisos/config", methods=["GET", "PUT"])
+def api_muestras_avisos_config():
+    """Quien recibe cada aviso. GET lo lee cualquiera con permiso; PUT (cambiar
+    los destinatarios de una etapa) es cosa de administradores."""
+    bl = _requiere("muestras_fabricadas")
+    if bl:
+        return bl
+    av = _avisos_module()
+    if request.method == "PUT":
+        if _user_rol() != "admin":
+            return jsonify({"error": "solo un administrador puede cambiar los destinatarios"}), 403
+        cfg, err = av.guardar_config_avisos(request.get_json(force=True, silent=True) or {})
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify({"config": cfg})
+    return jsonify({"config": av.config_avisos(), "filas": av.filas_aviso(),
+                    "por_defecto": av.avisos_por_defecto(),
+                    "editable": _user_rol() == "admin"})
+
+
 @app.route("/api/muestras/avisos/prueba", methods=["POST"])
 def api_muestras_avisos_prueba():
     """Correo de prueba a quien lo pide (solo Completo)."""

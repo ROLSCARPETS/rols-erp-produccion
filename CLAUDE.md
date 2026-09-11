@@ -202,9 +202,14 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
-  La pestaña **Análisis** lleva la chuleta: una tabla con cada momento, quién
-  lo recibe (personas vs. buzones, y si el aviso se salta o no a quien hace el
-  cambio) y el asunto del correo. Al tocar las reglas, actualizarla.
+  **Los destinatarios se configuran** desde la tabla de la pestaña Análisis
+  (`GET|PUT /api/muestras/avisos/config`, el PUT solo admin): por cada momento
+  —el alta, cada etapa y el hito— se elige si va a **quien la encargó** (`no` |
+  `salvo_actor` | `siempre`), si va a **quien la creó** y qué **buzones** fijos
+  la reciben. `muestras_avisos.avisos_por_defecto()` son los valores de fábrica
+  (los de arriba) y `config_avisos()` les pega encima lo guardado en la muestra
+  doc (`avisos_destinatarios`, solo las filas tocadas); `clave_aviso()` manda
+  el `por_empezar` de Print a la fila de «Listo para empezar diseño».
   El chequeo de hitos corre en segundo plano como mucho cada 15 min desde
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).

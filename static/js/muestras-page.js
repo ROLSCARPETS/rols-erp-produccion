@@ -432,10 +432,110 @@
           `hasta que el servidor tenga <code>ROLS_SMTP_HOST</code>, <code>ROLS_SMTP_USER</code> y <code>ROLS_SMTP_PASS</code> en su <code>.env</code> (o un <code>correo.json</code> en la carpeta de datos) no se envía nada; el resto funciona igual.`;
       }
       $('an-avisos-prueba').hidden = !e.es_admin;
+      if (!AVISOS) cargarAvisosConfig();
     } catch (err) {
       box.textContent = 'No se pudo consultar el estado de los avisos: ' + err.message;
     }
   }
+  // ------------------------------------------------------------
+  // Quién recibe cada aviso (la tabla se puede cambiar si eres admin)
+  // ------------------------------------------------------------
+  let AVISOS = null;
+  const MODOS = [['no', 'No se le avisa'], ['salvo_actor', 'Sí, salvo si lo hace ella'], ['siempre', 'Sí, siempre']];
+
+  async function cargarAvisosConfig() {
+    const tb = $('an-avisos-filas');
+    try {
+      AVISOS = await api('/api/muestras/avisos/config');
+    } catch (e) {
+      tb.innerHTML = `<tr><td colspan="5" class="ms-vacio">No se pudo cargar: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+    pintarAvisosConfig();
+  }
+
+  function filaCambiada(clave) {
+    const c = AVISOS.config[clave] || {}, d = AVISOS.por_defecto[clave] || {};
+    return c.encargada !== d.encargada || !!c.creador !== !!d.creador
+      || (c.buzones || []).join(',') !== (d.buzones || []).join(',');
+  }
+
+  function pintarAvisosConfig() {
+    const { config, filas, editable } = AVISOS;
+    const off = editable ? '' : ' disabled';
+    $('an-avisos-filas').innerHTML = filas.map(f => {
+      const c = config[f.clave] || {};
+      const etiqueta = f.tipo === 'etapa'
+        ? `<span class="ms-estado ms-estado-${esc(f.clave)}">${esc(f.etiqueta)}</span>`
+        : `<span class="ms-estado ms-estado-${f.clave === 'nueva' ? 'esperando_telar' : 'en_telar'}">${esc(f.etiqueta)}</span>`;
+      const opciones = MODOS.map(([v, l]) =>
+        `<option value="${v}" ${c.encargada === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
+      return `<tr data-clave="${esc(f.clave)}">
+        <td>${etiqueta}${filaCambiada(f.clave) ? '<span class="ms-av-cambiado" title="Cambiado respecto al valor de fábrica">cambiado</span>' : ''}
+          ${f.nota ? `<div class="ms-hint">${esc(f.nota)}</div>` : ''}</td>
+        <td><select class="ms-av-campo" data-campo="encargada"${off}>${opciones}</select></td>
+        <td><label class="ms-av-check"><input type="checkbox" class="ms-av-campo" data-campo="creador" ${c.creador ? 'checked' : ''}${off} /><span>Avisar</span></label></td>
+        <td><input type="text" class="ms-av-campo ms-av-buzones" data-campo="buzones" value="${esc((c.buzones || []).join(', '))}" placeholder="nadie más" title="E-mails separados por comas"${off} /></td>
+        <td class="ms-avisos-asunto">${esc(f.asunto)}</td>
+      </tr>`;
+    }).join('');
+    $('an-avisos-quien-manda').textContent = editable
+      ? 'Los cambios se guardan solos.'
+      : 'Solo un administrador puede cambiar los destinatarios.';
+    $('an-avisos-reset').hidden = !editable || !filas.some(f => filaCambiada(f.clave));
+  }
+
+  async function guardarAviso(el) {
+    const tr = el.closest('tr');
+    const clave = tr.dataset.clave, campo = el.dataset.campo;
+    const valor = campo === 'creador' ? el.checked
+      : campo === 'buzones' ? el.value.split(/[,;\s]+/).filter(Boolean) : el.value;
+    el.classList.remove('saved-ok', 'saved-err');
+    el.classList.add('saving');
+    try {
+      const d = await api('/api/muestras/avisos/config', { method: 'PUT', body: { [clave]: { [campo]: valor } } });
+      AVISOS.config = d.config;
+      el.classList.remove('saving');
+      el.classList.add('saved-ok');
+      setTimeout(() => el.classList.remove('saved-ok'), 1400);
+      // la marca de "cambiado" y el botón de fábrica dependen de la fila entera
+      const c = AVISOS.config[clave] || {};
+      if (campo === 'buzones') el.value = (c.buzones || []).join(', ');
+      tr.querySelector('.ms-av-cambiado')?.remove();
+      if (filaCambiada(clave)) {
+        tr.querySelector('td').insertAdjacentHTML('afterbegin',
+          '<span class="ms-av-cambiado" title="Cambiado respecto al valor de fábrica">cambiado</span>');
+      }
+      $('an-avisos-reset').hidden = !AVISOS.filas.some(f => filaCambiada(f.clave));
+    } catch (e) {
+      el.classList.remove('saving');
+      el.classList.add('saved-err');
+      await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
+      pintarAvisosConfig();
+    }
+  }
+
+  $('an-avisos-filas').addEventListener('change', (e) => {
+    const el = e.target.closest('.ms-av-campo');
+    if (el && !el.disabled) guardarAviso(el);
+  });
+
+  $('an-avisos-reset').addEventListener('click', async () => {
+    const r = await window.mostrarConfirmacion({
+      titulo: 'Volver a los valores de fábrica',
+      mensaje: 'Los destinatarios de todas las etapas vuelven a como venían de serie. Lo que hayas cambiado se pierde.',
+      textoConfirmar: 'Restablecer',
+    });
+    if (!r.ok) return;
+    try {
+      const d = await api('/api/muestras/avisos/config', { method: 'PUT', body: AVISOS.por_defecto });
+      AVISOS.config = d.config;
+      pintarAvisosConfig();
+    } catch (e) {
+      await window.mostrarAlerta({ titulo: 'No se pudo restablecer', mensaje: e.message, tipo: 'danger' });
+    }
+  });
+
   $('an-avisos-prueba').addEventListener('click', async () => {
     const b = $('an-avisos-prueba');
     b.disabled = true;
