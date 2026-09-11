@@ -6,7 +6,7 @@
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, montarTablaMaterias,
-          llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
+          llenarSelect, llenarSelectPersonas, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -547,7 +547,7 @@
     const u = window.__rolsUser || {};
     // Por defecto, quien está logueado (si tiene acceso a muestras)
     llenarSelectPersonas($('ms-n-persona'), c.personas_activas, { vacio: '— quién la encarga —', usuario: u.username || '' });
-    llenarSelect($('ms-n-telar'), c.telares_alta || c.telares, { vacio: '— telar / técnica —', otro: true, valor: '' });
+    llenarSelect($('ms-n-telar'), c.telares_alta || c.telares, { vacio: '— telar / técnica —', valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
@@ -574,7 +574,7 @@
   $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
   // El bloque técnico (y las construcciones que ofrece) dependen del telar
   function pintarTecnicaAlta(valorPelo) {
-    const telar = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
+    const telar = $('ms-n-telar').value;
     const cfg = configTecnica(telar);
     $('ms-n-tecnica').hidden = !esTecnico(telar);
     $('ms-n-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : '') + telar;
@@ -628,10 +628,7 @@
     return faltan;
   }
 
-  $('ms-n-telar').addEventListener('change', async () => {
-    await gestionarOtro($('ms-n-telar'), 'telar / técnica');
-    pintarTecnicaAlta();
-  });
+  $('ms-n-telar').addEventListener('change', () => pintarTecnicaAlta());
   // Escribir en un campo de número selecciona su opción
   $('ms-n-variante').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="variante"]').checked = true; });
   $('ms-n-manual').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="manual"]').checked = true; });
@@ -642,7 +639,7 @@
     err.classList.remove('show');
     const cliente = $('ms-n-cliente').value.trim();
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
-    const telarNuevo = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
+    const telarNuevo = $('ms-n-telar').value;
     if (esTecnico(telarNuevo)) {
       const faltan = faltanTecnicos(telarNuevo);
       if (faltan.length) {

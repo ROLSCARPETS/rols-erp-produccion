@@ -189,12 +189,14 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 8
+_VERSION_SCHEMA = 9
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
 TELARES_DEFAULT = ["Print", "Tufting Bucle", "Tufting Corte", "Colortec", "Varilla",
                    "Lancetas", "Pompón", "Kibby", "Rapier", "Festón",
+                   # cajon de sastre: se elige como cualquier otro, sin escribir nada
+                   "Otros",
                    # se conservan para el historico (retirados, ver abajo)
                    "Tufting", "Raschel"]
 # Tecnicas que ya no se fabrican: siguen valiendo para el historico y para las
@@ -425,6 +427,8 @@ def cargar() -> dict:
                     _migrar_v7(data)
                 if v < 8:
                     _migrar_v8(data)
+                if v < 9:
+                    _migrar_v9(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -557,6 +561,14 @@ def _migrar_v8(data: dict) -> None:
     base = {_clave(t) for t in TELARES_DEFAULT}
     cat["telares"] = [t for t in (cat.get("telares") or [])
                       if _clave(t) in base or _clave(t) in usados]
+
+
+def _migrar_v9(data: dict) -> None:
+    """v8 → v9: mete en el catalogo los telares de TELARES_DEFAULT que falten
+    (estrena «Otros», que antes habia que escribir a mano en «Otro…»).
+    Idempotente."""
+    for t in TELARES_DEFAULT:
+        _anadir_a_catalogo(data, "telares", t)
 
 
 def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:

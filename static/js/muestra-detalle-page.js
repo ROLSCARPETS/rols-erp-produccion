@@ -7,7 +7,7 @@
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, PELO_LABEL, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
-          gestionarOtro, montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
+          montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -244,7 +244,7 @@
     pintarNavLink();
     rellenarPersona();
     // sin las técnicas retiradas; si la muestra lleva una, llenarSelect la añade
-    llenarSelect($('md-f-telar'), CAT.telares_alta || CAT.telares, { vacio: '—', otro: true, valor: M.telar || '' });
+    llenarSelect($('md-f-telar'), CAT.telares_alta || CAT.telares, { vacio: '—', valor: M.telar || '' });
     pintarTecnica();
     $('md-f-prioridad').value = String(M.prioridad || 2);
     colorearPrio($('md-f-prioridad'));
@@ -360,11 +360,6 @@
   document.querySelectorAll('[data-campo]').forEach(el => {
     if (el.tagName === 'SELECT') {
       el.addEventListener('change', async () => {
-        if (el.value === '__otro__') {
-          const tipo = el.dataset.campo === 'encargada_por' ? 'personas' : 'telares';
-          const ok = await gestionarOtro(el, tipo === 'personas' ? 'nombre' : 'telar / técnica');
-          if (!ok) { el.value = M[el.dataset.campo] || ''; return; }
-        }
         if (el.dataset.campo === 'prioridad') colorearPrio(el);
         guardarCampo(el);
       });
