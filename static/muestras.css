@@ -55,6 +55,20 @@
 .ms-section-title { font-size: 1rem; font-weight: 600; color: #2a2a2a; margin: 0 0 0.8rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .ms-count { background: var(--accent-soft); color: var(--accent-hover); font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; }
 .ms-hint { font-size: 0.74rem; color: #9a9a9a; font-weight: 400; }
+/* Ayudas plegadas: un círculo con una «i»; el texto sale al pasar el ratón */
+.ms-hint[data-ayuda] {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 15px; height: 15px; padding: 0; border-radius: 50%; vertical-align: middle;
+  border: 1px solid #d8d0c6; background: #fff; color: #9a9a9a;
+  font-size: 0.64rem; font-weight: 700; font-style: normal; line-height: 1;
+  letter-spacing: 0; text-transform: none; cursor: help; transition: all 0.12s;
+}
+.ms-hint[data-ayuda]::before { content: "i"; font-family: Georgia, "Times New Roman", serif; }
+.ms-hint[data-ayuda]:hover {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hover);
+}
+/* El telar del bloque técnico NO es una ayuda: es el dato de qué técnica es */
+.ms-tec-telar { font-size: 0.74rem; color: #9a9a9a; font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 .ms-estados { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.8rem; }
 .ms-chip {
@@ -264,7 +278,7 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-marca.salvo { color: #8a857d; border: 1px dotted #d8d0c6; }
 .ms-avisos-asunto { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.72rem; color: #4d4d4d; }
 .ms-avisos-otras { font-size: 0.78rem; color: #2a2a2a; font-weight: 500; }
-.ms-avisos-otras .ms-hint { display: block; font-weight: 400; }
+.ms-avisos-otras .ms-hint { margin-left: 0.3rem; font-weight: 400; }
 .ms-avisos-no { color: #7a7a7a; }
 .ms-avisos-pie { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; font-size: 0.78rem; color: #9a9a9a; margin-bottom: 0.7rem; }
 .ms-av-campo { font-family: inherit; font-size: 0.78rem; color: #2a2a2a; border: 1px solid var(--border); border-radius: 7px; padding: 0.25rem 0.4rem; background: #fff; }

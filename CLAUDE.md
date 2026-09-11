@@ -236,6 +236,14 @@ laboratorio pueda llevar las muestras sin ver costes.
 
 ## Convenciones (heredadas de Rols One)
 
+### Ayudas de la interfaz
+Los textos grises que explican un campo o una sección van en un `<span
+class="ms-hint">`. `MS.plegarAyudas()` (en `muestras-common.js`, con un
+MutationObserver para lo que se pinta después) los deja como un **círculo con
+una «i»** y mete el texto en el `title`: se leen al pasar el ratón. Lo que es
+un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
+`ms-tec-telar`).
+
 ### Paleta Rols
 ```
 --bg-page:#FAF8F6  --bg-card:#FFFFFF  --bg-sidebar:#4D4D4D  --text-sidebar:#D7CDC5

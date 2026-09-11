@@ -133,6 +133,29 @@
     }
   }
 
+  // Los textos de ayuda (.ms-hint) se pliegan en un círculo con una «i»: el
+  // texto sale al pasar el ratón por encima. El observador los pilla también
+  // en lo que el JS pinta después (tablas, filas nuevas, el modal de alta…).
+  function plegarAyudas(raiz) {
+    const r = raiz || document;
+    const nodos = [];
+    if (r.nodeType === 1 && r.classList.contains('ms-hint')) nodos.push(r);
+    if (r.querySelectorAll) nodos.push(...r.querySelectorAll('.ms-hint'));
+    nodos.forEach(el => {
+      if (el.dataset.ayuda) return;
+      const txt = el.textContent.trim();
+      if (!txt) return;
+      el.dataset.ayuda = txt;
+      el.title = txt;
+      el.textContent = '';
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => plegarAyudas());
+  else plegarAyudas();
+  new MutationObserver(cambios => cambios.forEach(c =>
+    c.addedNodes.forEach(n => { if (n.nodeType === 1) plegarAyudas(n); })
+  )).observe(document.documentElement, { childList: true, subtree: true });
+
   function hoyISO() {
     const d = new Date();
     const p = n => String(n).padStart(2, '0');
@@ -451,7 +474,7 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_TELAR, FLUJO_POMPON, flujoDe, flujoQueContiene, etiquetaEstado,
-    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum,
+    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, plegarAyudas,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, montarBuscadorCliente,
     materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
