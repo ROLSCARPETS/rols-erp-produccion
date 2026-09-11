@@ -52,9 +52,13 @@
     $('md-titulo').textContent = `M-${M.id}`;
     const esInterna = M.tipo === 'interna';
     $('md-cliente').textContent = M.cliente || (esInterna ? 'Interna' : '—');
+    // el código de Navision va pegado al nombre, no con los chips de estado
+    const nav = $('md-cliente-nav');
+    nav.hidden = !M.cliente_navision;
+    nav.textContent = M.cliente_navision || '';
+    nav.title = M.cliente_navision ? 'Cliente vinculado a su ficha de Navision' : '';
     let chips = tipoTag(M) + estadoPill(M.estado, M.estado_label) + ' ' + prioPill(M.prioridad);
     if (M.telar) chips += ` <span class="ms-estado" style="background:#f1ece4;color:#6b5323">${esc(M.telar)}</span>`;
-    if (M.cliente_navision) chips += ` <span class="ms-estado" style="background:#dbeafe;color:#1e40af" title="Cliente vinculado a su ficha de Navision">Navision ${esc(M.cliente_navision)}</span>`;
     if (M.archivada && !TERMINALES.includes(M.estado)) chips += ' <span class="ms-tag-archivada">archivada</span>';
     if (M.diseno_verificado) chips += ` <span class="ms-estado" style="background:#e8f3e1;color:#256b1f" title="Diseño verificado por ${esc(M.diseno_verificado_por_nombre || M.diseno_verificado_por || '')}${M.diseno_verificado_en ? ' el ' + esc(fmtFechaHora(M.diseno_verificado_en)) : ''}">Diseño verificado</span>`;
     $('md-chips').innerHTML = chips;

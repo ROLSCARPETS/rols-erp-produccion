@@ -299,6 +299,8 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
 .ms-hero-title { font-size: 1.65rem; font-weight: 300; color: #2a2a2a; line-height: 1.2; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
 .ms-hero-title .em { font-weight: 500; border-bottom: 2px solid #2a2a2a; padding-bottom: 2px; }
+/* El código de Navision, pegado al nombre del cliente */
+.ms-hero-title .ms-hero-nav { font-size: 0.78rem; font-weight: 600; color: #1e40af; background: #dbeafe; border-radius: 5px; padding: 0.12rem 0.4rem; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; margin-left: -0.25rem; }
 .ms-hero-sub { font-size: 0.85rem; color: #7a7a7a; margin: 0.35rem 0 0; }
 /* Referencia muestra (resumen corto) bajo el título de la ficha */
 .ms-hero-ref { font-size: 1rem; font-weight: 500; color: #4d4d4d; margin: 0.4rem 0 0; line-height: 1.35; }

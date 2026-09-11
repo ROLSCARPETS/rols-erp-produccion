@@ -220,7 +220,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   `before_request` y bajo demanda en `POST /api/muestras/avisos/hitos` (token
   API o Completo, para un cron). Rastro en el historial (`tipo: aviso`).
 - El **código de Navision** del cliente sale en el listado bajo su nombre
-  (`MS.clienteHtml`), en el hero de la ficha, bajo el campo Cliente y en el PDF.
+  (`MS.clienteHtml`), en la ficha pegado al nombre del hero (`#md-cliente-nav`,
+  antes de los chips de estado), bajo el campo Cliente y en el PDF.
 - **Cliente**: texto libre (prospectos) con buscador sobre el maestro de
   clientes de Navision que tiene Rols One (`/api/navision/clientes`, copia
   diaria de BC; el ERP lo proxya en `/api/muestras/clientes-navision`). Al
