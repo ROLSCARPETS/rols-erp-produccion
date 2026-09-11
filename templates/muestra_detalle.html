@@ -188,27 +188,6 @@
           <datalist id="md-materiales"></datalist>
           <datalist id="md-coloridos"></datalist>
         </div>
-        <!-- Diseño adjunto (ficheros) -->
-        <div class="ms-campo" id="md-adjuntos-wrap">
-          <label>Diseño <span class="ms-hint">imagen, PDF, AI/EPS/PSD o ZIP · hasta 25 MB</span></label>
-          <div class="ms-adjuntos" id="md-adjuntos" hidden></div>
-          <div class="ms-adj-zona" id="md-adj-zona">
-            <input type="file" id="md-adj-file" accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.tif,.tiff,.svg,.pdf,.ai,.eps,.psd,.zip" multiple hidden />
-            <select id="md-adj-clase" class="ms-adj-clase-sel" title="Qué es el fichero que vas a adjuntar">
-              <option value="version">Versión (propuesta)</option>
-              <option value="final">Diseño final</option>
-              <option value="otro">Otro (foto, referencia…)</option>
-            </select>
-            <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="md-adj-btn">Adjuntar diseño</button>
-            <span class="ms-adj-ayuda">o arrastra el fichero aquí</span>
-          </div>
-          <!-- Verificación de diseño: quién la marca y cuándo lo pone el servidor -->
-          <label class="ms-check" id="md-verif-wrap" title="Marca cuando el diseño esté revisado y aprobado">
-            <input type="checkbox" id="md-verif" />
-            <span>Verificación de diseño</span>
-            <span class="ms-verif-quien" id="md-verif-quien"></span>
-          </label>
-        </div>
         <div class="ms-campo" id="md-anotacion-wrap" hidden>
           <label>Anotación del registro de números</label>
           <div class="ms-readonly" id="md-anotacion"></div>
@@ -216,7 +195,7 @@
         <div class="ms-origen" id="md-origen"></div>
       </section>
 
-      <!-- ===== Columna derecha: seguimiento, diario, variantes, historial ===== -->
+      <!-- ===== Columna derecha: seguimiento, diario, diseño, variantes, resultado e historial ===== -->
       <div>
         <!-- Seguimiento: fechas para que comercial y laboratorio sepan cuándo mirar
              (mismos ids y data-campo que antes: el autoguardado es el mismo) -->
@@ -259,23 +238,45 @@
           <div class="ms-diario" id="md-diario"></div>
         </section>
 
+        <!-- Diseño adjunto: al lado del diario, que es donde se trabaja la muestra -->
+        <section class="ms-section" id="md-adjuntos-wrap">
+          <div class="ms-section-title"><span>Diseño</span><span class="ms-hint">imagen, PDF, AI/EPS/PSD o ZIP · hasta 25 MB</span></div>
+          <div class="ms-adjuntos" id="md-adjuntos" hidden></div>
+          <div class="ms-adj-zona" id="md-adj-zona">
+            <input type="file" id="md-adj-file" accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.tif,.tiff,.svg,.pdf,.ai,.eps,.psd,.zip" multiple hidden />
+            <select id="md-adj-clase" class="ms-adj-clase-sel" title="Qué es el fichero que vas a adjuntar">
+              <option value="version">Versión (propuesta)</option>
+              <option value="final">Diseño final</option>
+              <option value="otro">Otro (foto, referencia…)</option>
+            </select>
+            <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="md-adj-btn">Adjuntar diseño</button>
+            <span class="ms-adj-ayuda">o arrastra el fichero aquí</span>
+          </div>
+          <!-- Verificación de diseño: quién la marca y cuándo lo pone el servidor -->
+          <label class="ms-check" id="md-verif-wrap" title="Marca cuando el diseño esté revisado y aprobado">
+            <input type="checkbox" id="md-verif" />
+            <span>Verificación de diseño</span>
+            <span class="ms-verif-quien" id="md-verif-quien"></span>
+          </label>
+        </section>
+
         <section class="ms-section" id="md-variantes-wrap" hidden>
           <div class="ms-section-title"><span>Otras muestras con este número</span><span class="ms-count" id="md-var-count">0</span></div>
           <div class="ms-variantes" id="md-variantes"></div>
         </section>
 
-        <section class="ms-section">
-          <details class="ms-hist" id="md-hist">
-            <summary>Historial de cambios (<span id="md-hist-count">0</span>)</summary>
-            <ul class="ms-hist-lista" id="md-historial"></ul>
-          </details>
-        </section>
         <!-- Lo comercial cierra la ficha: qué pasó con la muestra una vez hecha -->
         <section class="ms-section">
           <div class="ms-section-title"><span>Resultado (comercial)</span><span class="ms-hint">qué pasó después · se guarda solo</span></div>
           <div class="ms-campo" style="margin-bottom:0">
             <textarea id="md-f-resultado" data-campo="resultado" aria-label="Resultado (comercial)" placeholder="Qué pasó después: pedido confirmado, no la escogen, a la espera…" style="min-height:64px"></textarea>
           </div>
+        </section>
+        <section class="ms-section">
+          <details class="ms-hist" id="md-hist">
+            <summary>Historial de cambios (<span id="md-hist-count">0</span>)</summary>
+            <ul class="ms-hist-lista" id="md-historial"></ul>
+          </details>
         </section>
       </div>
     </div>
