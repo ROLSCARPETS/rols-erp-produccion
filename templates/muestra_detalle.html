@@ -151,7 +151,7 @@
         </div>
         <!-- Datos técnicos: solo cuando el telar es de varilla -->
         <div class="ms-tecnica" id="md-tecnica" hidden>
-          <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
+          <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint" id="md-tecnica-telar">telar de varilla</span></div>
           <!-- Tejeduría: cómo se teje -->
           <div class="ms-tecnica-sub">Datos de tejeduría</div>
           <div class="ms-campo-row tres">
@@ -171,9 +171,10 @@
           <div class="ms-campo-row">
             <div class="ms-campo">
               <label for="md-f-pelo">Construcción</label>
-              <select id="md-f-pelo" data-campo="pelo">
-                <option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option><option value="estructurado">Estructurado</option><option value="pendiente">Pendiente</option>
-              </select>
+              <!-- las opciones las pone el JS: cada telar tiene las suyas -->
+              <select id="md-f-pelo" data-campo="pelo"></select>
+              <!-- Rapier no elige: va siempre tejido plano -->
+              <div class="ms-readonly" id="md-f-pelo-fijo" hidden></div>
             </div>
             <div class="ms-campo">
               <label for="md-f-acabado">Acabado</label>

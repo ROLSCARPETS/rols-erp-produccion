@@ -80,15 +80,21 @@ laboratorio pueda llevar las muestras sin ver costes.
   `descripcion` sigue siendo el texto largo (el listado la enseña si no hay
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
-- **Datos técnicos** (solo con telar **Varilla**), en dos bloques en la UI:
+- **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**
+  y **Rapier**), en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
-  cortos —, `pelo` con etiqueta "Construcción": corte | bucle | corte_bucle |
-  estructurado | pendiente, y `acabado`: latex | sin_aprestar | resina |
-  latex_resina | pendiente) y
+  cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
+  sin_aprestar | resina | latex_resina | pendiente) y
   *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
   (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
-  La ficha y el alta los enseñan solo si el telar es de varilla (si cambia, se
-  conservan). La tabla se guarda **entera** en cada cambio (`PUT` con
+  La ficha y el alta los enseñan solo si el telar es de los técnicos (si
+  cambia, se conservan). Las **construcciones** dependen del telar
+  (`PELOS_POR_TELAR` / `MS.PELOS_POR_TELAR`): Varilla (corte, bucle,
+  corte_bucle, estructurado, pendiente), Lancetas (raya, bucle_sencillo,
+  tejido_plano, bucle_saltillo, pendiente) y Rapier, que **no elige**: es
+  siempre `tejido_plano` (`pelo_fijo()` lo pone al crear y al pasar a Rapier,
+  y la UI enseña el valor fijo en vez del selector). `pelo` se valida contra la
+  unión de todas, así que cambiar de telar nunca deja un valor no válido. La tabla se guarda **entera** en cada cambio (`PUT` con
   `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
   nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`
   por posición. v6 pasó los campos planos `material` / `hilos_pua` a una

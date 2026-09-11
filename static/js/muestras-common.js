@@ -59,8 +59,43 @@
     return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
   }
 
-  // Telar de varilla: lleva datos técnicos (material, pasadas, felpa, pelo, acabado)
+  // Telar de varilla: manda en el flujo de etapas (las de diseño por delante)
   function esVarilla(telar) { return (telar || '').trim().toLowerCase().startsWith('varilla'); }
+
+  // Telares con datos técnicos. Los campos son los mismos en los tres; cambian
+  // las CONSTRUCCIONES que ofrece cada uno, y Rapier no elige: tejido plano.
+  const PELOS_POR_TELAR = {
+    Varilla: [['corte', 'Corte'], ['bucle', 'Bucle'], ['corte_bucle', 'Corte y bucle'],
+      ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']],
+    Lancetas: [['raya', 'Raya'], ['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
+      ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']],
+    Rapier: [['tejido_plano', 'Tejido plano']],
+  };
+  const PELO_LABEL = Object.fromEntries([].concat(...Object.values(PELOS_POR_TELAR)));
+  function telarTecnico(telar) {
+    const k = String(telar || '').trim().toLowerCase();
+    return Object.keys(PELOS_POR_TELAR).find(t => k.startsWith(t.toLowerCase())) || '';
+  }
+  function esTecnico(telar) { return !!telarTecnico(telar); }
+  function pelosDe(telar) { return PELOS_POR_TELAR[telarTecnico(telar) || 'Varilla']; }
+  // Construcción única del telar (Rapier) → [valor, etiqueta]; null si se elige
+  function peloFijo(telar) {
+    const ops = PELOS_POR_TELAR[telarTecnico(telar)] || [];
+    return ops.length === 1 ? ops[0] : null;
+  }
+  // Pinta el <select> de construcción del telar; con telar de construcción
+  // única lo deja con ese valor, oculto, y enseña el texto fijo de al lado.
+  function pintarConstruccion(sel, telar, valor, elFijo) {
+    const fijo = peloFijo(telar);
+    sel.innerHTML = (fijo ? [] : [['', '—']]).concat(pelosDe(telar))
+      .map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+    sel.value = fijo ? fijo[0] : (pelosDe(telar).some(([v]) => v === valor) ? valor : '');
+    sel.hidden = !!fijo;
+    if (elFijo) {
+      elFijo.hidden = !fijo;
+      elFijo.textContent = fijo ? fijo[1] : '';
+    }
+  }
 
   function hoyISO() {
     const d = new Date();
@@ -373,6 +408,7 @@
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
+    PELOS_POR_TELAR, PELO_LABEL, esTecnico, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente,
     materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
 })();

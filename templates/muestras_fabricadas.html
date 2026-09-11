@@ -287,13 +287,13 @@
       <div class="full"><label>Referencia muestra <small style="font-weight:400;color:#9a9a9a">(resumen corto: es lo que sale en el listado)</small></label><input type="text" id="ms-n-ref" maxlength="120" placeholder="Ej. Print Colortec 1400 g, 2 colores, logo del hotel" autocomplete="off" /></div>
       <div class="full"><label>Descripción de la muestra</label><textarea id="ms-n-desc" rows="3" placeholder="Ej. 2 MUESTRAS TEJIDAS - WILTON 30 - Lana 100 2/c - 2 cuerpos…"></textarea></div>
       <div class="full ms-n-tecnica" id="ms-n-tecnica" hidden>
-        <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint">telar de varilla</span></div>
+        <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint" id="ms-n-tecnica-telar">telar de varilla</span></div>
         <div class="ms-form-grid ms-form-grid-inner">
           <div class="full ms-tecnica-sub">Datos de tejeduría</div>
           <div class="c2"><label>Pasadas</label><input type="text" id="ms-n-pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" /></div>
           <div class="c2"><label>Altura felpa</label><input type="text" id="ms-n-altura" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" /></div>
           <div class="c2"><label>Nº de cuerpos</label><input type="text" id="ms-n-cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></div>
-          <div class="c3"><label>Construcción</label><select id="ms-n-pelo"><option value="">—</option><option value="corte">Corte</option><option value="bucle">Bucle</option><option value="corte_bucle">Corte y bucle</option><option value="estructurado">Estructurado</option><option value="pendiente">Pendiente</option></select></div>
+          <div class="c3"><label>Construcción</label><select id="ms-n-pelo"></select><div class="ms-readonly" id="ms-n-pelo-fijo" hidden></div></div>
           <div class="c3"><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option><option value="pendiente">Pendiente</option></select></div>
           <div class="full ms-tecnica-sub">Datos de materias <span class="ms-hint">una fila por cuerpo</span></div>
           <div class="full" id="ms-n-materias"></div>

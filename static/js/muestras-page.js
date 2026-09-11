@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, hoyISO, fmtNum, esVarilla, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
+  const { esc, fmtFecha, hoyISO, fmtNum, esTecnico, pintarConstruccion, peloFijo, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, montarTablaMaterias,
           llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
@@ -552,10 +552,10 @@
     // Datos técnicos: solo con telar de varilla
     $('ms-materiales').innerHTML = (c.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
     $('ms-coloridos').innerHTML = (c.coloridos || []).map(x => `<option value="${esc(x)}"></option>`).join('');
-    ['ms-n-ref', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-pelo', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
+    ['ms-n-ref', 'ms-n-pasadas', 'ms-n-altura', 'ms-n-cuerpos', 'ms-n-acabado'].forEach(id => { $(id).value = ''; });
     tablaMaterias.pintar([]);
     modal.querySelectorAll('.ms-falta').forEach(el => el.classList.remove('ms-falta'));
-    $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
+    pintarTecnicaAlta('');   // alta nueva: sin construcción arrastrada de la anterior
     $('ms-n-cliente').value = ''; $('ms-n-desc').value = ''; $('ms-n-prio').value = '2';
     clienteNav = null; pintarNavLink();
     colorearPrio($('ms-n-prio'));
@@ -572,6 +572,15 @@
   modal.addEventListener('click', (e) => { if (e.target === modal) cerrarNueva(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) cerrarNueva(); });
   $('ms-n-prio').addEventListener('change', () => colorearPrio($('ms-n-prio')));
+  // El bloque técnico (y las construcciones que ofrece) dependen del telar
+  function pintarTecnicaAlta(valorPelo) {
+    const telar = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
+    $('ms-n-tecnica').hidden = !esTecnico(telar);
+    $('ms-n-tecnica-telar').textContent = 'telar ' + telar;
+    const actual = valorPelo === undefined ? $('ms-n-pelo').value : valorPelo;
+    pintarConstruccion($('ms-n-pelo'), telar, actual || '', $('ms-n-pelo-fijo'));
+  }
+
   // Al escribir en un campo que faltaba, se le quita la marca de rojo
   ['input', 'change'].forEach(ev => $('ms-n-tecnica').addEventListener(ev, (e) => {
     if (e.target.matches('input, select')) e.target.classList.remove('ms-falta');
@@ -609,7 +618,7 @@
 
   $('ms-n-telar').addEventListener('change', async () => {
     await gestionarOtro($('ms-n-telar'), 'telares', 'telar / técnica');
-    $('ms-n-tecnica').hidden = !esVarilla($('ms-n-telar').value);
+    pintarTecnicaAlta();
   });
   // Escribir en un campo de número selecciona su opción
   $('ms-n-variante').addEventListener('focus', () => { modal.querySelector('input[name="ms-n-tipo"][value="variante"]').checked = true; });
@@ -622,7 +631,7 @@
     const cliente = $('ms-n-cliente').value.trim();
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
     const telarNuevo = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
-    if (esVarilla(telarNuevo)) {
+    if (esTecnico(telarNuevo)) {
       const faltan = faltanTecnicos();
       if (faltan.length) {
         $('ms-n-tecnica').scrollIntoView({ block: 'center', behavior: 'smooth' });

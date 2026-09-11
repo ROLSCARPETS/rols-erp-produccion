@@ -195,15 +195,49 @@ TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
 # "pendiente" existe para poder dar de alta una varilla sin saber aun la
 # construccion o el acabado (el alta los exige rellenos: lo que no se sabe se
 # deja como pendiente, igual que el "Pdte" de los campos de texto).
-PELOS: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
-                                      ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
-                                      ("pendiente", "Pendiente"))
+# Telares que llevan datos tecnicos. Los campos son los mismos en los tres;
+# lo que cambia son las CONSTRUCCIONES (`pelo`) que ofrece cada uno, y que
+# Rapier no elige: siempre es tejido plano.
+TELARES_TECNICOS = ("Varilla", "Lancetas", "Rapier")
+PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
+                                              ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
+                                              ("pendiente", "Pendiente"))
+PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("raya", "Raya"), ("bucle_sencillo", "Bucle sencillo"),
+                                               ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
+                                               ("pendiente", "Pendiente"))
+PELOS_RAPIER: tuple[tuple[str, str], ...] = (("tejido_plano", "Tejido plano"),)
+PELOS_POR_TELAR = {"Varilla": PELOS_VARILLA, "Lancetas": PELOS_LANCETAS, "Rapier": PELOS_RAPIER}
+# Union (en orden, sin repetir): vale para validar venga del telar que venga y
+# para traducir el slug a su etiqueta en la ficha y en el historial.
+PELOS: tuple[tuple[str, str], ...] = tuple(
+    dict((s, l) for ops in PELOS_POR_TELAR.values() for s, l in ops).items())
 ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "Sin aprestar"),
                                          ("resina", "Resina"), ("latex_resina", "Látex + resina"),
                                          ("pendiente", "Pendiente"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
 CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "n_cuerpos", "pelo", "acabado")
+
+
+def _telar_tecnico(telar) -> str:
+    """Nombre canonico del telar tecnico al que pertenece, o "" si no lleva
+    datos tecnicos ('Varilla 2' cuenta como Varilla)."""
+    k = _clave(telar)
+    for t in TELARES_TECNICOS:
+        if k.startswith(_clave(t)):
+            return t
+    return ""
+
+
+def pelos_de(telar) -> tuple[tuple[str, str], ...]:
+    """Construcciones que ofrece ese telar (las de Varilla si no es tecnico)."""
+    return PELOS_POR_TELAR.get(_telar_tecnico(telar) or "Varilla", PELOS_VARILLA)
+
+
+def pelo_fijo(telar) -> str:
+    """Construccion unica del telar (Rapier: tejido plano); "" si se elige."""
+    ops = PELOS_POR_TELAR.get(_telar_tecnico(telar) or "")
+    return ops[0][0] if ops and len(ops) == 1 else ""
 
 # MATERIAS: una fila por cuerpo (que se teje con que). Sustituyen a los campos
 # planos `material` / `hilos_pua` (v6 los paso a una fila). Cada fila:
@@ -889,7 +923,11 @@ def obtener(mid: str) -> dict | None:
         out[k] = out.get(k) or ""
     out["materias"] = [{"id": f.get("id"), **{k: f.get(k) or "" for k in CAMPOS_MATERIA}}
                        for f in (m.get("materias") or [])]
-    out["es_varilla"] = _es_telar_tecnico(m.get("telar"))
+    # es_varilla se queda por compatibilidad: hoy significa "lleva datos tecnicos"
+    out["es_tecnico"] = out["es_varilla"] = _es_telar_tecnico(m.get("telar"))
+    fijo = pelo_fijo(m.get("telar"))
+    if fijo:
+        out["pelo"] = fijo
     out["tecnica_resumen"] = resumen_tecnico(m)
     out["adjuntos"] = _adjuntos_publicos(m.get("adjuntos") or [])
     out["variantes"] = [
@@ -939,6 +977,8 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "clientes": clientes,
         # Datos tecnicos (telar de varilla)
         "pelos": [{"valor": s, "label": l} for s, l in PELOS],
+        "pelos_por_telar": {t: [{"valor": s, "label": l} for s, l in ops]
+                            for t, ops in PELOS_POR_TELAR.items()},
         "acabados": [{"valor": s, "label": l} for s, l in ACABADOS],
         "materiales": materiales,
         "coloridos": coloridos,
@@ -1206,7 +1246,7 @@ def resumen_materias(filas, maximo: int | None = 4) -> str:
 
 
 def _es_telar_tecnico(telar) -> bool:
-    return es_varilla(telar)
+    return bool(_telar_tecnico(telar))
 
 
 def resumen_tecnico(m: dict) -> str:
@@ -1227,8 +1267,9 @@ def resumen_tecnico(m: dict) -> str:
     cu = (m.get("n_cuerpos") or "").strip()
     if cu:
         partes.append(cu if "cuerpo" in cu.lower() else f"{cu} cuerpos")
-    if m.get("pelo"):
-        partes.append(PELOS_LABEL.get(m["pelo"], m["pelo"]))
+    pelo = pelo_fijo(m.get("telar")) or m.get("pelo")
+    if pelo:
+        partes.append(PELOS_LABEL.get(pelo, pelo))
     if m.get("acabado"):
         partes.append(ACABADOS_LABEL.get(m["acabado"], m["acabado"]))
     return " · ".join(partes)
@@ -1325,6 +1366,8 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
         telar = normalizar_telar(datos.get("telar"), data["catalogos"].get("telares"))
         if len(telar) > 60:
             return None, "telar demasiado largo"
+        # Rapier no elige construccion: va siempre tejido plano
+        tecnicos["pelo"] = pelo_fijo(telar) or tecnicos["pelo"]
         if not etapa_permitida(estado, telar):
             return None, _msg_etapa_no_permitida(estado)
         persona, persona_usuario, err = _resolver_persona(
@@ -1469,6 +1512,11 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                     return None, (f"la muestra está en «{etiqueta_estado(m.get('estado'), m.get('telar'))}» "
                                   f"(etapa de {' o '.join(tecnicas_de_etapa(m.get('estado')))}): "
                                   "cámbiala antes de etapa para pasarla a otra técnica")
+                # Telar de construccion unica (Rapier): se la pone el servidor
+                fijo = pelo_fijo(v)
+                if fijo and m.get("pelo") != fijo and "pelo" not in datos:
+                    cambios.append(("pelo", m.get("pelo"), fijo))
+                    m["pelo"] = fijo
                 _anadir_a_catalogo(data, "telares", v)
             elif k == "encargada_por":
                 v, v_usuario, err = _resolver_persona(

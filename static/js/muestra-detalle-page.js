@@ -5,7 +5,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla, estadoPill, prioPill, tipoTag, colorearPrio, api,
+  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esTecnico, pintarConstruccion, PELO_LABEL, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
           gestionarOtro, montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
   const $ = id => document.getElementById(id);
@@ -378,7 +378,6 @@
   // ------------------------------------------------------------
   // Datos técnicos (solo telar de varilla)
   // ------------------------------------------------------------
-  const PELO_LABEL = { corte: 'Corte', bucle: 'Bucle', corte_bucle: 'Corte y bucle', estructurado: 'Estructurado', pendiente: 'Pendiente' };
   const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina', pendiente: 'Pendiente' };
   // Tabla de materias: una fila por cuerpo. Se guarda entera en cada cambio
   // (misma marca de guardado que el resto de campos de la ficha).
@@ -394,12 +393,13 @@
 
   function pintarTecnica() {
     // Los valores se conservan aunque cambie el telar; solo se esconden
-    $('md-tecnica').hidden = !esVarilla(M.telar);
+    $('md-tecnica').hidden = !esTecnico(M.telar);
+    $('md-tecnica-telar').textContent = 'telar ' + (M.telar || '');
     pintarDatalists();
     $('md-f-pasadas').value = M.pasadas || '';
     $('md-f-altura').value = M.altura_felpa || '';
     $('md-f-cuerpos').value = M.n_cuerpos || '';
-    $('md-f-pelo').value = M.pelo || '';
+    pintarConstruccion($('md-f-pelo'), M.telar, M.pelo || '', $('md-f-pelo-fijo'));
     $('md-f-acabado').value = M.acabado || '';
     tablaMaterias.pintar(M.materias || []);
   }
