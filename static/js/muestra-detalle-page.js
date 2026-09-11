@@ -396,7 +396,8 @@
     // Los valores se conservan aunque cambie el telar; solo se esconden
     const cfg = configTecnica(M.telar);
     $('md-tecnica').hidden = !esTecnico(M.telar);
-    $('md-tecnica-telar').textContent = 'telar ' + (M.telar || '');
+    // Pompón, Kibby y Festón no son telares
+    $('md-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : 'técnica ') + (M.telar || '');
     // Pompón no teje: solo lleva materias
     $('md-tejeduria').hidden = !cfg.tejeduria;
     $('md-tecnica').classList.toggle('sin-tejeduria', !cfg.tejeduria);

@@ -81,8 +81,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
 - **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
-  **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte** y **Pompón**),
-  en dos bloques en la UI:
+  **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte**, **Pompón**,
+  **Kibby** y **Festón**), en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
   cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
   sin_aprestar | resina | latex_resina | pendiente) y
@@ -98,12 +98,15 @@ laboratorio pueda llevar las muestras sin ver costes.
   valor fijo en vez del selector). `pelo` se valida contra la unión de todas,
   así que cambiar de telar nunca deja un valor no válido.
   Toda la configuración va en **`TECNICOS_POR_TELAR`** (espejo en
-  `MS.TECNICOS_POR_TELAR`), que además dice: `tejeduria` (Pompón la lleva a
-  False: solo materias), `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
-  "Nº de colores"), `etiqueta_cuerpo` (en Pompón, la columna de la tabla de
-  materias es "Color") y `hilos_pua` (Pompón no lleva esa columna). Helpers:
+  `MS.TECNICOS_POR_TELAR`), que además dice: `es_telar` (Pompón, Kibby y
+  Festón **no son telares**: el rótulo del bloque dice "técnica X" en vez de
+  "telar X"), `tejeduria` (esos tres la llevan a False: solo materias, ver
+  `_TEC_SOLO_MATERIAS`), `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
+  "Nº de colores"), `etiqueta_cuerpo` (en los tres, la columna de la tabla de
+  materias es "Color") y `hilos_pua` (no llevan esa columna). Helpers:
   `config_tecnica`, `etiqueta_n_cuerpos`, `etiqueta_cuerpo`, `lleva_tejeduria`,
-  `lleva_hilos_pua`; el endpoint de catálogos lo sirve en `tecnicos_por_telar`.
+  `lleva_hilos_pua`, `es_telar`; el endpoint de catálogos lo sirve en
+  `tecnicos_por_telar`.
   La tabla de materias se guarda **entera** en cada cambio (`PUT` con
   `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
   nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`

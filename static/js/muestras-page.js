@@ -577,7 +577,7 @@
     const telar = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
     const cfg = configTecnica(telar);
     $('ms-n-tecnica').hidden = !esTecnico(telar);
-    $('ms-n-tecnica-telar').textContent = 'telar ' + telar;
+    $('ms-n-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : 'técnica ') + telar;
     // Pompón no teje: solo lleva materias
     $('ms-n-tecnica').querySelectorAll('.tejeduria').forEach(el => { el.hidden = !cfg.tejeduria; });
     $('ms-n-materias-sub').firstChild.textContent = 'Datos de materias ';

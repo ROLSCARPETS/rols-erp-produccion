@@ -64,6 +64,7 @@
 
   // Telares con datos técnicos y en qué se diferencian (espejo de
   // TECNICOS_POR_TELAR en muestras_fabricadas.py):
+  //   esTelar        → si de verdad es un telar (Pompón, Kibby y Festón no lo son)
   //   tejeduria      → enseña el bloque de tejeduría
   //   pelos          → construcciones; si solo hay una, NO se elige
   //   etiquetaN      → cómo se llama `n_cuerpos` en ese telar
@@ -73,7 +74,10 @@
     ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']];
   const PELOS_LANCETAS = [['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
     ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']];
-  const TEC_BASE = { tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true };
+  const TEC_BASE = { esTelar: true, tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true };
+  // Pompón, Kibby y Festón no son telares: solo materias, por color y sin hilos púa
+  const TEC_SOLO_MATERIAS = { esTelar: false, tejeduria: false, pelos: [], etiquetaN: 'Nº de colores',
+    etiquetaCuerpo: 'Color', hilosPua: false };
   const TECNICOS_POR_TELAR = {
     'Varilla': Object.assign({}, TEC_BASE, { pelos: PELOS_VARILLA }),
     'Lancetas': Object.assign({}, TEC_BASE, { pelos: PELOS_LANCETAS }),
@@ -82,8 +86,10 @@
     // Tufting son dos telares distintos; los cuerpos se cuentan como colores
     'Tufting Bucle': Object.assign({}, TEC_BASE, { pelos: [['bucle', 'Bucle']], etiquetaN: 'Nº de colores' }),
     'Tufting Corte': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']], etiquetaN: 'Nº de colores' }),
-    // Pompón: solo materias, por color y sin hilos por púa
-    'Pompón': { tejeduria: false, pelos: [], etiquetaN: 'Nº de colores', etiquetaCuerpo: 'Color', hilosPua: false },
+    // No son telares: solo materias (ver TEC_SOLO_MATERIAS)
+    'Pompón': Object.assign({}, TEC_SOLO_MATERIAS),
+    'Kibby': Object.assign({}, TEC_SOLO_MATERIAS),
+    'Festón': Object.assign({}, TEC_SOLO_MATERIAS),
   };
   const PELO_LABEL = Object.fromEntries([].concat(...Object.values(TECNICOS_POR_TELAR).map(c => c.pelos)));
   const sinAcentos = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();

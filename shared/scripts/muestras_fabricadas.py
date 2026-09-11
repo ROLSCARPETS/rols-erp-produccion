@@ -210,6 +210,7 @@ def telares_para_alta(catalogo) -> list[str]:
 # construccion o el acabado (el alta los exige rellenos: lo que no se sabe se
 # deja como pendiente, igual que el "Pdte" de los campos de texto).
 # Telares que llevan datos tecnicos y en que se diferencian:
+#   es_telar       → si de verdad es un telar (Pompón, Kibby y Festón no lo son)
 #   tejeduria      → ensena el bloque de tejeduria (pasadas, felpa, n, construccion, acabado)
 #   pelos          → construcciones que ofrece; si solo hay una, NO se elige (la pone el servidor)
 #   etiqueta_n     → como se llama `n_cuerpos` en ese telar
@@ -221,7 +222,12 @@ PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Buc
 PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("bucle_sencillo", "Bucle sencillo"),
                                                ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
                                                ("pendiente", "Pendiente"))
-_TEC_BASE = {"tejeduria": True, "etiqueta_n": "Nº de cuerpos", "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True}
+_TEC_BASE = {"es_telar": True, "tejeduria": True, "etiqueta_n": "Nº de cuerpos",
+             "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True}
+# Pompon, Kibby y Feston no son telares: solo llevan materias, por color y sin
+# hilos por pua.
+_TEC_SOLO_MATERIAS = {"es_telar": False, "tejeduria": False, "pelos": (), "etiqueta_n": "Nº de colores",
+                      "etiqueta_cuerpo": "Color", "hilos_pua": False}
 TECNICOS_POR_TELAR: dict[str, dict] = {
     "Varilla":       {**_TEC_BASE, "pelos": PELOS_VARILLA},
     "Lancetas":      {**_TEC_BASE, "pelos": PELOS_LANCETAS},
@@ -231,9 +237,10 @@ TECNICOS_POR_TELAR: dict[str, dict] = {
     # cuerpos se cuentan como colores.
     "Tufting Bucle": {**_TEC_BASE, "pelos": (("bucle", "Bucle"),), "etiqueta_n": "Nº de colores"},
     "Tufting Corte": {**_TEC_BASE, "pelos": (("corte", "Corte"),), "etiqueta_n": "Nº de colores"},
-    # Pompon: solo materias, por color y sin hilos por pua
-    "Pompón":        {"tejeduria": False, "pelos": (), "etiqueta_n": "Nº de colores",
-                      "etiqueta_cuerpo": "Color", "hilos_pua": False},
+    # No son telares: solo materias (ver _TEC_SOLO_MATERIAS)
+    "Pompón":        dict(_TEC_SOLO_MATERIAS),
+    "Kibby":         dict(_TEC_SOLO_MATERIAS),
+    "Festón":        dict(_TEC_SOLO_MATERIAS),
 }
 TELARES_TECNICOS = tuple(TECNICOS_POR_TELAR)
 PELOS_POR_TELAR = {t: cfg["pelos"] for t, cfg in TECNICOS_POR_TELAR.items() if cfg["pelos"]}
@@ -288,6 +295,11 @@ def etiqueta_cuerpo(telar) -> str:
 
 def lleva_tejeduria(telar) -> bool:
     return bool(config_tecnica(telar).get("tejeduria"))
+
+
+def es_telar(telar) -> bool:
+    """False en las tecnicas que no son un telar (Pompón, Kibby, Festón)."""
+    return bool(config_tecnica(telar).get("es_telar", True))
 
 
 def lleva_hilos_pua(telar) -> bool:
@@ -1047,7 +1059,7 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "pelos": [{"valor": s, "label": l} for s, l in PELOS],
         "pelos_por_telar": {t: [{"valor": s, "label": l} for s, l in ops]
                             for t, ops in PELOS_POR_TELAR.items()},
-        "tecnicos_por_telar": {t: {"tejeduria": cfg["tejeduria"], "etiqueta_n": cfg["etiqueta_n"],
+        "tecnicos_por_telar": {t: {"es_telar": cfg["es_telar"], "tejeduria": cfg["tejeduria"], "etiqueta_n": cfg["etiqueta_n"],
                                    "etiqueta_cuerpo": cfg["etiqueta_cuerpo"], "hilos_pua": cfg["hilos_pua"],
                                    "pelos": [{"valor": s, "label": l} for s, l in cfg["pelos"]]}
                                for t, cfg in TECNICOS_POR_TELAR.items()},
