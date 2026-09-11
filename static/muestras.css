@@ -395,11 +395,15 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 /* Subdivisión del bloque técnico: tejeduría / materias */
 .ms-tecnica-sub { font-size: 0.66rem; font-weight: 700; color: #a0865a; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.45rem; padding-top: 0.55rem; border-top: 1px dashed #e8dcc6; }
 .ms-tecnica-title + .ms-tecnica-sub, .ms-form-grid-inner > .ms-tecnica-sub:first-child { border-top: 0; padding-top: 0; }
+/* Sin bloque de tejeduría, el de materias es el primero: sin línea arriba */
+.ms-tecnica.sin-tejeduria .ms-tecnica-sub { border-top: 0; padding-top: 0; }
 .ms-form-grid-inner > .ms-tecnica-sub { margin-bottom: -0.25rem; }
 .ms-campo-row.tres { grid-template-columns: 1fr 1fr 1fr; }
 /* ---- Tabla de materias: una fila por cuerpo ---- */
 .ms-materias { margin-bottom: 0.7rem; }
 .ms-materias-cab, .ms-materia { display: grid; grid-template-columns: 54px minmax(0, 1.5fr) 54px minmax(0, 1.1fr) 20px; gap: 0.25rem; align-items: center; }
+/* Sin hilos púa (Pompón): una columna menos */
+.ms-materias.sin-hilos .ms-materias-cab, .ms-materias.sin-hilos .ms-materia { grid-template-columns: 54px minmax(0, 1.5fr) minmax(0, 1.3fr) 20px; }
 .ms-materias-cab { font-size: 0.6rem; font-weight: 700; color: #a0865a; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
 .ms-materias-cab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-materia { margin-bottom: 0.3rem; }

@@ -5,7 +5,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esTecnico, pintarConstruccion, PELO_LABEL, estadoPill, prioPill, tipoTag, colorearPrio, api,
+  const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, PELO_LABEL, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
           gestionarOtro, montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
   const $ = id => document.getElementById(id);
@@ -394,14 +394,20 @@
 
   function pintarTecnica() {
     // Los valores se conservan aunque cambie el telar; solo se esconden
+    const cfg = configTecnica(M.telar);
     $('md-tecnica').hidden = !esTecnico(M.telar);
     $('md-tecnica-telar').textContent = 'telar ' + (M.telar || '');
+    // Pompón no teje: solo lleva materias
+    $('md-tejeduria').hidden = !cfg.tejeduria;
+    $('md-tecnica').classList.toggle('sin-tejeduria', !cfg.tejeduria);
+    $('md-f-cuerpos-lbl').textContent = cfg.etiquetaN;
     pintarDatalists();
     $('md-f-pasadas').value = M.pasadas || '';
     $('md-f-altura').value = M.altura_felpa || '';
     $('md-f-cuerpos').value = M.n_cuerpos || '';
     pintarConstruccion($('md-f-pelo'), M.telar, M.pelo || '', $('md-f-pelo-fijo'));
     $('md-f-acabado').value = M.acabado || '';
+    tablaMaterias.configurar({ etiquetaCuerpo: cfg.etiquetaCuerpo, conHilos: cfg.hilosPua });
     tablaMaterias.pintar(M.materias || []);
   }
 

@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   'use strict';
-  const { esc, fmtFecha, hoyISO, fmtNum, esTecnico, pintarConstruccion, peloFijo, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
+  const { esc, fmtFecha, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, montarTablaMaterias,
           llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente } = window.MS;
   const $ = id => document.getElementById(id);
@@ -575,10 +575,17 @@
   // El bloque técnico (y las construcciones que ofrece) dependen del telar
   function pintarTecnicaAlta(valorPelo) {
     const telar = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
+    const cfg = configTecnica(telar);
     $('ms-n-tecnica').hidden = !esTecnico(telar);
     $('ms-n-tecnica-telar').textContent = 'telar ' + telar;
+    // Pompón no teje: solo lleva materias
+    $('ms-n-tecnica').querySelectorAll('.tejeduria').forEach(el => { el.hidden = !cfg.tejeduria; });
+    $('ms-n-materias-sub').firstChild.textContent = 'Datos de materias ';
+    $('ms-n-materias-sub').querySelector('.ms-hint').textContent = `una fila por ${cfg.etiquetaCuerpo.toLowerCase()}`;
+    $('ms-n-cuerpos-lbl').textContent = cfg.etiquetaN;
     const actual = valorPelo === undefined ? $('ms-n-pelo').value : valorPelo;
     pintarConstruccion($('ms-n-pelo'), telar, actual || '', $('ms-n-pelo-fijo'));
+    tablaMaterias.configurar({ etiquetaCuerpo: cfg.etiquetaCuerpo, conHilos: cfg.hilosPua });
   }
 
   // Al escribir en un campo que faltaba, se le quita la marca de rojo
@@ -588,13 +595,14 @@
 
   // Una muestra de varilla se da de alta con sus datos técnicos rellenos: lo
   // que todavía no se sepa se escribe «Pdte» (o «Pendiente» en los dos selectores).
-  const TECNICOS_OBLIGATORIOS = [['ms-n-pasadas', 'Pasadas'], ['ms-n-altura', 'Altura felpa'],
-    ['ms-n-cuerpos', 'Nº de cuerpos'], ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
-  function faltanTecnicos() {
+  function faltanTecnicos(telar) {
+    const cfg = configTecnica(telar);
+    const tejeduria = [['ms-n-pasadas', 'Pasadas'], ['ms-n-altura', 'Altura felpa'],
+      ['ms-n-cuerpos', cfg.etiquetaN], ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
     const faltan = [];
-    TECNICOS_OBLIGATORIOS.forEach(([id, etiqueta]) => {
+    tejeduria.forEach(([id, etiqueta]) => {
       const el = $(id);
-      const vacio = !el.value.trim();
+      const vacio = cfg.tejeduria && !el.value.trim();
       el.classList.toggle('ms-falta', vacio);
       if (vacio) faltan.push(etiqueta);
     });
@@ -612,7 +620,11 @@
         if (vacio) incompletas++;
       });
     });
-    if (incompletas) faltan.push('las materias (cuerpo, materia, hilos púa y colorido)');
+    if (incompletas) {
+      const cols = [cfg.etiquetaCuerpo.toLowerCase(), 'materia']
+        .concat(cfg.hilosPua ? ['hilos púa'] : []).concat(['colorido']);
+      faltan.push(`las materias (${cols.join(', ')})`);
+    }
     return faltan;
   }
 
@@ -632,7 +644,7 @@
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
     const telarNuevo = $('ms-n-telar').value === '__otro__' ? '' : $('ms-n-telar').value;
     if (esTecnico(telarNuevo)) {
-      const faltan = faltanTecnicos();
+      const faltan = faltanTecnicos(telarNuevo);
       if (faltan.length) {
         $('ms-n-tecnica').scrollIntoView({ block: 'center', behavior: 'smooth' });
         return fallo(`Una muestra de ${telarNuevo} se da de alta con sus datos técnicos. Falta: ${faltan.join(', ')}. Si todavía no se sabe, escribe «Pdte».`);

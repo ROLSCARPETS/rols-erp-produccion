@@ -180,16 +180,20 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 6
+_VERSION_SCHEMA = 7
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
-TELARES_DEFAULT = ["Print", "Tufting", "Colortec", "Varilla", "Lancetas",
-                   "Raschel", "Pompón", "Kibby", "Rapier", "Festón"]
+TELARES_DEFAULT = ["Print", "Tufting Bucle", "Tufting Corte", "Colortec", "Varilla",
+                   "Lancetas", "Pompón", "Kibby", "Rapier", "Festón",
+                   # se conservan para el historico (retirados, ver abajo)
+                   "Tufting", "Raschel"]
 # Tecnicas que ya no se fabrican: siguen valiendo para el historico y para las
 # muestras que ya las llevan, pero no se ofrecen al dar de alta ni al cambiar
 # de telar. No se tocan los datos: es solo lo que ofrece la UI.
-TELARES_RETIRADOS = ("Raschel",)
+# Tufting se partio en dos telares (Bucle y Corte); el "Tufting" a secas se
+# queda solo para las muestras antiguas.
+TELARES_RETIRADOS = ("Raschel", "Tufting")
 
 
 def telares_para_alta(catalogo) -> list[str]:
@@ -205,21 +209,34 @@ def telares_para_alta(catalogo) -> list[str]:
 # "pendiente" existe para poder dar de alta una varilla sin saber aun la
 # construccion o el acabado (el alta los exige rellenos: lo que no se sabe se
 # deja como pendiente, igual que el "Pdte" de los campos de texto).
-# Telares que llevan datos tecnicos. Los campos son los mismos en los tres;
-# lo que cambia son las CONSTRUCCIONES (`pelo`) que ofrece cada uno, y que
-# Rapier no elige: siempre es tejido plano.
-TELARES_TECNICOS = ("Varilla", "Lancetas", "Rapier", "Colortec")
+# Telares que llevan datos tecnicos y en que se diferencian:
+#   tejeduria      → ensena el bloque de tejeduria (pasadas, felpa, n, construccion, acabado)
+#   pelos          → construcciones que ofrece; si solo hay una, NO se elige (la pone el servidor)
+#   etiqueta_n     → como se llama `n_cuerpos` en ese telar
+#   etiqueta_cuerpo→ como se llama la columna `cuerpo` de la tabla de materias
+#   hilos_pua      → si la tabla de materias lleva esa columna
 PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
                                               ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
                                               ("pendiente", "Pendiente"))
 PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("raya", "Raya"), ("bucle_sencillo", "Bucle sencillo"),
                                                ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
                                                ("pendiente", "Pendiente"))
-# Telares de construccion unica: no se elige, la pone el servidor
-PELOS_RAPIER: tuple[tuple[str, str], ...] = (("tejido_plano", "Tejido plano"),)
-PELOS_COLORTEC: tuple[tuple[str, str], ...] = (("corte", "Corte"),)
-PELOS_POR_TELAR = {"Varilla": PELOS_VARILLA, "Lancetas": PELOS_LANCETAS,
-                   "Rapier": PELOS_RAPIER, "Colortec": PELOS_COLORTEC}
+_TEC_BASE = {"tejeduria": True, "etiqueta_n": "Nº de cuerpos", "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True}
+TECNICOS_POR_TELAR: dict[str, dict] = {
+    "Varilla":       {**_TEC_BASE, "pelos": PELOS_VARILLA},
+    "Lancetas":      {**_TEC_BASE, "pelos": PELOS_LANCETAS},
+    "Rapier":        {**_TEC_BASE, "pelos": (("tejido_plano", "Tejido plano"),)},
+    "Colortec":      {**_TEC_BASE, "pelos": (("corte", "Corte"),)},
+    # Tufting: dos telares distintos, cada uno con su construccion fija, y los
+    # cuerpos se cuentan como colores.
+    "Tufting Bucle": {**_TEC_BASE, "pelos": (("bucle", "Bucle"),), "etiqueta_n": "Nº de colores"},
+    "Tufting Corte": {**_TEC_BASE, "pelos": (("corte", "Corte"),), "etiqueta_n": "Nº de colores"},
+    # Pompon: solo materias, por color y sin hilos por pua
+    "Pompón":        {"tejeduria": False, "pelos": (), "etiqueta_n": "Nº de colores",
+                      "etiqueta_cuerpo": "Color", "hilos_pua": False},
+}
+TELARES_TECNICOS = tuple(TECNICOS_POR_TELAR)
+PELOS_POR_TELAR = {t: cfg["pelos"] for t, cfg in TECNICOS_POR_TELAR.items() if cfg["pelos"]}
 # Union (en orden, sin repetir): vale para validar venga del telar que venga y
 # para traducir el slug a su etiqueta en la ficha y en el historial.
 PELOS: tuple[tuple[str, str], ...] = tuple(
@@ -234,23 +251,47 @@ CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "n_cuerpos", "pelo", "acabado")
 
 def _telar_tecnico(telar) -> str:
     """Nombre canonico del telar tecnico al que pertenece, o "" si no lleva
-    datos tecnicos ('Varilla 2' cuenta como Varilla)."""
+    datos tecnicos ('Varilla 2' cuenta como Varilla). Los nombres mas largos
+    se prueban antes ('Tufting Bucle' no puede quedar en 'Tufting')."""
     k = _clave(telar)
-    for t in TELARES_TECNICOS:
+    for t in sorted(TELARES_TECNICOS, key=len, reverse=True):
         if k.startswith(_clave(t)):
             return t
     return ""
 
 
+def config_tecnica(telar) -> dict:
+    """Como son los datos tecnicos de ese telar ({} si no lleva)."""
+    return TECNICOS_POR_TELAR.get(_telar_tecnico(telar), {})
+
+
 def pelos_de(telar) -> tuple[tuple[str, str], ...]:
     """Construcciones que ofrece ese telar (las de Varilla si no es tecnico)."""
-    return PELOS_POR_TELAR.get(_telar_tecnico(telar) or "Varilla", PELOS_VARILLA)
+    return config_tecnica(telar).get("pelos") or PELOS_VARILLA
 
 
 def pelo_fijo(telar) -> str:
     """Construccion unica del telar (Rapier: tejido plano); "" si se elige."""
-    ops = PELOS_POR_TELAR.get(_telar_tecnico(telar) or "")
-    return ops[0][0] if ops and len(ops) == 1 else ""
+    ops = config_tecnica(telar).get("pelos") or ()
+    return ops[0][0] if len(ops) == 1 else ""
+
+
+def etiqueta_n_cuerpos(telar) -> str:
+    """Como se llama `n_cuerpos` en ese telar (en Tufting, colores)."""
+    return config_tecnica(telar).get("etiqueta_n") or "Nº de cuerpos"
+
+
+def etiqueta_cuerpo(telar) -> str:
+    """Como se llama la columna `cuerpo` de las materias (en Pompón, Color)."""
+    return config_tecnica(telar).get("etiqueta_cuerpo") or "Cuerpo"
+
+
+def lleva_tejeduria(telar) -> bool:
+    return bool(config_tecnica(telar).get("tejeduria"))
+
+
+def lleva_hilos_pua(telar) -> bool:
+    return bool(config_tecnica(telar).get("hilos_pua"))
 
 # MATERIAS: una fila por cuerpo (que se teje con que). Sustituyen a los campos
 # planos `material` / `hilos_pua` (v6 los paso a una fila). Cada fila:
@@ -359,6 +400,8 @@ def cargar() -> dict:
                     _migrar_v5(data)
                 if v < 6:
                     _migrar_v6(data)
+                if v < 7:
+                    _migrar_v7(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -470,6 +513,15 @@ def _migrar_v6(data: dict) -> None:
         fila = {"id": _nuevo_id_apunte(), "cuerpo": "", "materia": mat,
                 "hilos_pua": hp, "colorido": ""}
         m["materias"] = [fila] + list(m.get("materias") or [])
+
+
+def _migrar_v7(data: dict) -> None:
+    """v6 → v7: Tufting se parte en «Tufting Bucle» y «Tufting Corte» (son dos
+    telares distintos). Los dos entran en el catalogo; el «Tufting» a secas se
+    queda para las muestras antiguas, que NO se tocan (no se puede saber cual
+    de los dos era). Idempotente."""
+    for t in ("Tufting Bucle", "Tufting Corte"):
+        _anadir_a_catalogo(data, "telares", t)
 
 
 def _personas_conocidas(data: dict, usuarios_one, usuario_actual) -> list[dict]:
@@ -995,6 +1047,10 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
         "pelos": [{"valor": s, "label": l} for s, l in PELOS],
         "pelos_por_telar": {t: [{"valor": s, "label": l} for s, l in ops]
                             for t, ops in PELOS_POR_TELAR.items()},
+        "tecnicos_por_telar": {t: {"tejeduria": cfg["tejeduria"], "etiqueta_n": cfg["etiqueta_n"],
+                                   "etiqueta_cuerpo": cfg["etiqueta_cuerpo"], "hilos_pua": cfg["hilos_pua"],
+                                   "pelos": [{"valor": s, "label": l} for s, l in cfg["pelos"]]}
+                               for t, cfg in TECNICOS_POR_TELAR.items()},
         "acabados": [{"valor": s, "label": l} for s, l in ACABADOS],
         "materiales": materiales,
         "coloridos": coloridos,
@@ -1236,24 +1292,26 @@ def _validar_materias(v, anteriores=None) -> tuple[list[dict] | None, str]:
     return filas, ""
 
 
-def _texto_materia(f: dict) -> str:
+def _texto_materia(f: dict, etiqueta: str = "Cuerpo", con_hilos: bool = True) -> str:
     """'Cuerpo 1: Lana 100 3/c (CREMA · 3 hilos/púa)' (solo lo relleno)."""
     if not _materia_util(f):
         return ""
     mat = (f.get("materia") or "").strip()
     col = (f.get("colorido") or "").strip()
-    hp = (f.get("hilos_pua") or "").strip()
+    hp = (f.get("hilos_pua") or "").strip() if con_hilos else ""
     entre = [x for x in (col, (hp if "hilo" in hp.lower() else f"{hp} hilos/púa") if hp else "") if x]
     txt = mat or "—"
     if entre:
         txt += " (" + " · ".join(entre) + ")"
     cuerpo = (f.get("cuerpo") or "").strip()
-    return f"Cuerpo {cuerpo}: {txt}" if cuerpo else txt
+    return f"{etiqueta} {cuerpo}: {txt}" if cuerpo else txt
 
 
-def resumen_materias(filas, maximo: int | None = 4) -> str:
+def resumen_materias(filas, maximo: int | None = 4, telar=None) -> str:
     """Las materias en una linea: fila + fila + …"""
-    txt = [t for t in (_texto_materia(f) for f in (filas or [])) if t]
+    et = etiqueta_cuerpo(telar) if telar else "Cuerpo"
+    hilos = lleva_hilos_pua(telar) if telar else True
+    txt = [t for t in (_texto_materia(f, et, hilos) for f in (filas or [])) if t]
     if not txt:
         return ""
     if maximo and len(txt) > maximo:
@@ -1270,10 +1328,13 @@ def resumen_tecnico(m: dict) -> str:
     Látex' (solo lo relleno y solo si el telar es de varilla)."""
     if not _es_telar_tecnico(m.get("telar")):
         return ""
+    telar = m.get("telar")
     partes = []
-    mat = resumen_materias(m.get("materias"))
+    mat = resumen_materias(m.get("materias"), telar=telar)
     if mat:
         partes.append(mat)
+    if not lleva_tejeduria(telar):
+        return " · ".join(partes)
     pas = (m.get("pasadas") or "").strip()
     if pas:
         partes.append(pas if "pasada" in pas.lower() else f"{pas} pasadas")
@@ -1282,7 +1343,9 @@ def resumen_tecnico(m: dict) -> str:
         partes.append(alt if "felpa" in alt.lower() else f"felpa {alt}")
     cu = (m.get("n_cuerpos") or "").strip()
     if cu:
-        partes.append(cu if "cuerpo" in cu.lower() else f"{cu} cuerpos")
+        # "2 cuerpos" o, en Tufting, "2 colores"
+        palabra = "colores" if "color" in etiqueta_n_cuerpos(telar).lower() else "cuerpos"
+        partes.append(cu if palabra[:-2] in cu.lower() else f"{cu} {palabra}")
     pelo = pelo_fijo(m.get("telar")) or m.get("pelo")
     if pelo:
         partes.append(PELOS_LABEL.get(pelo, pelo))
@@ -1548,7 +1611,8 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
         if cambios:
             for k, de, a in cambios:
                 if k == "materias":
-                    de, a = resumen_materias(de, None), resumen_materias(a, None)
+                    de = resumen_materias(de, None, m.get("telar"))
+                    a = resumen_materias(a, None, m.get("telar"))
                 _historial(m, usuario, "campo", campo=k,
                            de=_recortar(str(de) if de is not None else "", 80),
                            a=_recortar(str(a) if a is not None else "", 80))

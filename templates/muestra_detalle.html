@@ -152,7 +152,8 @@
         <!-- Datos técnicos: solo cuando el telar es de varilla -->
         <div class="ms-tecnica" id="md-tecnica" hidden>
           <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint" id="md-tecnica-telar">telar de varilla</span></div>
-          <!-- Tejeduría: cómo se teje -->
+          <!-- Tejeduría: cómo se teje (Pompón no lleva, solo materias) -->
+          <div id="md-tejeduria">
           <div class="ms-tecnica-sub">Datos de tejeduría</div>
           <div class="ms-campo-row tres">
             <div class="ms-campo">
@@ -164,7 +165,7 @@
               <input type="text" id="md-f-altura" data-campo="altura_felpa" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" />
             </div>
             <div class="ms-campo">
-              <label for="md-f-cuerpos">Nº de cuerpos</label>
+              <label for="md-f-cuerpos" id="md-f-cuerpos-lbl">Nº de cuerpos</label>
               <input type="text" id="md-f-cuerpos" data-campo="n_cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" />
             </div>
           </div>
@@ -182,6 +183,7 @@
                 <option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option><option value="pendiente">Pendiente</option>
               </select>
             </div>
+          </div>
           </div>
           <!-- Materias: una fila por cuerpo (se guardan solas, como el resto) -->
           <div class="ms-tecnica-sub">Datos de materias</div>

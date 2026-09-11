@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v5). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v7). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -81,7 +81,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   referencia). v5 rellenó a mano la referencia de las que estaban en curso
   (`_REFERENCIAS_V5`).
 - **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
-  **Rapier** y **Colortec**), en dos bloques en la UI:
+  **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte** y **Pompón**),
+  en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
   cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
   sin_aprestar | resina | latex_resina | pendiente) y
@@ -91,11 +92,18 @@ laboratorio pueda llevar las muestras sin ver costes.
   cambia, se conservan). Las **construcciones** dependen del telar
   (`PELOS_POR_TELAR` / `MS.PELOS_POR_TELAR`): Varilla (corte, bucle,
   corte_bucle, estructurado, pendiente), Lancetas (raya, bucle_sencillo,
-  tejido_plano, bucle_saltillo, pendiente). Rapier y Colortec **no eligen**:
-  son siempre `tejido_plano` y `corte` (`pelo_fijo()` la pone al crear y al
-  cambiar a ese telar, y la UI enseña el valor fijo en vez del selector).
-  `pelo` se valida contra la unión de todas, así que cambiar de telar nunca
-  deja un valor no válido.
+  tejido_plano, bucle_saltillo, pendiente). Rapier, Colortec y los dos Tufting
+  **no eligen**: son siempre `tejido_plano`, `corte`, `bucle` y `corte`
+  (`pelo_fijo()` la pone al crear y al cambiar a ese telar, y la UI enseña el
+  valor fijo en vez del selector). `pelo` se valida contra la unión de todas,
+  así que cambiar de telar nunca deja un valor no válido.
+  Toda la configuración va en **`TECNICOS_POR_TELAR`** (espejo en
+  `MS.TECNICOS_POR_TELAR`), que además dice: `tejeduria` (Pompón la lleva a
+  False: solo materias), `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
+  "Nº de colores"), `etiqueta_cuerpo` (en Pompón, la columna de la tabla de
+  materias es "Color") y `hilos_pua` (Pompón no lleva esa columna). Helpers:
+  `config_tecnica`, `etiqueta_n_cuerpos`, `etiqueta_cuerpo`, `lleva_tejeduria`,
+  `lleva_hilos_pua`; el endpoint de catálogos lo sirve en `tecnicos_por_telar`.
   La tabla de materias se guarda **entera** en cada cambio (`PUT` con
   `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
   nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`
@@ -108,7 +116,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   Acabado está la opción «Pendiente». Es un control del modal de alta (marca en
   rojo lo que falte); el backend no lo exige, para no romper las variantes
   (se crean desde la ficha copiando cliente y telar) ni el histórico.
-- **Técnicas retiradas** (`TELARES_RETIRADOS`: Raschel): siguen en el
+- **Técnicas retiradas** (`TELARES_RETIRADOS`: Raschel y el **Tufting** a
+  secas, que v7 partió en «Tufting Bucle» y «Tufting Corte» — las muestras
+  antiguas se quedan como estaban, no se puede saber cuál de los dos era):
+  siguen en el
   histórico, en los filtros y en las muestras que ya las llevan, pero no se
   ofrecen al dar de alta ni en el selector de la ficha
   (`catalogos.telares_alta` = el catálogo sin ellas; `telares` sigue completo

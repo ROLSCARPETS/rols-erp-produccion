@@ -289,13 +289,13 @@
       <div class="full ms-n-tecnica" id="ms-n-tecnica" hidden>
         <div class="ms-tecnica-title">Datos técnicos <span class="ms-hint" id="ms-n-tecnica-telar">telar de varilla</span></div>
         <div class="ms-form-grid ms-form-grid-inner">
-          <div class="full ms-tecnica-sub">Datos de tejeduría</div>
-          <div class="c2"><label>Pasadas</label><input type="text" id="ms-n-pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" /></div>
-          <div class="c2"><label>Altura felpa</label><input type="text" id="ms-n-altura" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" /></div>
-          <div class="c2"><label>Nº de cuerpos</label><input type="text" id="ms-n-cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></div>
-          <div class="c3"><label>Construcción</label><select id="ms-n-pelo"></select><div class="ms-readonly" id="ms-n-pelo-fijo" hidden></div></div>
-          <div class="c3"><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option><option value="pendiente">Pendiente</option></select></div>
-          <div class="full ms-tecnica-sub">Datos de materias <span class="ms-hint">una fila por cuerpo</span></div>
+          <div class="full ms-tecnica-sub tejeduria">Datos de tejeduría</div>
+          <div class="c2 tejeduria"><label>Pasadas</label><input type="text" id="ms-n-pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" /></div>
+          <div class="c2 tejeduria"><label>Altura felpa</label><input type="text" id="ms-n-altura" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" /></div>
+          <div class="c2 tejeduria"><label id="ms-n-cuerpos-lbl">Nº de cuerpos</label><input type="text" id="ms-n-cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></div>
+          <div class="c3 tejeduria"><label>Construcción</label><select id="ms-n-pelo"></select><div class="ms-readonly" id="ms-n-pelo-fijo" hidden></div></div>
+          <div class="c3 tejeduria"><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option><option value="pendiente">Pendiente</option></select></div>
+          <div class="full ms-tecnica-sub" id="ms-n-materias-sub">Datos de materias <span class="ms-hint">una fila por cuerpo</span></div>
           <div class="full" id="ms-n-materias"></div>
           <datalist id="ms-materiales"></datalist>
           <datalist id="ms-coloridos"></datalist>

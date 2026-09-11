@@ -62,27 +62,48 @@
   // Telar de varilla: manda en el flujo de etapas (las de diseño por delante)
   function esVarilla(telar) { return (telar || '').trim().toLowerCase().startsWith('varilla'); }
 
-  // Telares con datos técnicos. Los campos son los mismos en los tres; cambian
-  // las CONSTRUCCIONES que ofrece cada uno, y Rapier no elige: tejido plano.
-  const PELOS_POR_TELAR = {
-    Varilla: [['corte', 'Corte'], ['bucle', 'Bucle'], ['corte_bucle', 'Corte y bucle'],
-      ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']],
-    Lancetas: [['raya', 'Raya'], ['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
-      ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']],
-    Rapier: [['tejido_plano', 'Tejido plano']],     // fijo: no se elige
-    Colortec: [['corte', 'Corte']],                 // fijo: no se elige
+  // Telares con datos técnicos y en qué se diferencian (espejo de
+  // TECNICOS_POR_TELAR en muestras_fabricadas.py):
+  //   tejeduria      → enseña el bloque de tejeduría
+  //   pelos          → construcciones; si solo hay una, NO se elige
+  //   etiquetaN      → cómo se llama `n_cuerpos` en ese telar
+  //   etiquetaCuerpo → cómo se llama la columna `cuerpo` de las materias
+  //   hilosPua       → si la tabla de materias lleva esa columna
+  const PELOS_VARILLA = [['corte', 'Corte'], ['bucle', 'Bucle'], ['corte_bucle', 'Corte y bucle'],
+    ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']];
+  const PELOS_LANCETAS = [['raya', 'Raya'], ['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
+    ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']];
+  const TEC_BASE = { tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true };
+  const TECNICOS_POR_TELAR = {
+    'Varilla': Object.assign({}, TEC_BASE, { pelos: PELOS_VARILLA }),
+    'Lancetas': Object.assign({}, TEC_BASE, { pelos: PELOS_LANCETAS }),
+    'Rapier': Object.assign({}, TEC_BASE, { pelos: [['tejido_plano', 'Tejido plano']] }),
+    'Colortec': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']] }),
+    // Tufting son dos telares distintos; los cuerpos se cuentan como colores
+    'Tufting Bucle': Object.assign({}, TEC_BASE, { pelos: [['bucle', 'Bucle']], etiquetaN: 'Nº de colores' }),
+    'Tufting Corte': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']], etiquetaN: 'Nº de colores' }),
+    // Pompón: solo materias, por color y sin hilos por púa
+    'Pompón': { tejeduria: false, pelos: [], etiquetaN: 'Nº de colores', etiquetaCuerpo: 'Color', hilosPua: false },
   };
-  const PELO_LABEL = Object.fromEntries([].concat(...Object.values(PELOS_POR_TELAR)));
+  const PELO_LABEL = Object.fromEntries([].concat(...Object.values(TECNICOS_POR_TELAR).map(c => c.pelos)));
+  const sinAcentos = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  // los nombres largos primero: "Tufting Bucle" no puede quedarse en "Tufting"
+  const TELARES_TECNICOS = Object.keys(TECNICOS_POR_TELAR).sort((a, b) => b.length - a.length);
   function telarTecnico(telar) {
-    const k = String(telar || '').trim().toLowerCase();
-    return Object.keys(PELOS_POR_TELAR).find(t => k.startsWith(t.toLowerCase())) || '';
+    const k = sinAcentos(telar);
+    return TELARES_TECNICOS.find(t => k.startsWith(sinAcentos(t))) || '';
   }
   function esTecnico(telar) { return !!telarTecnico(telar); }
-  function pelosDe(telar) { return PELOS_POR_TELAR[telarTecnico(telar) || 'Varilla']; }
-  // Construcción única del telar (Rapier) → [valor, etiqueta]; null si se elige
+  function configTecnica(telar) { return TECNICOS_POR_TELAR[telarTecnico(telar)] || TEC_BASE; }
+  function pelosDe(telar) {
+    const p = configTecnica(telar).pelos;
+    return (p && p.length) ? p : PELOS_VARILLA;
+  }
+  // Construcción única del telar (Rapier, Colortec, los dos Tufting) →
+  // [valor, etiqueta]; null si se elige
   function peloFijo(telar) {
-    const ops = PELOS_POR_TELAR[telarTecnico(telar)] || [];
-    return ops.length === 1 ? ops[0] : null;
+    const p = configTecnica(telar).pelos || [];
+    return p.length === 1 ? p[0] : null;
   }
   // Pinta el <select> de construcción del telar; con telar de construcción
   // única lo deja con ese valor, oculto, y enseña el texto fijo de al lado.
@@ -321,28 +342,40 @@
     }));
   }
   // opts: { listaMateriales, listaColoridos (ids de <datalist>), onCambio(filas, input), minimo }
+  // opts: { listaMateriales, listaColoridos (ids de <datalist>), onCambio(filas, input),
+  //         minimo, etiquetaCuerpo, conHilos }.  `configurar` cambia las columnas
+  //  cuando cambia el telar (Pompón: Color y sin hilos púa).
   function montarTablaMaterias(root, opts) {
     const o = opts || {};
     const minimo = o.minimo === undefined ? 1 : o.minimo;
+    let cfg = { etiquetaCuerpo: o.etiquetaCuerpo || 'Cuerpo', conHilos: o.conHilos !== false };
     let filas = [];
     root.classList.add('ms-materias');
     root.innerHTML =
-      // "Cuerpo" a secas: "Nº de cuerpo" no cabe en la columna (va en el título del campo)
-      '<div class="ms-materias-cab"><span title="Nº de cuerpo">Cuerpo</span><span>Materia</span><span>Hilos púa</span><span>Colorido</span><span></span></div>' +
+      '<div class="ms-materias-cab"></div>' +
       '<div class="ms-materias-filas"></div>' +
       '<div class="ms-materias-pie"><button type="button" class="ms-link ms-materias-add">+ Añadir materia</button>' +
       '<span class="ms-materias-hint"></span></div>';
+    const cab = root.querySelector('.ms-materias-cab');
     const cont = root.querySelector('.ms-materias-filas');
     const btnAdd = root.querySelector('.ms-materias-add');
     const hint = root.querySelector('.ms-materias-hint');
     const lm = o.listaMateriales ? ` list="${esc(o.listaMateriales)}"` : '';
     const lc = o.listaColoridos ? ` list="${esc(o.listaColoridos)}"` : '';
+    const vacia = () => ({ cuerpo: '', materia: '', hilos_pua: '', colorido: '' });
 
+    function pintarCab() {
+      // "Cuerpo" a secas: "Nº de cuerpo" no cabe en la columna (va en el título del campo)
+      const cols = [cfg.etiquetaCuerpo, 'Materia'].concat(cfg.conHilos ? ['Hilos púa'] : []).concat(['Colorido', '']);
+      cab.innerHTML = cols.map(c => `<span>${esc(c)}</span>`).join('');
+      root.classList.toggle('sin-hilos', !cfg.conHilos);
+    }
     function htmlFila(f, i) {
+      const et = esc(cfg.etiquetaCuerpo);
       return `<div class="ms-materia">` +
-        `<input type="text" class="cuerpo" maxlength="20" value="${esc(f.cuerpo || '')}" placeholder="${i + 1}" title="Nº de cuerpo" aria-label="Nº de cuerpo" autocomplete="off" />` +
+        `<input type="text" class="cuerpo" maxlength="20" value="${esc(f.cuerpo || '')}" placeholder="${i + 1}" title="${et}" aria-label="${et}" autocomplete="off" />` +
         `<input type="text" class="materia" maxlength="200" value="${esc(f.materia || '')}" placeholder="Ej. Lana 100 3/c" title="Materia" aria-label="Materia" autocomplete="off"${lm} />` +
-        `<input type="text" class="hilos" maxlength="40" value="${esc(f.hilos_pua || '')}" placeholder="Ej. 3" title="Hilos púa" aria-label="Hilos púa" autocomplete="off" />` +
+        (cfg.conHilos ? `<input type="text" class="hilos" maxlength="40" value="${esc(f.hilos_pua || '')}" placeholder="Ej. 3" title="Hilos púa" aria-label="Hilos púa" autocomplete="off" />` : '') +
         `<input type="text" class="colorido" maxlength="120" value="${esc(f.colorido || '')}" placeholder="Ej. CREMA" title="Colorido" aria-label="Colorido" autocomplete="off"${lc} />` +
         `<button type="button" class="ms-materia-x" title="Quitar esta materia" aria-label="Quitar esta materia">×</button></div>`;
     }
@@ -352,14 +385,26 @@
       hint.textContent = filas.length >= MAX_MATERIAS ? `máximo ${MAX_MATERIAS} materias` : '';
     }
     function leer() {
-      return [...cont.querySelectorAll('.ms-materia')].map(d => ({
-        cuerpo: d.querySelector('.cuerpo').value, materia: d.querySelector('.materia').value,
-        hilos_pua: d.querySelector('.hilos').value, colorido: d.querySelector('.colorido').value,
-      }));
+      return [...cont.querySelectorAll('.ms-materia')].map((d, i) => {
+        const h = d.querySelector('.hilos');
+        return {
+          cuerpo: d.querySelector('.cuerpo').value, materia: d.querySelector('.materia').value,
+          // sin columna de hilos púa (Pompón) se conserva lo que hubiera
+          hilos_pua: h ? h.value : ((filas[i] || {}).hilos_pua || ''),
+          colorido: d.querySelector('.colorido').value,
+        };
+      });
     }
     function pintar(nuevas) {
-      filas = (nuevas || []).map(f => ({ cuerpo: f.cuerpo || '', materia: f.materia || '', hilos_pua: f.hilos_pua || '', colorido: f.colorido || '' }));
-      while (filas.length < minimo) filas.push({ cuerpo: '', materia: '', hilos_pua: '', colorido: '' });
+      filas = (nuevas || []).map(f => Object.assign(vacia(), {
+        cuerpo: f.cuerpo || '', materia: f.materia || '', hilos_pua: f.hilos_pua || '', colorido: f.colorido || '' }));
+      while (filas.length < minimo) filas.push(vacia());
+      repintar();
+    }
+    function configurar(nuevo) {
+      if (cont.querySelector('.ms-materia')) filas = leer();
+      cfg = Object.assign({}, cfg, nuevo || {});
+      pintarCab();
       repintar();
     }
     cont.addEventListener('change', (e) => {
@@ -373,21 +418,22 @@
       const i = [...cont.querySelectorAll('.ms-materia')].indexOf(b.closest('.ms-materia'));
       filas = leer();
       filas.splice(i, 1);
-      while (filas.length < minimo) filas.push({ cuerpo: '', materia: '', hilos_pua: '', colorido: '' });
+      while (filas.length < minimo) filas.push(vacia());
       repintar();
       if (o.onCambio) o.onCambio(filas, null);
     });
     btnAdd.addEventListener('click', () => {
       filas = leer();
       if (filas.length >= MAX_MATERIAS) return;
-      // el nº de cuerpo se propone (1, 2, 3…); la fila no se guarda hasta que diga algo de la materia
-      filas.push({ cuerpo: String(filas.length + 1), materia: '', hilos_pua: '', colorido: '' });
+      // el nº se propone (1, 2, 3…); la fila no se guarda hasta que diga algo de la materia
+      filas.push(Object.assign(vacia(), { cuerpo: String(filas.length + 1) }));
       repintar();
       const ult = cont.querySelector('.ms-materia:last-child .materia');
       if (ult) ult.focus();
     });
+    pintarCab();
     pintar([]);
-    return { pintar, leer, utiles: () => materiasUtiles(leer()) };
+    return { pintar, leer, utiles: () => materiasUtiles(leer()), configurar };
   }
 
   // Al elegir "Otro…" en un select de catálogo: pide el valor, lo guarda y lo selecciona.
@@ -409,7 +455,7 @@
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_VARILLA, esPrint, flujoDe, flujoQueContiene, etiquetaEstado,
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esVarilla,
-    PELOS_POR_TELAR, PELO_LABEL, esTecnico, pelosDe, peloFijo, pintarConstruccion,
+    TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, gestionarOtro, montarBuscadorCliente,
     materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
 })();
