@@ -26,9 +26,12 @@
   const FLUJO_PRINT = ['por_empezar', 'en_diseno', 'revision_diseno', 'terminada'];
   const FLUJO_VARILLA = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno', 'diseno_listo',
     'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
+  // Colortec: las etapas de diseño por delante del textil, como Varilla pero sin «Diseño listo»
+  const FLUJO_COLORTEC = ['por_empezar', 'listo_diseno', 'en_diseno', 'revision_diseno',
+    'en_hilatura', 'en_tintoreria', 'bobinando', 'esperando_telar', 'en_telar', 'en_aprestos', 'terminada'];
   // Pompones y festones no se tejen: tintorería, revisar el color a la vuelta y listo
   const FLUJO_POMPON = ['por_empezar', 'en_tintoreria', 'revisar_color', 'terminada'];
-  const FLUJOS_PROPIOS = { 'Print': FLUJO_PRINT, 'Varilla': FLUJO_VARILLA,
+  const FLUJOS_PROPIOS = { 'Print': FLUJO_PRINT, 'Varilla': FLUJO_VARILLA, 'Colortec': FLUJO_COLORTEC,
     'Pompón': FLUJO_POMPON, 'Festón': FLUJO_POMPON };
   const ETIQUETAS_PRINT = { por_empezar: 'Listo para empezar diseño' };
   const esPrint = (telar) => String(telar || '').trim().toLowerCase() === 'print';

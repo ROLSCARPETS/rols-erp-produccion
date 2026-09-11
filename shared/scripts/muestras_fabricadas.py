@@ -104,10 +104,15 @@ ETIQUETAS_PRINT = {"por_empezar": "Listo para empezar diseño"}
 FLUJO_VARILLA = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno", "diseno_listo",
                  "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
                  "en_aprestos", "terminada")
+# COLORTEC lleva las etapas de diseno por delante del flujo textil, como
+# Varilla pero sin «Diseño listo».
+FLUJO_COLORTEC = ("por_empezar", "listo_diseno", "en_diseno", "revision_diseno",
+                  "en_hilatura", "en_tintoreria", "bobinando", "esperando_telar", "en_telar",
+                  "en_aprestos", "terminada")
 # Los POMPONES y los FESTONES no se tejen: van a tintoreria, se revisa el
 # color a la vuelta y se terminan.
 FLUJO_POMPON = ("por_empezar", "en_tintoreria", "revisar_color", "terminada")
-FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA,
+FLUJOS_PROPIOS = {"Print": FLUJO_PRINT, "Varilla": FLUJO_VARILLA, "Colortec": FLUJO_COLORTEC,
                   "Pompón": FLUJO_POMPON, "Festón": FLUJO_POMPON}
 # Etapas que solo existen en un flujo propio (no en el textil): el backend las
 # rechaza para las tecnicas cuyo flujo no las recorre.
