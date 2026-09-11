@@ -141,9 +141,17 @@ laboratorio pueda llevar las muestras sin ver costes.
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
   del próximo hito (`hito_avisado` evita repetir). No se avisa a quien hace el
   cambio, salvo en los `HITOS_CLAVE` («Listo para revisión diseño», que pide
-  marcar la Verificación de diseño, y «Terminada»), que avisan siempre; y al **crear** una muestra,
-  resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`) y a
-  quien la crea (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
+  marcar la Verificación de diseño, y «Terminada»), que avisan siempre. Las
+  **etapas de diseño** suman destinatarios (sale un único correo con todos):
+  «Listo para empezar diseño» (`listo_diseno` de Varilla y el `por_empezar` de
+  Print, `listo_para_disenar()`) al buzón de diseño
+  (`ROLS_MUESTRAS_DISENO_EMAIL`, por defecto `diseno@rolscarpets.com`, sin eñe
+  a propósito: una ñ en la parte local exige SMTPUTF8); «Listo para revisión
+  diseño» también a quien **creó** la muestra (`creado_por`); «Diseño listo» al
+  buzón del laboratorio. Y al **crear** una muestra,
+  resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`), a
+  quien la crea y, si nace lista para empezar diseño (una Print), a diseño
+  (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
   chequeo de hitos corre en segundo plano como mucho cada 15 min desde

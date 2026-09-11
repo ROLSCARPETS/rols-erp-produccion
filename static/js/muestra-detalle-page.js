@@ -673,7 +673,7 @@
     }
     if (t === 'archivo') return h.a === 'archivada' ? 'Archivada (fuera de En curso)' : 'Devuelta a En curso';
     if (t === 'aviso') {
-      const motivos = { estado: 'cambio de etapa', terminada: 'terminada', cancelada: 'cancelada', revision_diseno: 'listo para revisión de diseño', hito: 'próximo hito', nueva: 'alta de la muestra' };
+      const motivos = { estado: 'cambio de etapa', terminada: 'terminada', cancelada: 'cancelada', listo_diseno: 'listo para empezar diseño', revision_diseno: 'listo para revisión de diseño', diseno_listo: 'diseño listo', hito: 'próximo hito', nueva: 'alta de la muestra' };
       const por = motivos[h.motivo] || h.motivo || '';
       return h.ok
         ? `Aviso por correo a ${esc(h.a)} (${esc(por)})`
