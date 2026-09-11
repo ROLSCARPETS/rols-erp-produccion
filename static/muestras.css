@@ -292,7 +292,6 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-av-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: #4d4d4d; cursor: pointer; margin: 0; }
 .ms-av-check input { width: 15px; height: 15px; accent-color: var(--accent-hover); margin: 0; }
 .ms-av-check input:disabled + span { color: #9a9a9a; }
-.ms-av-cambiado { display: inline-block; margin-left: 0.35rem; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #8a6d3b; background: var(--accent-soft); border-radius: 4px; padding: 0.1rem 0.3rem; vertical-align: middle; }
 .ms-avisos-estado code { background: #f1ece4; border-radius: 4px; padding: 0 0.3rem; font-size: 0.78rem; }
 
 /* ---------- Ficha ---------- */

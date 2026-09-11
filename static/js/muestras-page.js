@@ -471,7 +471,7 @@
       const opciones = MODOS.map(([v, l]) =>
         `<option value="${v}" ${c.encargada === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
       return `<tr data-clave="${esc(f.clave)}">
-        <td>${etiqueta}${filaCambiada(f.clave) ? '<span class="ms-av-cambiado" title="Cambiado respecto al valor de fábrica">cambiado</span>' : ''}
+        <td>${etiqueta}
           ${f.nota ? `<div class="ms-hint">${esc(f.nota)}</div>` : ''}</td>
         <td><select class="ms-av-campo" data-campo="encargada"${off}>${opciones}</select></td>
         <td><label class="ms-av-check"><input type="checkbox" class="ms-av-campo" data-campo="creador" ${c.creador ? 'checked' : ''}${off} /><span>Avisar</span></label></td>
@@ -498,14 +498,9 @@
       el.classList.remove('saving');
       el.classList.add('saved-ok');
       setTimeout(() => el.classList.remove('saved-ok'), 1400);
-      // la marca de "cambiado" y el botón de fábrica dependen de la fila entera
       const c = AVISOS.config[clave] || {};
       if (campo === 'buzones') el.value = (c.buzones || []).join(', ');
-      tr.querySelector('.ms-av-cambiado')?.remove();
-      if (filaCambiada(clave)) {
-        tr.querySelector('td').insertAdjacentHTML('afterbegin',
-          '<span class="ms-av-cambiado" title="Cambiado respecto al valor de fábrica">cambiado</span>');
-      }
+      // el botón de fábrica sale si alguna fila ya no está como venía
       $('an-avisos-reset').hidden = !AVISOS.filas.some(f => filaCambiada(f.clave));
     } catch (e) {
       el.classList.remove('saving');
