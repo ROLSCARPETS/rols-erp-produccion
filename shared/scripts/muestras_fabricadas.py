@@ -218,7 +218,7 @@ def telares_para_alta(catalogo) -> list[str]:
 PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
                                               ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
                                               ("pendiente", "Pendiente"))
-PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("raya", "Raya"), ("bucle_sencillo", "Bucle sencillo"),
+PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("bucle_sencillo", "Bucle sencillo"),
                                                ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
                                                ("pendiente", "Pendiente"))
 _TEC_BASE = {"tejeduria": True, "etiqueta_n": "Nº de cuerpos", "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True}

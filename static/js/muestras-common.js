@@ -71,7 +71,7 @@
   //   hilosPua       → si la tabla de materias lleva esa columna
   const PELOS_VARILLA = [['corte', 'Corte'], ['bucle', 'Bucle'], ['corte_bucle', 'Corte y bucle'],
     ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']];
-  const PELOS_LANCETAS = [['raya', 'Raya'], ['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
+  const PELOS_LANCETAS = [['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
     ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']];
   const TEC_BASE = { tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true };
   const TECNICOS_POR_TELAR = {

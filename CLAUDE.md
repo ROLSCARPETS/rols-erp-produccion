@@ -91,7 +91,7 @@ laboratorio pueda llevar las muestras sin ver costes.
   La ficha y el alta los enseñan solo si el telar es de los técnicos (si
   cambia, se conservan). Las **construcciones** dependen del telar
   (`PELOS_POR_TELAR` / `MS.PELOS_POR_TELAR`): Varilla (corte, bucle,
-  corte_bucle, estructurado, pendiente), Lancetas (raya, bucle_sencillo,
+  corte_bucle, estructurado, pendiente), Lancetas (bucle_sencillo,
   tejido_plano, bucle_saltillo, pendiente). Rapier, Colortec y los dos Tufting
   **no eligen**: son siempre `tejido_plano`, `corte`, `bucle` y `corte`
   (`pelo_fijo()` la pone al crear y al cambiar a ese telar, y la UI enseña el
