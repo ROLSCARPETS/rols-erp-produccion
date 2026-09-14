@@ -178,7 +178,7 @@ PRIORIDADES = {1: "Alta", 2: "Media", 3: "Baja"}
 # Muestra para un cliente o desarrollo propio (lo que el libro apuntaba como
 # "INTERNA ( NANDO )", "MOQUETAS ROLS", "ROLS (PACO)"...).
 TIPOS = ("cliente", "interna")
-_VERSION_SCHEMA = 10
+_VERSION_SCHEMA = 11
 
 # "Solo diseño" y "Escala" del libro antiguo se unificaron en Print y Rapier
 # (sept 2026); normalizar_telar los sigue reconociendo como alias.
@@ -259,7 +259,7 @@ PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
 # En la muestra se queda lo que comparten todas las piezas (como se monta el
 # telar); lo que cambia de una pieza a otra va en la pieza (ver CAMPOS_PIEZA).
-CAMPOS_TECNICOS = ("pasadas", "pelo", "acabado")
+CAMPOS_TECNICOS = ("pelo", "acabado")
 
 
 def _telar_tecnico(telar) -> str:
@@ -348,11 +348,12 @@ MAX_MATERIAS = 12
 # v10 convirtio en la pieza 1 lo que hasta entonces iba plano en la muestra.
 #   {id, nombre, altura_felpa, gramaje, n_cuerpos, ancho, largo, resultado,
 #    materias: [...]}
-CAMPOS_PIEZA = ("nombre", "altura_felpa", "gramaje", "n_cuerpos", "ancho", "largo", "resultado")
-_MAX_PIEZA = {"nombre": 120, "altura_felpa": 40, "gramaje": 40, "n_cuerpos": 40,
+CAMPOS_PIEZA = ("nombre", "pasadas", "altura_felpa", "gramaje", "n_cuerpos",
+                "ancho", "largo", "resultado")
+_MAX_PIEZA = {"nombre": 120, "pasadas": 40, "altura_felpa": 40, "gramaje": 40, "n_cuerpos": 40,
               "ancho": 40, "largo": 40, "resultado": 300}
 # Los que el alta manda sueltos (son de la pieza 1, no de la muestra)
-CAMPOS_PIEZA_LEGACY = ("altura_felpa", "gramaje", "n_cuerpos", "ancho", "largo")
+CAMPOS_PIEZA_LEGACY = ("pasadas", "altura_felpa", "gramaje", "n_cuerpos", "ancho", "largo")
 MAX_PIEZAS = 12
 
 
@@ -467,6 +468,8 @@ def cargar() -> dict:
                     _migrar_v9(data)
                 if v < 10:
                     _migrar_v10(data)
+                if v < 11:
+                    _migrar_v11(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
     return data
@@ -596,6 +599,23 @@ def _migrar_v10(data: dict) -> None:
             continue
         m["piezas"] = [{"id": _nuevo_id_apunte(), "nombre": "", **plano,
                         "resultado": "", "materias": materias}]
+
+
+def _migrar_v11(data: dict) -> None:
+    """v10 → v11: las pasadas tambien son de la pieza (dos alturas suelen ir a
+    distinta pasada). El valor que tuviera la muestra se copia a las piezas que
+    no lo traigan y el campo plano desaparece. Idempotente."""
+    for m in data.get("muestras", []):
+        pas = (m.pop("pasadas", "") or "").strip()
+        if not pas:
+            continue
+        for p in (m.get("piezas") or []):
+            if not (p.get("pasadas") or "").strip():
+                p["pasadas"] = pas
+        if not m.get("piezas"):
+            m["piezas"] = [{"id": _nuevo_id_apunte(), "nombre": "", "pasadas": pas,
+                            "altura_felpa": "", "gramaje": "", "n_cuerpos": "",
+                            "ancho": "", "largo": "", "resultado": "", "materias": []}]
 
 
 def _migrar_v7(data: dict) -> None:
@@ -1485,6 +1505,9 @@ def resumen_pieza(p: dict, telar=None, con_materias: bool = True) -> str:
             partes.append(mat)
     if not lleva_tejeduria(telar):
         return " · ".join(partes)
+    pas = (p.get("pasadas") or "").strip()
+    if pas:
+        partes.append(pas if "pasada" in pas.lower() else f"{pas} pasadas")
     alt = (p.get("altura_felpa") or "").strip()
     if alt:
         partes.append(alt if "felpa" in alt.lower() else f"felpa {alt}")
@@ -1532,9 +1555,6 @@ def resumen_tecnico(m: dict) -> str:
         partes.append(piezas)
     if not lleva_tejeduria(telar):
         return " · ".join(partes)
-    pas = (m.get("pasadas") or "").strip()
-    if pas:
-        partes.append(pas if "pasada" in pas.lower() else f"{pas} pasadas")
     pelo = pelo_fijo(telar) or m.get("pelo")
     if pelo:
         partes.append(PELOS_LABEL.get(pelo, pelo))

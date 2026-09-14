@@ -222,7 +222,6 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
     # Lo que comparten todas las piezas: como se monta el telar
     if mf.lleva_tejeduria(telar):
         seccion("DATOS DE TEJEDURÍA", [tabla_datos([
-            ("Pasadas", m.get("pasadas")),
             ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
             ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado"))),
         ])])
@@ -233,6 +232,7 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
     for i, pz in enumerate(piezas, 1):
         bloque, datos = [], []
         if mf.lleva_tejeduria(telar):
+            datos.append(("Pasadas", pz.get("pasadas")))
             datos.append(("Altura felpa", pz.get("altura_felpa")))
             if mf.lleva_gramaje(telar):
                 datos.append(("Gramaje felpa", pz.get("gramaje")))

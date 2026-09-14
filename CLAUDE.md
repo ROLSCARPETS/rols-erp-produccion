@@ -88,19 +88,25 @@ laboratorio pueda llevar las muestras sin ver costes.
 - **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
   **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte**, **Pompón**,
   **Kibby** y **Festón**). En la muestra se queda lo que comparten todas las
-  piezas (`CAMPOS_TECNICOS`: `pasadas`, `pelo` con etiqueta "Construcción" y
-  `acabado`: latex | sin_aprestar | resina | latex_resina | pendiente); lo que
-  puede cambiar de un trozo tejido a otro va en las **piezas**.
+  piezas —cómo se monta el telar— (`CAMPOS_TECNICOS`: `pelo` con etiqueta
+  "Construcción" y `acabado`: latex | sin_aprestar | resina | latex_resina |
+  pendiente); lo que puede cambiar de un trozo tejido a otro va en las
+  **piezas**.
 - **Piezas tejidas** (`piezas[]`, esquema v10): dentro de una misma M se tejen
   varias (dos alturas, dos dibujos, dos materias) y **se terminan juntas**, así
   que comparten seguimiento, diario y plazo — para lo que va por su cuenta
   están las variantes (M-5448-B). Cada pieza es
-  `{id, nombre, altura_felpa, gramaje, n_cuerpos, ancho, largo, resultado,
-  materias: [{id, cuerpo, materia, hilos_pua, colorido}]}`, máx. `MAX_PIEZAS`
+  `{id, nombre, pasadas, altura_felpa, gramaje, n_cuerpos, ancho, largo,
+  resultado, materias: [{id, cuerpo, materia, hilos_pua, colorido}]}`, máx. `MAX_PIEZAS`
   = 12 y `MAX_MATERIAS` = 12 materias cada una. `nombre` es «qué es» (Dib.
   7846, la prueba baja…) y `resultado` el veredicto de esa pieza.
   **v10** convirtió en la pieza 1 lo que hasta entonces iba plano en la muestra
-  (altura, gramaje, nº de cuerpos, ancho, largo y su tabla de materias).
+  (altura, gramaje, nº de cuerpos, ancho, largo y su tabla de materias) y
+  **v11** hizo lo mismo con las `pasadas` (dos alturas suelen ir a distinta
+  pasada), copiándolas a todas las piezas que no las trajeran.
+  En la ficha, «**+ Añadir otra igual**» crea una pieza copiando la anterior
+  (todo menos el `resultado`, que es el veredicto de aquella) para cambiar solo
+  lo que varíe.
   La lista se guarda **entera** en cada cambio (`PUT` con `piezas`, como antes
   las materias): el servidor tira las piezas y las filas que no dicen nada y
   reaprovecha los `id` por posición. El **alta** sigue mandando esos campos

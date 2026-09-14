@@ -382,7 +382,7 @@
   const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina', pendiente: 'Pendiente' };
   // Piezas tejidas: una tarjeta por pieza, cada una con su tabla de materias.
   // La lista entera se guarda en cada cambio (como hacía la de materias).
-  const PIEZA_CAMPOS = ['nombre', 'altura_felpa', 'gramaje', 'n_cuerpos', 'ancho', 'largo', 'resultado'];
+  const PIEZA_CAMPOS = ['nombre', 'pasadas', 'altura_felpa', 'gramaje', 'n_cuerpos', 'ancho', 'largo', 'resultado'];
   let tablasPieza = [];      // una instancia de tabla de materias por pieza
 
   function htmlPieza(p, i, cfg) {
@@ -394,7 +394,9 @@
         <button type="button" class="ms-ico-btn danger ms-pieza-x" title="Quitar esta pieza" aria-label="Quitar esta pieza">✕</button>
       </div>
       <div class="ms-pieza-campos${cfg.tejeduria ? '' : ' sin-tejeduria'}">
-        ${cfg.tejeduria ? `<label class="ms-campo"><span>Altura felpa</span>
+        ${cfg.tejeduria ? `<label class="ms-campo"><span>Pasadas</span>
+          <input type="text" data-p="pasadas" maxlength="40" value="${v('pasadas')}" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" /></label>
+        <label class="ms-campo"><span>Altura felpa</span>
           <input type="text" data-p="altura_felpa" maxlength="40" value="${v('altura_felpa')}" placeholder="Ej. 12 mm" autocomplete="off" /></label>` : ''}
         ${cfg.tejeduria && cfg.gramaje ? `<label class="ms-campo"><span>Gramaje felpa</span>
           <input type="text" data-p="gramaje" maxlength="40" value="${v('gramaje')}" placeholder="Ej. 1.500 gr/m2" autocomplete="off" /></label>` : ''}
@@ -417,6 +419,9 @@
     $('md-piezas').innerHTML = piezas.map((p, i) => htmlPieza(p, i, cfg)).join('');
     $('md-piezas-n').textContent = fmtNum(piezas.length);
     $('md-pieza-add').disabled = piezas.length >= MAX_PIEZAS;
+    const hayQueCopiar = piezas.some(p => PIEZA_CAMPOS.some(k => (p[k] || '').trim()) || (p.materias || []).length);
+    $('md-pieza-copia').hidden = !hayQueCopiar;
+    $('md-pieza-copia').disabled = piezas.length >= MAX_PIEZAS;
     $('md-piezas-hint').textContent = piezas.length >= MAX_PIEZAS ? `máximo ${MAX_PIEZAS} piezas` : '';
     $('md-piezas').classList.toggle('una', piezas.length === 1);
     tablasPieza = [...$('md-piezas').querySelectorAll('.ms-pieza')].map((card, i) => {
@@ -493,14 +498,24 @@
     card.remove();
     guardarPiezas(null);
   });
-  $('md-pieza-add').addEventListener('click', () => {
+  // Una pieza más: en blanco, o copiando la anterior para cambiar solo lo
+  // que varíe (el resultado NO se copia: es el veredicto de aquella pieza).
+  function anadirPieza(copiar) {
     const piezas = leerPiezas();
-    piezas.push({ materias: [] });
+    const ultima = piezas[piezas.length - 1] || {};
+    const nueva = { materias: [] };
+    if (copiar) {
+      PIEZA_CAMPOS.forEach(k => { if (k !== 'resultado') nueva[k] = ultima[k] || ''; });
+      nueva.materias = (ultima.materias || []).map(f => Object.assign({}, f, { id: undefined }));
+    }
+    piezas.push(nueva);
     M = Object.assign({}, M, { piezas: piezas });
     pintarPiezas();
-    const ultima = $('md-piezas').querySelector('.ms-pieza:last-child .ms-pieza-nombre');
-    if (ultima) ultima.focus();
-  });
+    const foco = $('md-piezas').querySelector('.ms-pieza:last-child .ms-pieza-nombre');
+    if (foco) { foco.focus(); foco.select(); }
+  }
+  $('md-pieza-add').addEventListener('click', () => anadirPieza(false));
+  $('md-pieza-copia').addEventListener('click', () => anadirPieza(true));
 
   function pintarDatalists() {
     $('md-materiales').innerHTML = (CAT.materiales || []).map(x => `<option value="${esc(x)}"></option>`).join('');
@@ -517,7 +532,6 @@
     $('md-tejeduria').hidden = !cfg.tejeduria;
     $('md-tecnica').classList.toggle('sin-tejeduria', !cfg.tejeduria);
     pintarDatalists();
-    $('md-f-pasadas').value = M.pasadas || '';
     pintarConstruccion($('md-f-pelo'), M.telar, M.pelo || '', $('md-f-pelo-fijo'));
     $('md-f-acabado').value = M.acabado || '';
     pintarPiezas();

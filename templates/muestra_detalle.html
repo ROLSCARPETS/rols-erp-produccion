@@ -160,12 +160,8 @@
           <div class="ms-tecnica-title">Datos técnicos <span class="ms-tec-telar" id="md-tecnica-telar">telar de varilla</span></div>
           <!-- Tejeduría: cómo se teje (Pompón no lleva, solo materias) -->
           <div id="md-tejeduria">
-          <div class="ms-tecnica-sub">Datos de tejeduría <span class="ms-hint">lo que comparten todas las piezas de esta M</span></div>
-          <div class="ms-campo-row tres">
-            <div class="ms-campo">
-              <label for="md-f-pasadas">Pasadas</label>
-              <input type="text" id="md-f-pasadas" data-campo="pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" />
-            </div>
+          <div class="ms-tecnica-sub">Datos de tejeduría <span class="ms-hint">cómo se monta el telar: lo comparten todas las piezas de esta M</span></div>
+          <div class="ms-campo-row">
             <div class="ms-campo">
               <label for="md-f-pelo">Construcción</label>
               <!-- las opciones las pone el JS: cada telar tiene las suyas -->
@@ -188,6 +184,7 @@
           <div id="md-piezas"></div>
           <div class="ms-piezas-pie">
             <button type="button" class="ms-link" id="md-pieza-add">+ Añadir pieza</button>
+            <button type="button" class="ms-link" id="md-pieza-copia" hidden title="Otra pieza con los mismos datos, para cambiar solo lo que varíe">+ Añadir otra igual</button>
             <span class="ms-materias-hint" id="md-piezas-hint"></span>
           </div>
           <datalist id="md-materiales"></datalist>
