@@ -211,12 +211,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`ROLS_MUESTRAS_DISENO_EMAIL`, por defecto `diseño@rolscarpets.com`, **con
   eñe**: es el buzón real. Una ñ en la parte local obliga al servidor a hablar
   SMTPUTF8, así que `correo.soporta_smtputf8()` se lo pregunta —solo EHLO, sin
-  mandar nada— y el panel de Análisis avisa si no lo habla. **El MTA local de
-  Plesk NO lo habla** (comprobado en producción): mientras siga así, ese buzón
-  no recibe; el envío no se cae por ello, `correo._sin_smtputf8()` deja la
-  dirección fuera, el correo sale para el resto y lo cuenta en el historial
-  del aviso. Se arregla activando SMTPUTF8 en el servidor, enviando por el
-  SMTP del proveedor (`ROLS_SMTP_*`) o poniendo un alias sin eñe); «Listo para revisión
+  mandar nada— y el panel de Análisis avisa si no lo habla. El MTA de
+  producción (Postfix 3.10 de Plesk) venía con `smtputf8_enable = no` y se
+  activó a mano el 14/09/2026 (`postconf -e smtputf8_enable=yes && systemctl
+  reload postfix`): si Plesk reescribiera `main.cf` habría que volver a
+  ponerlo, y el panel lo cantaría en rojo. Si un día no lo hablara, el envío
+  no se cae: `correo._sin_smtputf8()` deja esa dirección fuera, el correo sale
+  para el resto y lo cuenta en el historial del aviso); «Listo para revisión
   diseño» también a quien **creó** la muestra (`creado_por`); «Diseño listo» al
   buzón del laboratorio. Y al **crear** una muestra,
   resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`), a
