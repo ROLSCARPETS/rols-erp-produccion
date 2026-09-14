@@ -401,6 +401,16 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-hist-lista .f { color: #9a9a9a; font-variant-numeric: tabular-nums; margin-right: 0.4rem; }
 
 /* ---------- Modal alta ---------- */
+/* El alta crece mucho con los datos técnicos: el modal no pasa de la pantalla,
+   los campos scrollean por dentro y «Crear muestra» se queda siempre a la vista. */
+#ms-modal-nueva .uim-modal { display: flex; flex-direction: column; max-height: 92vh; }
+#ms-modal-nueva .uim-modal > .ms-form-grid { flex: 1 1 auto; overflow-y: auto; margin-right: -0.5rem; padding-right: 0.5rem; }
+#ms-modal-nueva .uim-modal > h3,
+#ms-modal-nueva .uim-modal > .uim-sub,
+#ms-modal-nueva .uim-modal > .uim-error,
+#ms-modal-nueva .uim-modal > .uim-actions { flex: 0 0 auto; }
+#ms-modal-nueva .uim-modal > .uim-actions { border-top: 1px solid var(--border); margin-top: 0.9rem; padding-top: 0.9rem; }
+
 .ms-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem 0.9rem; margin-bottom: 0.5rem; }
 .ms-form-grid .full { grid-column: 1 / -1; }
 .ms-form-grid select, .ms-form-grid input[type="date"], .ms-form-grid input[type="number"], .ms-form-grid input[type="text"] {
