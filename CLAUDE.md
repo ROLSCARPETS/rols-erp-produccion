@@ -248,7 +248,10 @@ laboratorio pueda llevar las muestras sin ver costes.
 Los textos grises que explican un campo o una sección van en un `<span
 class="ms-hint">`. `MS.plegarAyudas()` (en `muestras-common.js`, con un
 MutationObserver para lo que se pinta después) los deja como un **círculo con
-una «i»** y mete el texto en el `title`: se leen al pasar el ratón. Lo que es
+una «i»** y mete el texto en el `title`: se leen al pasar el ratón. Para
+cambiar una ayuda desde JS hay que usar **`MS.ponerAyuda(el, texto)`**: si se
+le escribe el `textContent` a una ya plegada, el texto sale dentro del círculo
+y se come lo de al lado. Lo que es
 un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
 `ms-tec-telar`).
 

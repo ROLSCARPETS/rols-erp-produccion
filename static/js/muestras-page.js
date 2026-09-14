@@ -6,7 +6,7 @@
   'use strict';
   const { esc, fmtFecha, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, numeroHtml, estadoPill, prioPill, clienteHtml, colorearPrio, api,
           ESTADOS, ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, montarTablaMaterias,
-          llenarSelect, llenarSelectPersonas, montarBuscadorCliente } = window.MS;
+          llenarSelect, llenarSelectPersonas, montarBuscadorCliente, ponerAyuda } = window.MS;
   const $ = id => document.getElementById(id);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -664,7 +664,7 @@
     // el gramaje solo lo llevan Colortec y los dos Tufting
     $('ms-n-gramaje-wrap').hidden = !(cfg.tejeduria && cfg.gramaje);
     $('ms-n-materias-sub').firstChild.textContent = 'Datos de materias ';
-    $('ms-n-materias-sub').querySelector('.ms-hint').textContent = `una fila por ${cfg.etiquetaCuerpo.toLowerCase()}`;
+    ponerAyuda($('ms-n-materias-sub').querySelector('.ms-hint'), `una fila por ${cfg.etiquetaCuerpo.toLowerCase()}`);
     $('ms-n-cuerpos-lbl').textContent = cfg.etiquetaN;
     const actual = valorPelo === undefined ? $('ms-n-pelo').value : valorPelo;
     pintarConstruccion($('ms-n-pelo'), telar, actual || '', $('ms-n-pelo-fijo'));

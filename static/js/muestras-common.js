@@ -152,6 +152,17 @@
       el.textContent = '';
     });
   }
+  // Cambiar el texto de una ayuda: si ya está plegada hay que tocar el título,
+  // no el contenido (si no, el texto se mete dentro del círculo de la «i»).
+  function ponerAyuda(el, texto) {
+    if (!el) return;
+    const txt = String(texto || '').trim();
+    if (el.dataset.ayuda === undefined) { el.textContent = txt; return; }
+    el.dataset.ayuda = txt;
+    el.title = txt;
+    el.textContent = '';
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => plegarAyudas());
   else plegarAyudas();
   new MutationObserver(cambios => cambios.forEach(c =>
@@ -479,7 +490,7 @@
   }
 
   window.MS = { ESTADOS, ESTADOS_LABEL, ESTADOS_FLUJO, FLUJO_PRINT, FLUJO_TELAR, FLUJO_POMPON, flujoDe, flujoQueContiene, etiquetaEstado,
-    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, plegarAyudas,
+    PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, plegarAyudas, ponerAyuda,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, montarBuscadorCliente,
     materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
