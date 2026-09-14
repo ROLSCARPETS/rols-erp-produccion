@@ -87,18 +87,35 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`_REFERENCIAS_V5`).
 - **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
   **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte**, **Pompón**,
-  **Kibby** y **Festón**), en dos bloques en la UI:
-  *Datos de tejeduría* (`pasadas`, `altura_felpa`, `gramaje`, `n_cuerpos` —
-  textos cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
-  sin_aprestar | resina | latex_resina | pendiente),
-  *Medidas de la muestra* (`ancho` y `largo`, el tamaño que se pide tejer:
-  **solo los telares** —`es_telar`—, porque hay que montarlos a ese ancho;
-  `lleva_medidas()` y `medidas_texto()` = «50 × 70 cm» para el resumen y el
-  PDF) y
-  *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
-  (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
-  La ficha y el alta los enseñan solo si el telar es de los técnicos (si
-  cambia, se conservan). Las **construcciones** dependen del telar
+  **Kibby** y **Festón**). En la muestra se queda lo que comparten todas las
+  piezas (`CAMPOS_TECNICOS`: `pasadas`, `pelo` con etiqueta "Construcción" y
+  `acabado`: latex | sin_aprestar | resina | latex_resina | pendiente); lo que
+  puede cambiar de un trozo tejido a otro va en las **piezas**.
+- **Piezas tejidas** (`piezas[]`, esquema v10): dentro de una misma M se tejen
+  varias (dos alturas, dos dibujos, dos materias) y **se terminan juntas**, así
+  que comparten seguimiento, diario y plazo — para lo que va por su cuenta
+  están las variantes (M-5448-B). Cada pieza es
+  `{id, nombre, altura_felpa, gramaje, n_cuerpos, ancho, largo, resultado,
+  materias: [{id, cuerpo, materia, hilos_pua, colorido}]}`, máx. `MAX_PIEZAS`
+  = 12 y `MAX_MATERIAS` = 12 materias cada una. `nombre` es «qué es» (Dib.
+  7846, la prueba baja…) y `resultado` el veredicto de esa pieza.
+  **v10** convirtió en la pieza 1 lo que hasta entonces iba plano en la muestra
+  (altura, gramaje, nº de cuerpos, ancho, largo y su tabla de materias).
+  La lista se guarda **entera** en cada cambio (`PUT` con `piezas`, como antes
+  las materias): el servidor tira las piezas y las filas que no dicen nada y
+  reaprovecha los `id` por posición. El **alta** sigue mandando esos campos
+  sueltos (`CAMPOS_PIEZA_LEGACY`) y el servidor los monta como la pieza 1.
+  Qué enseña cada técnica lo dice `TECNICOS_POR_TELAR` (ver abajo):
+  `tejeduria` (Pompón, Kibby y Festón: solo materias), `gramaje` (Colortec y
+  los dos Tufting) y `es_telar` (el ancho y el largo solo en los telares, que
+  hay que montarlos a esa medida; `lleva_medidas`, `medidas_texto` = «50 cm ×
+  70 cm»). `materias_de(m)` junta las de todas las piezas (catálogos y
+  buscador), `resumen_pieza`/`resumen_piezas` las ponen en una línea y
+  `resumen_tecnico` arma el resumen del hero, los correos y el PDF (con varias
+  piezas van numeradas: «2 piezas · 1) … + 2) …»). En el PDF, la tejeduría
+  común va en su tabla y **cada pieza en su sección** con sus medidas, sus
+  materias y su resultado.
+  Las **construcciones** dependen del telar
   (`PELOS_POR_TELAR` / `MS.PELOS_POR_TELAR`): Varilla (corte, bucle,
   corte_bucle, estructurado, pendiente), Lancetas (bucle_sencillo,
   tejido_plano, bucle_saltillo, pendiente). Rapier, Colortec y los dos Tufting
@@ -109,27 +126,17 @@ laboratorio pueda llevar las muestras sin ver costes.
   Toda la configuración va en **`TECNICOS_POR_TELAR`** (espejo en
   `MS.TECNICOS_POR_TELAR`), que además dice: `es_telar` (Pompón, Kibby y
   Festón **no son telares**: el rótulo del bloque dice "técnica X" en vez de
-  "telar X"), `tejeduria` (esos tres la llevan a False: solo materias, ver
-  `_TEC_SOLO_MATERIAS`), `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
+  "telar X"), `tejeduria`, `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
   "Nº de colores"), `etiqueta_cuerpo` (en los tres, la columna de la tabla de
-  materias es "Color"), `hilos_pua` (no llevan esa columna) y **`gramaje`**
-  («Gramaje felpa», p.ej. 1.500 gr/m2: lo llevan solo **Colortec** y los dos
-  **Tufting**, que se piden así). Helpers:
+  materias es "Color"), `hilos_pua` y `gramaje`. Helpers:
   `config_tecnica`, `etiqueta_n_cuerpos`, `etiqueta_cuerpo`, `lleva_tejeduria`,
-  `lleva_hilos_pua`, `lleva_gramaje`, `es_telar`; el endpoint de catálogos lo sirve en
-  `tecnicos_por_telar`.
-  La tabla de materias se guarda **entera** en cada cambio (`PUT` con
-  `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
-  nada de la materia (solo el nº de cuerpo no cuenta) y reaprovecha los `id`
-  por posición. v6 pasó los campos planos `material` / `hilos_pua` a una
-  primera fila de la tabla. `resumen_tecnico()` junta materias y tejeduría
-  para el hero y los correos; `materiales` y `coloridos` de `catalogos` salen
-  de las filas ya escritas (datalist). **El alta de un telar técnico exige los
-  datos técnicos rellenos** (los campos de tejeduría y todas las casillas
-  de cada materia): lo que no se sepa se escribe «Pdte», y en Construcción y
-  Acabado está la opción «Pendiente». Es un control del modal de alta (marca en
-  rojo lo que falte); el backend no lo exige, para no romper las variantes
-  (se crean desde la ficha copiando cliente y telar) ni el histórico.
+  `lleva_hilos_pua`, `lleva_gramaje`, `lleva_medidas`, `es_telar`; el endpoint
+  de catálogos lo sirve en `tecnicos_por_telar`.
+  **El alta de un telar técnico exige los datos técnicos rellenos** (los
+  campos de tejeduría y todas las casillas de cada materia): lo que no se sepa
+  se escribe «Pdte», y en Construcción y Acabado está la opción «Pendiente».
+  Es un control del modal de alta (marca en rojo lo que falte); el backend no
+  lo exige, para no romper las variantes ni el histórico.
 - **Catálogo de telares**: el de `TELARES_DEFAULT` más los que use alguna
   muestra. Los selectores **solo ofrecen valores del catálogo**: para lo que no
   encaje en ninguna técnica está **«Otros»**, que se elige como cualquier otra

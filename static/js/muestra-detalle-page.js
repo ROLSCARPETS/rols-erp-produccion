@@ -7,7 +7,7 @@
   'use strict';
   const { esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, esTecnico, configTecnica, pintarConstruccion, PELO_LABEL, estadoPill, prioPill, tipoTag, colorearPrio, api,
           ESTADOS_LABEL, flujoQueContiene, etiquetaEstado, esAdmin, llenarSelect, llenarSelectPersonas,
-          montarBuscadorCliente, materiasUtiles, montarTablaMaterias } = window.MS;
+          montarBuscadorCliente, materiasUtiles, montarTablaMaterias, MAX_PIEZAS } = window.MS;
   const $ = id => document.getElementById(id);
   const MID = window.MUESTRA_ID;
   const URL_API = '/api/muestras/' + encodeURIComponent(MID);
@@ -380,11 +380,126 @@
   // Datos técnicos (solo telar de varilla)
   // ------------------------------------------------------------
   const ACABADO_LABEL = { latex: 'Látex', sin_aprestar: 'Sin aprestar', resina: 'Resina', latex_resina: 'Látex + resina', pendiente: 'Pendiente' };
-  // Tabla de materias: una fila por cuerpo. Se guarda entera en cada cambio
-  // (misma marca de guardado que el resto de campos de la ficha).
-  const tablaMaterias = montarTablaMaterias($('md-materias'), {
-    listaMateriales: 'md-materiales', listaColoridos: 'md-coloridos',
-    onCambio: (filas, el) => guardarMaterias(filas, el),
+  // Piezas tejidas: una tarjeta por pieza, cada una con su tabla de materias.
+  // La lista entera se guarda en cada cambio (como hacía la de materias).
+  const PIEZA_CAMPOS = ['nombre', 'altura_felpa', 'gramaje', 'n_cuerpos', 'ancho', 'largo', 'resultado'];
+  let tablasPieza = [];      // una instancia de tabla de materias por pieza
+
+  function htmlPieza(p, i, cfg) {
+    const v = k => esc(p[k] || '');
+    return `<div class="ms-pieza" data-i="${i}">
+      <div class="ms-pieza-cab">
+        <span class="ms-pieza-n">Pieza ${i + 1}</span>
+        <input type="text" class="ms-pieza-nombre" data-p="nombre" maxlength="120" value="${v('nombre')}" placeholder="Qué es: dibujo, prueba…" autocomplete="off" />
+        <button type="button" class="ms-ico-btn danger ms-pieza-x" title="Quitar esta pieza" aria-label="Quitar esta pieza">✕</button>
+      </div>
+      <div class="ms-pieza-campos${cfg.tejeduria ? '' : ' sin-tejeduria'}">
+        ${cfg.tejeduria ? `<label class="ms-campo"><span>Altura felpa</span>
+          <input type="text" data-p="altura_felpa" maxlength="40" value="${v('altura_felpa')}" placeholder="Ej. 12 mm" autocomplete="off" /></label>` : ''}
+        ${cfg.tejeduria && cfg.gramaje ? `<label class="ms-campo"><span>Gramaje felpa</span>
+          <input type="text" data-p="gramaje" maxlength="40" value="${v('gramaje')}" placeholder="Ej. 1.500 gr/m2" autocomplete="off" /></label>` : ''}
+        ${cfg.tejeduria ? `<label class="ms-campo"><span>${esc(cfg.etiquetaN)}</span>
+          <input type="text" data-p="n_cuerpos" maxlength="40" value="${v('n_cuerpos')}" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></label>` : ''}
+        ${cfg.esTelar ? `<label class="ms-campo"><span>Ancho</span>
+          <input type="text" data-p="ancho" maxlength="40" value="${v('ancho')}" placeholder="Ej. 50 cm" autocomplete="off" /></label>
+        <label class="ms-campo"><span>Largo</span>
+          <input type="text" data-p="largo" maxlength="40" value="${v('largo')}" placeholder="Ej. 70 cm" autocomplete="off" /></label>` : ''}
+      </div>
+      <div class="ms-pieza-materias"></div>
+      <label class="ms-campo ms-pieza-res"><span>Resultado de esta pieza</span>
+        <input type="text" data-p="resultado" maxlength="300" value="${v('resultado')}" placeholder="Ej. es la buena · repetir más baja…" autocomplete="off" /></label>
+    </div>`;
+  }
+
+  function pintarPiezas() {
+    const cfg = configTecnica(M.telar);
+    const piezas = (M.piezas && M.piezas.length) ? M.piezas : [{}];
+    $('md-piezas').innerHTML = piezas.map((p, i) => htmlPieza(p, i, cfg)).join('');
+    $('md-piezas-n').textContent = fmtNum(piezas.length);
+    $('md-pieza-add').disabled = piezas.length >= MAX_PIEZAS;
+    $('md-piezas-hint').textContent = piezas.length >= MAX_PIEZAS ? `máximo ${MAX_PIEZAS} piezas` : '';
+    $('md-piezas').classList.toggle('una', piezas.length === 1);
+    tablasPieza = [...$('md-piezas').querySelectorAll('.ms-pieza')].map((card, i) => {
+      const t = montarTablaMaterias(card.querySelector('.ms-pieza-materias'), {
+        listaMateriales: 'md-materiales', listaColoridos: 'md-coloridos',
+        etiquetaCuerpo: cfg.etiquetaCuerpo, conHilos: cfg.hilosPua,
+        onCambio: (filas, el) => guardarPiezas(el),
+      });
+      t.pintar((piezas[i] || {}).materias || []);
+      return t;
+    });
+  }
+
+  // Lo que hay escrito ahora mismo en las tarjetas
+  function leerPiezas() {
+    return [...$('md-piezas').querySelectorAll('.ms-pieza')].map((card, i) => {
+      const p = { materias: materiasUtiles(tablasPieza[i] ? tablasPieza[i].leer() : []) };
+      PIEZA_CAMPOS.forEach(k => {
+        const el = card.querySelector(`[data-p="${k}"]`);
+        p[k] = el ? el.value.trim() : ((M.piezas || [])[i] || {})[k] || '';
+      });
+      return p;
+    });
+  }
+  const utilPieza = p => PIEZA_CAMPOS.some(k => (p[k] || '').trim()) || (p.materias || []).length;
+  const mismasPiezas = (a, b) => JSON.stringify(a.filter(utilPieza)) === JSON.stringify(
+    (b || []).map(p => {
+      const o = { materias: materiasUtiles(p.materias || []) };
+      PIEZA_CAMPOS.forEach(k => { o[k] = p[k] || ''; });
+      return o;
+    }).filter(utilPieza));
+
+  async function guardarPiezas(el) {
+    const nuevas = leerPiezas();
+    // Una pieza o una fila recién añadida y aún vacía no es un cambio
+    if (mismasPiezas(nuevas, M.piezas)) { if (el) marcar(el, null); return; }
+    if (el) marcar(el, 'saving');
+    try {
+      const d = await api(URL_API, { method: 'PUT', body: { piezas: nuevas.filter(utilPieza) } });
+      const antes = (M.piezas || []).length;
+      M = d.muestra;
+      if (el) marcar(el, 'saved-ok');
+      pintarHero(); pintarHistorial();
+      // Si el servidor descartó algo, se repinta para que se vea igual
+      if ((M.piezas || []).length !== Math.max(antes, nuevas.filter(utilPieza).length)) pintarPiezas();
+      $('md-piezas-n').textContent = fmtNum(Math.max(1, (M.piezas || []).length));
+      CAT = await api('/api/muestras/catalogos');
+      pintarDatalists();
+    } catch (e) {
+      if (el) marcar(el, 'saved-err');
+      await window.mostrarAlerta({ titulo: 'No se pudieron guardar las piezas', mensaje: e.message, tipo: 'danger' });
+      pintarPiezas();
+    }
+  }
+
+  // Escribir en un campo de la pieza guarda, como el resto de la ficha
+  $('md-piezas').addEventListener('change', (e) => {
+    if (e.target.matches('[data-p]')) guardarPiezas(e.target);
+  });
+  $('md-piezas').addEventListener('click', async (e) => {
+    const x = e.target.closest('.ms-pieza-x');
+    if (!x) return;
+    const card = x.closest('.ms-pieza');
+    const i = Number(card.dataset.i);
+    const p = (M.piezas || [])[i];
+    if (p && utilPieza(Object.assign({ materias: p.materias || [] }, p))) {
+      const r = await window.mostrarConfirmacion({
+        titulo: 'Quitar la pieza',
+        mensaje: `Se quita la pieza ${i + 1}${p.nombre ? ` («${p.nombre}»)` : ''} de esta M, con sus materias.`,
+        textoConfirmar: 'Quitar', tipo: 'danger',
+      });
+      if (!r.ok) return;
+    }
+    card.remove();
+    guardarPiezas(null);
+  });
+  $('md-pieza-add').addEventListener('click', () => {
+    const piezas = leerPiezas();
+    piezas.push({ materias: [] });
+    M = Object.assign({}, M, { piezas: piezas });
+    pintarPiezas();
+    const ultima = $('md-piezas').querySelector('.ms-pieza:last-child .ms-pieza-nombre');
+    if (ultima) ultima.focus();
   });
 
   function pintarDatalists() {
@@ -401,45 +516,11 @@
     // Pompón no teje: solo lleva materias
     $('md-tejeduria').hidden = !cfg.tejeduria;
     $('md-tecnica').classList.toggle('sin-tejeduria', !cfg.tejeduria);
-    $('md-f-cuerpos-lbl').textContent = cfg.etiquetaN;
     pintarDatalists();
     $('md-f-pasadas').value = M.pasadas || '';
-    $('md-f-altura').value = M.altura_felpa || '';
-    // el gramaje solo lo llevan Colortec y los dos Tufting
-    $('md-gramaje-row').hidden = !(cfg.tejeduria && cfg.gramaje);
-    $('md-f-gramaje').value = M.gramaje || '';
-    $('md-f-cuerpos').value = M.n_cuerpos || '';
     pintarConstruccion($('md-f-pelo'), M.telar, M.pelo || '', $('md-f-pelo-fijo'));
     $('md-f-acabado').value = M.acabado || '';
-    tablaMaterias.configurar({ etiquetaCuerpo: cfg.etiquetaCuerpo, conHilos: cfg.hilosPua });
-    tablaMaterias.pintar(M.materias || []);
-    // el tamaño de la muestra solo se pide en los telares
-    $('md-medidas').hidden = !cfg.esTelar;
-    $('md-f-ancho').value = M.ancho || '';
-    $('md-f-largo').value = M.largo || '';
-  }
-
-  async function guardarMaterias(filas, el) {
-    const nuevas = materiasUtiles(filas);
-    const antes = materiasUtiles(M.materias || []);
-    // Una fila recién añadida y aún vacía no es un cambio: no se guarda ni se
-    // repinta (si no, desaparecería mientras se escribe en ella).
-    if (JSON.stringify(nuevas) === JSON.stringify(antes)) { if (el) marcar(el, null); return; }
-    if (el) marcar(el, 'saving');
-    try {
-      const d = await api(URL_API, { method: 'PUT', body: { materias: nuevas } });
-      M = d.muestra;
-      if (el) marcar(el, 'saved-ok');
-      pintarHero(); pintarHistorial();
-      // Si el servidor descartó alguna fila, se repinta para que se vea igual
-      if ((M.materias || []).length !== filas.length) tablaMaterias.pintar(M.materias || []);
-      CAT = await api('/api/muestras/catalogos');
-      pintarDatalists();
-    } catch (e) {
-      if (el) marcar(el, 'saved-err');
-      await window.mostrarAlerta({ titulo: 'No se pudieron guardar las materias', mensaje: e.message, tipo: 'danger' });
-      tablaMaterias.pintar(M.materias || []);
-    }
+    pintarPiezas();
   }
 
   // ------------------------------------------------------------
@@ -710,7 +791,7 @@
     // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', materias: 'Materias', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', gramaje: 'Gramaje felpa', ancho: 'Ancho', largo: 'Largo', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
+      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', piezas: 'Piezas tejidas', materias: 'Materias', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', gramaje: 'Gramaje felpa', ancho: 'Ancho', largo: 'Largo', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
       if (h.campo === 'diseno_verificado') return h.a === 'True' ? 'Diseño <b>verificado</b>' : 'Verificación de diseño retirada';
       const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;

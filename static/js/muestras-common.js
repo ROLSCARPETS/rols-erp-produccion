@@ -383,6 +383,8 @@
   // Se usa igual en la ficha (autoguardado, opts.onCambio) y en el alta (se
   // lee al crear). El servidor tira las filas que no dicen nada de la materia.
   const MAX_MATERIAS = 12;
+  // Piezas tejidas dentro de una misma M (espejo de MAX_PIEZAS del servidor)
+  const MAX_PIEZAS = 12;
   function materiaUtil(f) {
     return !!((f.materia || '').trim() || (f.hilos_pua || '').trim() || (f.colorido || '').trim());
   }
@@ -493,5 +495,5 @@
     PRIO_LABEL, esc, fmtFecha, fmtFechaHora, hoyISO, fmtNum, plegarAyudas, ponerAyuda,
     TECNICOS_POR_TELAR, PELO_LABEL, esTecnico, configTecnica, pelosDe, peloFijo, pintarConstruccion,
     numeroHtml, estadoPill, prioPill, tipoTag, clienteHtml, colorearPrio, api, esAdmin, llenarSelect, llenarSelectPersonas, montarBuscadorCliente,
-    materiasUtiles, montarTablaMaterias, MAX_MATERIAS };
+    materiasUtiles, montarTablaMaterias, MAX_MATERIAS, MAX_PIEZAS };
 })();

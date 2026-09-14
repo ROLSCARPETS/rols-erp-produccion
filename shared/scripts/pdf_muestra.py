@@ -187,34 +187,24 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
         cab = Paragraph(_esc(titulo) + (f'  <font color="#9a9a9a">{_esc(hint)}</font>' if hint else ""), st_seccion)
         flow.append(KeepTogether([cab, Spacer(1, 1.5 * mm)] + contenido + [Spacer(1, 4 * mm)]))
 
-    if mf.lleva_tejeduria(telar):
-        tej = [("Pasadas", m.get("pasadas")), ("Altura felpa", m.get("altura_felpa"))]
-        if mf.lleva_gramaje(telar):
-            tej.append(("Gramaje felpa", m.get("gramaje")))
-        if mf.lleva_medidas(telar):
-            tej.append(("Medidas", mf.medidas_texto(m)))
-        tej += [(mf.etiqueta_n_cuerpos(telar), m.get("n_cuerpos")),
-                ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
-                ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado")))]
-        celdas = [[Paragraph(_esc(k), st_label) for k, _ in tej],
-                  [Paragraph(_esc(v) or "—", st_valor) for _, v in tej]]
-        t = Table(celdas, colWidths=[ancho / len(tej)] * len(tej))
+    def tabla_datos(pares):
+        """La fila de etiquetas y la de valores, en la caja arena."""
+        celdas = [[Paragraph(_esc(k), st_label) for k, _ in pares],
+                  [Paragraph(_esc(v) or "—", st_valor) for _, v in pares]]
+        t = Table(celdas, colWidths=[ancho / len(pares)] * len(pares))
         t.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"), ("BACKGROUND", (0, 0), (-1, -1), ROLS_SAND),
             ("BOX", (0, 0), (-1, -1), 0.5, ROLS_BORDER),
             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
             ("TOPPADDING", (0, 0), (-1, 0), 5), ("BOTTOMPADDING", (0, 1), (-1, 1), 5),
         ]))
-        seccion("DATOS DE TEJEDURÍA", [t])
+        return t
 
-    # -------------------------------------------------------- datos de materias
-    materias = [f for f in (m.get("materias") or [])
-                if any((f.get(k) or "").strip() for k in ("materia", "hilos_pua", "colorido"))]
-    if materias:
+    def tabla_materias(filas):
         con_hilos = mf.lleva_hilos_pua(telar)
         cab = [mf.etiqueta_cuerpo(telar), "Materia"] + (["Hilos púa"] if con_hilos else []) + ["Colorido"]
         filas_m = [[Paragraph(_esc(x), st_th) for x in cab]]
-        for f in materias:
+        for f in filas:
             fila = [f.get("cuerpo"), f.get("materia")] + ([f.get("hilos_pua")] if con_hilos else []) + [f.get("colorido")]
             filas_m.append([Paragraph(_esc(x) or "—", st_td) for x in fila])
         anchos = ([20 * mm, ancho - 105 * mm, 20 * mm, 65 * mm] if con_hilos
@@ -227,7 +217,42 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
             ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ("TOPPADDING", (0, 0), (-1, -1), 3.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
         ]))
-        seccion("DATOS DE MATERIAS", [t])
+        return t
+
+    # Lo que comparten todas las piezas: como se monta el telar
+    if mf.lleva_tejeduria(telar):
+        seccion("DATOS DE TEJEDURÍA", [tabla_datos([
+            ("Pasadas", m.get("pasadas")),
+            ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
+            ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado"))),
+        ])])
+
+    # ------------------------------------------------------------- las piezas
+    # Cada trozo tejido de esta M, con sus medidas, sus materias y su resultado.
+    piezas = list(m.get("piezas") or [])
+    for i, pz in enumerate(piezas, 1):
+        bloque, datos = [], []
+        if mf.lleva_tejeduria(telar):
+            datos.append(("Altura felpa", pz.get("altura_felpa")))
+            if mf.lleva_gramaje(telar):
+                datos.append(("Gramaje felpa", pz.get("gramaje")))
+            datos.append((mf.etiqueta_n_cuerpos(telar), pz.get("n_cuerpos")))
+        if mf.lleva_medidas(telar):
+            datos.append(("Medidas", mf.medidas_texto(pz)))
+        if datos:
+            bloque += [tabla_datos(datos), Spacer(1, 2 * mm)]
+        filas = [f for f in (pz.get("materias") or [])
+                 if any((f.get(k) or "").strip() for k in ("materia", "hilos_pua", "colorido"))]
+        if filas:
+            bloque.append(tabla_materias(filas))
+        if (pz.get("resultado") or "").strip():
+            bloque += [Spacer(1, 2 * mm),
+                       Paragraph("<b>Resultado:</b> " + _esc(pz["resultado"]), st_texto)]
+        if not bloque:
+            continue
+        # Con una sola pieza no hace falta numerarla
+        titulo = "DATOS DE MATERIAS" if len(piezas) == 1 else f"PIEZA {i}"
+        seccion(titulo, bloque, (pz.get("nombre") or "").strip())
 
     # ------------------------------------------------------------- descripcion
     if (m.get("descripcion") or "").strip():

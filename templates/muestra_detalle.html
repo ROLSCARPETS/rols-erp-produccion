@@ -160,29 +160,12 @@
           <div class="ms-tecnica-title">Datos técnicos <span class="ms-tec-telar" id="md-tecnica-telar">telar de varilla</span></div>
           <!-- Tejeduría: cómo se teje (Pompón no lleva, solo materias) -->
           <div id="md-tejeduria">
-          <div class="ms-tecnica-sub">Datos de tejeduría</div>
+          <div class="ms-tecnica-sub">Datos de tejeduría <span class="ms-hint">lo que comparten todas las piezas de esta M</span></div>
           <div class="ms-campo-row tres">
             <div class="ms-campo">
               <label for="md-f-pasadas">Pasadas</label>
               <input type="text" id="md-f-pasadas" data-campo="pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" />
             </div>
-            <div class="ms-campo">
-              <label for="md-f-altura">Altura felpa</label>
-              <input type="text" id="md-f-altura" data-campo="altura_felpa" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" />
-            </div>
-            <div class="ms-campo">
-              <label for="md-f-cuerpos" id="md-f-cuerpos-lbl">Nº de cuerpos</label>
-              <input type="text" id="md-f-cuerpos" data-campo="n_cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" />
-            </div>
-          </div>
-          <!-- Gramaje de la felpa: solo Colortec y los dos Tufting -->
-          <div class="ms-campo-row" id="md-gramaje-row" hidden>
-            <div class="ms-campo">
-              <label for="md-f-gramaje">Gramaje felpa</label>
-              <input type="text" id="md-f-gramaje" data-campo="gramaje" maxlength="40" placeholder="Ej. 1.500 gr/m2" autocomplete="off" />
-            </div>
-          </div>
-          <div class="ms-campo-row">
             <div class="ms-campo">
               <label for="md-f-pelo">Construcción</label>
               <!-- las opciones las pone el JS: cada telar tiene las suyas -->
@@ -198,25 +181,17 @@
             </div>
           </div>
           </div>
-          <!-- Materias: una fila por cuerpo (se guardan solas, como el resto) -->
-          <div class="ms-tecnica-sub">Datos de materias</div>
-          <div id="md-materias"></div>
+          <!-- Piezas tejidas: dentro de una M pueden ir varias (dos alturas,
+               dos dibujos, dos materias). Se guardan enteras en cada cambio. -->
+          <div class="ms-tecnica-sub">Piezas tejidas <span class="ms-count" id="md-piezas-n">1</span>
+            <span class="ms-hint">cada trozo que se teje de esta M, con lo suyo</span></div>
+          <div id="md-piezas"></div>
+          <div class="ms-piezas-pie">
+            <button type="button" class="ms-link" id="md-pieza-add">+ Añadir pieza</button>
+            <span class="ms-materias-hint" id="md-piezas-hint"></span>
+          </div>
           <datalist id="md-materiales"></datalist>
           <datalist id="md-coloridos"></datalist>
-          <!-- Tamano de la muestra: solo los telares (hay que montarlos a ese ancho) -->
-          <div id="md-medidas" hidden>
-            <div class="ms-tecnica-sub">Medidas de la muestra <span class="ms-hint">lo que se pide tejer</span></div>
-            <div class="ms-campo-row">
-              <div class="ms-campo">
-                <label for="md-f-ancho">Ancho</label>
-                <input type="text" id="md-f-ancho" data-campo="ancho" maxlength="40" placeholder="Ej. 50 cm" autocomplete="off" />
-              </div>
-              <div class="ms-campo">
-                <label for="md-f-largo">Largo</label>
-                <input type="text" id="md-f-largo" data-campo="largo" maxlength="40" placeholder="Ej. 70 cm" autocomplete="off" />
-              </div>
-            </div>
-          </div>
         </div>
         <div class="ms-campo" id="md-anotacion-wrap" hidden>
           <label>Anotación del registro de números</label>
