@@ -162,8 +162,13 @@ laboratorio pueda llevar las muestras sin ver costes.
   `GET|DELETE /api/muestras/<id>/adjuntos/<aid>` (`?dl=1` fuerza descarga;
   imagen/PDF se abren en la pestaña). Cada adjunto lleva `clase`: `version`
   (las versiones se numeran por orden de subida en la UI), `final` (diseño
-  final) u `otro`; `PUT …/adjuntos/<aid>` `{clase}` la cambia. Rastro en el
-  historial (`tipo: adjunto`, a = anadido | etiqueta | borrado). Check
+  final), `otro` o **`cliente`**; `PUT …/adjuntos/<aid>` `{clase}` la cambia.
+  La clase decide **en qué bloque de la ficha sale el fichero**: los `cliente`
+  en «Información de cliente sobre muestra» (lo que manda el cliente:
+  pantallazos de correos, fotos…; sin verificación) y el resto en «Diseño».
+  Es el mismo `adjuntos[]`, las mismas rutas y el mismo almacén: cambiándole la
+  etiqueta a un fichero se pasa de un bloque al otro.
+  Rastro en el historial (`tipo: adjunto`, a = anadido | etiqueta | borrado). Check
   **Verificación de diseño** (`diseno_verificado` + `_por`, `_por_nombre`,
   `_en`, que pone el servidor con el actor al marcarlo y limpia al quitarlo);
   chip "Diseño verificado" en el hero. **Solo la quita quien la puso** (o un

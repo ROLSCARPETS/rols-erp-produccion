@@ -282,6 +282,18 @@
           </label>
         </section>
 
+        <!-- Lo que manda el cliente sobre la muestra: pantallazos de correos,
+             fotos de una moqueta, un PDF con sus indicaciones... -->
+        <section class="ms-section" id="md-cliente-info">
+          <div class="ms-section-title"><span>Información de cliente sobre muestra</span><span class="ms-hint">pantallazos de correos, fotos, PDF… hasta 25 MB</span></div>
+          <div class="ms-adjuntos" id="md-adjc" hidden></div>
+          <div class="ms-adj-zona" id="md-adjc-zona">
+            <input type="file" id="md-adjc-file" accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.tif,.tiff,.svg,.pdf,.ai,.eps,.psd,.zip" multiple hidden />
+            <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="md-adjc-btn">Adjuntar archivo</button>
+            <span class="ms-adj-ayuda">o arrastra el fichero aquí</span>
+          </div>
+        </section>
+
         <section class="ms-section" id="md-variantes-wrap" hidden>
           <div class="ms-section-title"><span>Otras muestras con este número</span><span class="ms-count" id="md-var-count">0</span></div>
           <div class="ms-variantes" id="md-variantes"></div>

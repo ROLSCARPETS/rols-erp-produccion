@@ -481,18 +481,26 @@
     }
   });
 
+  // Los de clase «cliente» van en su bloque; el resto, en Diseño.
+  const esDeCliente = a => a.clase === 'cliente';
   function pintarAdjuntos() {
     pintarVerificacion();
-    const lista = M.adjuntos || [];
-    $('md-adjuntos').hidden = !lista.length;
-    $('md-adjuntos').innerHTML = lista.map(a => {
-      const url = urlAdjunto(a);
-      const abrir = a.inline ? url : url + '?dl=1';
-      const vista = a.imagen
+    const todos = M.adjuntos || [];
+    const diseno = todos.filter(a => !esDeCliente(a));
+    const cliente = todos.filter(esDeCliente);
+    $('md-adjuntos').hidden = !diseno.length;
+    $('md-adjuntos').innerHTML = diseno.map(filaAdjunto).join('');
+    $('md-adjc').hidden = !cliente.length;
+    $('md-adjc').innerHTML = cliente.map(filaAdjunto).join('');
+  }
+  function filaAdjunto(a) {
+    const url = urlAdjunto(a);
+    const abrir = a.inline ? url : url + '?dl=1';
+    const vista = a.imagen
         ? `<img src="${url}" alt="" loading="lazy" />`
         : `<span class="ms-adj-ext">${esc((a.ext || '').toUpperCase())}</span>`;
-      const quien = a.usuario_nombre || a.usuario || '';
-      return `<div class="ms-adj" data-adj="${esc(a.id)}">
+    const quien = a.usuario_nombre || a.usuario || '';
+    return `<div class="ms-adj" data-adj="${esc(a.id)}">
         <a class="ms-adj-vista" href="${abrir}" target="_blank" rel="noopener" title="${a.inline ? 'Abrir' : 'Descargar'}">${vista}</a>
         <div class="ms-adj-info">
           <div class="ms-adj-linea">
@@ -501,6 +509,7 @@
               <option value="version" ${a.clase === 'version' ? 'selected' : ''}>${a.clase === 'version' ? esc(a.clase_label) : 'Versión'}</option>
               <option value="final" ${a.clase === 'final' ? 'selected' : ''}>Diseño final</option>
               <option value="otro" ${a.clase === 'otro' ? 'selected' : ''}>Otro</option>
+              <option value="cliente" ${a.clase === 'cliente' ? 'selected' : ''}>Información de cliente</option>
             </select>
           </div>
           <div class="ms-adj-meta">${fmtBytes(a.tamano)}${a.fecha ? ' · ' + fmtFechaHora(a.fecha) : ''}${quien ? ' · ' + esc(quien) : ''}</div>
@@ -509,17 +518,16 @@
           <a class="ms-ico-btn" href="${url}?dl=1" title="Descargar">⤓</a>
           <button type="button" class="ms-ico-btn danger" data-accion="borrar-adj" title="Quitar el adjunto">✕</button>
         </div>
-      </div>`;
-    }).join('');
+    </div>`;
   }
-  async function subirAdjuntos(files) {
-    const btn = $('md-adj-btn');
+  async function subirAdjuntos(files, zona) {
+    const btn = zona.btn;
     btn.disabled = true;
     try {
       for (const f of files) {
         const fd = new FormData();
         fd.append('fichero', f, f.name);
-        fd.append('clase', $('md-adj-clase').value || 'version');
+        fd.append('clase', zona.clase());
         btn.textContent = `Subiendo ${f.name}…`;
         const d = await api(URL_API + '/adjuntos', { method: 'POST', body: fd });
         M = d.muestra;
@@ -529,23 +537,30 @@
       await window.mostrarAlerta({ titulo: 'No se pudo adjuntar', mensaje: e.message, tipo: 'danger' });
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Adjuntar diseño';
-      $('md-adj-file').value = '';
+      btn.textContent = zona.etiqueta;
+      zona.input.value = '';
     }
   }
-  $('md-adj-btn').addEventListener('click', () => $('md-adj-file').click());
-  $('md-adj-file').addEventListener('change', () => {
-    const fs = Array.from($('md-adj-file').files || []);
-    if (fs.length) subirAdjuntos(fs);
-  });
-  const zonaAdj = $('md-adj-zona');
-  ['dragenter', 'dragover'].forEach(ev => zonaAdj.addEventListener(ev, (e) => { e.preventDefault(); zonaAdj.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(ev => zonaAdj.addEventListener(ev, (e) => { e.preventDefault(); zonaAdj.classList.remove('over'); }));
-  zonaAdj.addEventListener('drop', (e) => {
-    const fs = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
-    if (fs.length) subirAdjuntos(fs);
-  });
-  $('md-adjuntos').addEventListener('click', async (e) => {
+  // Botón y arrastrar-soltar de cada zona (Diseño e Información de cliente)
+  function montarZonaAdjuntos(zona) {
+    zona.btn.addEventListener('click', () => zona.input.click());
+    zona.input.addEventListener('change', () => {
+      const fs = Array.from(zona.input.files || []);
+      if (fs.length) subirAdjuntos(fs, zona);
+    });
+    ['dragenter', 'dragover'].forEach(ev => zona.caja.addEventListener(ev, (e) => { e.preventDefault(); zona.caja.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => zona.caja.addEventListener(ev, (e) => { e.preventDefault(); zona.caja.classList.remove('over'); }));
+    zona.caja.addEventListener('drop', (e) => {
+      const fs = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+      if (fs.length) subirAdjuntos(fs, zona);
+    });
+  }
+  montarZonaAdjuntos({ caja: $('md-adj-zona'), btn: $('md-adj-btn'), input: $('md-adj-file'),
+    clase: () => $('md-adj-clase').value || 'version', etiqueta: 'Adjuntar diseño' });
+  montarZonaAdjuntos({ caja: $('md-adjc-zona'), btn: $('md-adjc-btn'), input: $('md-adjc-file'),
+    clase: () => 'cliente', etiqueta: 'Adjuntar archivo' });
+
+  async function borrarAdjunto(e) {
     const b = e.target.closest('[data-accion="borrar-adj"]');
     if (!b) return;
     const fila = b.closest('.ms-adj');
@@ -563,9 +578,9 @@
     } catch (err) {
       await window.mostrarAlerta({ titulo: 'No se pudo quitar', mensaje: err.message, tipo: 'danger' });
     }
-  });
+  }
 
-  $('md-adjuntos').addEventListener('change', async (e) => {
+  async function reetiquetarAdjunto(e) {
     const sel = e.target.closest('.ms-adj-clase');
     if (!sel) return;
     sel.disabled = true;
@@ -577,6 +592,10 @@
       await window.mostrarAlerta({ titulo: 'No se pudo cambiar la etiqueta', mensaje: err.message, tipo: 'danger' });
       pintarAdjuntos();
     }
+  }
+  [$('md-adjuntos'), $('md-adjc')].forEach(lista => {
+    lista.addEventListener('click', borrarAdjunto);
+    lista.addEventListener('change', reetiquetarAdjunto);
   });
 
   // ------------------------------------------------------------

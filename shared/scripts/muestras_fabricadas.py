@@ -1758,10 +1758,15 @@ def _texto_cambio_estado(anterior: str, nuevo: str, nota: str = "", telar=None) 
 # ---------------------------------------------------------------------------
 
 # Que es cada fichero adjunto: una version del diseno (se numeran por orden
-# de subida), el diseno final, u otra cosa (foto, referencia...).
+# de subida), el diseno final, otra cosa (foto, referencia...) o informacion
+# que manda el cliente sobre la muestra (pantallazos de correos, fotos...).
+# La clase decide en que bloque de la ficha sale: `cliente` en el suyo, el
+# resto en Diseno.
 CLASES_ADJUNTO: tuple[tuple[str, str], ...] = (("version", "Versión"), ("final", "Diseño final"),
-                                              ("otro", "Otro"))
+                                              ("otro", "Otro"),
+                                              ("cliente", "Información de cliente"))
 CLASES_ADJUNTO_LABEL = dict(CLASES_ADJUNTO)
+CLASE_ADJUNTO_CLIENTE = "cliente"
 
 
 def _validar_clase_adjunto(v) -> tuple[str, str]:
@@ -1776,7 +1781,7 @@ def _validar_clase_adjunto(v) -> tuple[str, str]:
     for slug, label in CLASES_ADJUNTO:
         if v.lower() == slug or _clave(v) == _clave(label):
             return slug, ""
-    return "", f"clase no valida: {v!r} (version, final, otro)"
+    return "", f"clase no valida: {v!r} ({', '.join(s for s, _ in CLASES_ADJUNTO)})"
 
 
 def _adjunto_publico(a: dict) -> dict:
