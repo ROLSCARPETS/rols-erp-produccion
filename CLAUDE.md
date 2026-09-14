@@ -217,7 +217,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   (`aviso_nueva_muestra`, motivo `nueva` en el historial). Envío como Rols Muestras:
   MTA local de Plesk (localhost:25) por defecto; opcional `ROLS_SMTP_*` /
   `SMTP_*` en el `.env` (app.py lo carga) o `ROLS_DATA_DIR/correo.json`. El
-  **Los destinatarios se configuran** desde la tabla de la pestaña Análisis
+  **Los destinatarios se configuran** en la pestaña Análisis, una fila-tarjeta
+  por momento (la estructura del modal de fases de Heroturfs One: etapa +
+  asunto · selector · buzones con el check debajo)
   (`GET|PUT /api/muestras/avisos/config`, el PUT solo admin): por cada momento
   —el alta, cada etapa y el hito— se elige si va a **quien la encargó** (`no` |
   `salvo_actor` | `siempre`), si va a **quien la creó** y qué **buzones** fijos

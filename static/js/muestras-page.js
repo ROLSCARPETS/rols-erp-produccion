@@ -434,7 +434,7 @@
     try {
       AVISOS = await api('/api/muestras/avisos/config');
     } catch (e) {
-      tb.innerHTML = `<tr><td colspan="5" class="ms-vacio">No se pudo cargar: ${esc(e.message)}</td></tr>`;
+      tb.innerHTML = `<div class="ms-vacio">No se pudo cargar: ${esc(e.message)}</div>`;
       return;
     }
     pintarAvisosConfig();
@@ -456,14 +456,17 @@
         : `<span class="ms-estado ms-estado-${f.clave === 'nueva' ? 'esperando_telar' : 'en_telar'}">${esc(f.etiqueta)}</span>`;
       const opciones = MODOS.map(([v, l]) =>
         `<option value="${v}" ${c.encargada === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-      return `<tr data-clave="${esc(f.clave)}">
-        <td>${etiqueta}
-          ${f.nota ? `<div class="ms-hint">${esc(f.nota)}</div>` : ''}</td>
-        <td><select class="ms-av-campo" data-campo="encargada"${off}>${opciones}</select></td>
-        <td><label class="ms-av-check"><input type="checkbox" class="ms-av-campo" data-campo="creador" ${c.creador ? 'checked' : ''}${off} /><span>Avisar</span></label></td>
-        <td><input type="text" class="ms-av-campo ms-av-buzones" data-campo="buzones" value="${esc((c.buzones || []).join(', '))}" placeholder="nadie más" title="E-mails separados por comas"${off} /></td>
-        <td class="ms-avisos-asunto">${esc(f.asunto)}</td>
-      </tr>`;
+      return `<div class="ms-av-fila" data-clave="${esc(f.clave)}">
+        <div class="ms-av-cuando">
+          <div class="ms-av-etapa">${etiqueta}${f.nota ? `<span class="ms-hint">${esc(f.nota)}</span>` : ''}</div>
+          <div class="ms-av-asunto" title="Asunto del correo">${esc(f.asunto)}</div>
+        </div>
+        <select class="ms-av-campo" data-campo="encargada" title="Si se avisa a quien encargó la muestra"${off}>${opciones}</select>
+        <div class="ms-av-dest">
+          <input type="text" class="ms-av-campo ms-av-buzones" data-campo="buzones" value="${esc((c.buzones || []).join(', '))}" placeholder="Avisar por correo a… (opcional)" title="Buzones fijos que reciben este aviso, separados por comas"${off} />
+          <label class="ms-av-check"><input type="checkbox" class="ms-av-campo" data-campo="creador" ${c.creador ? 'checked' : ''}${off} /><span>Avisar a quien creó la muestra</span></label>
+        </div>
+      </div>`;
     }).join('');
     $('an-avisos-quien-manda').textContent = editable
       ? 'Los cambios se guardan solos.'
@@ -472,7 +475,7 @@
   }
 
   async function guardarAviso(el) {
-    const tr = el.closest('tr');
+    const tr = el.closest('.ms-av-fila');
     const clave = tr.dataset.clave, campo = el.dataset.campo;
     const valor = campo === 'creador' ? el.checked
       : campo === 'buzones' ? el.value.split(/[,;\s]+/).filter(Boolean) : el.value;
