@@ -413,6 +413,10 @@
     $('md-f-acabado').value = M.acabado || '';
     tablaMaterias.configurar({ etiquetaCuerpo: cfg.etiquetaCuerpo, conHilos: cfg.hilosPua });
     tablaMaterias.pintar(M.materias || []);
+    // el tamaño de la muestra solo se pide en los telares
+    $('md-medidas').hidden = !cfg.esTelar;
+    $('md-f-ancho').value = M.ancho || '';
+    $('md-f-largo').value = M.largo || '';
   }
 
   async function guardarMaterias(filas, el) {
@@ -706,7 +710,7 @@
     // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;
     if (t === 'campo') {
-      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', materias: 'Materias', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', gramaje: 'Gramaje felpa', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
+      const nombres = { cliente: 'Cliente', referencia: 'Referencia muestra', descripcion: 'Descripción', encargada_por: 'Encargada por', prioridad: 'Prioridad', telar: 'Telar', fecha_solicitud: 'Fecha de solicitud', fecha_lista: 'Muestra lista el (real)', fecha_estimada: 'Fecha estimada muestra lista', resultado: 'Resultado', anotacion_registro: 'Anotación', tipo: 'Tipo', cliente_navision: 'Cliente Navision', proximo_hito_fecha: 'Próximo hito', proximo_hito: 'Qué se espera en el hito', materias: 'Materias', material: 'Material', pasadas: 'Pasadas', altura_felpa: 'Altura felpa', gramaje: 'Gramaje felpa', ancho: 'Ancho', largo: 'Largo', n_cuerpos: 'Nº de cuerpos', hilos_pua: 'Hilos púa', pelo: 'Construcción', acabado: 'Acabado', diseno_verificado: 'Verificación de diseño' };
       if (h.campo === 'diseno_verificado') return h.a === 'True' ? 'Diseño <b>verificado</b>' : 'Verificación de diseño retirada';
       const lbl = (v) => h.campo === 'pelo' ? (PELO_LABEL[v] || v) : h.campo === 'acabado' ? (ACABADO_LABEL[v] || v) : v;
       return `${esc(nombres[h.campo] || h.campo)}: «${esc(lbl(h.de) || '—')}» → «${esc(lbl(h.a) || '—')}»`;

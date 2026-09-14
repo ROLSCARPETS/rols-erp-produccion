@@ -678,6 +678,8 @@
     $('ms-n-tecnica').querySelectorAll('.tejeduria').forEach(el => { el.hidden = !cfg.tejeduria; });
     // el gramaje solo lo llevan Colortec y los dos Tufting
     $('ms-n-gramaje-wrap').hidden = !(cfg.tejeduria && cfg.gramaje);
+    // y el tamaño de la muestra, solo los telares
+    $('ms-n-tecnica').querySelectorAll('.medidas').forEach(el => { el.hidden = !cfg.esTelar; });
     $('ms-n-materias-sub').firstChild.textContent = 'Datos de materias ';
     ponerAyuda($('ms-n-materias-sub').querySelector('.ms-hint'), `una fila por ${cfg.etiquetaCuerpo.toLowerCase()}`);
     $('ms-n-cuerpos-lbl').textContent = cfg.etiquetaN;
@@ -697,12 +699,15 @@
     const cfg = configTecnica(telar);
     const tejeduria = [['ms-n-pasadas', 'Pasadas'], ['ms-n-altura', 'Altura felpa'],
       ['ms-n-gramaje', 'Gramaje felpa'], ['ms-n-cuerpos', cfg.etiquetaN],
-      ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
+      ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado'],
+      ['ms-n-ancho', 'Ancho'], ['ms-n-largo', 'Largo']];
     const faltan = [];
+    const soloTelar = ['ms-n-ancho', 'ms-n-largo'];
     tejeduria.forEach(([id, etiqueta]) => {
       const el = $(id);
-      // el gramaje solo se pide donde se enseña
-      const toca = cfg.tejeduria && (id !== 'ms-n-gramaje' || cfg.gramaje);
+      // cada campo se pide solo donde se enseña
+      const toca = (soloTelar.includes(id) ? cfg.esTelar
+        : cfg.tejeduria && (id !== 'ms-n-gramaje' || cfg.gramaje));
       const vacio = toca && !el.value.trim();
       el.classList.toggle('ms-falta', vacio);
       if (vacio) faltan.push(etiqueta);
@@ -765,6 +770,9 @@
         pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
         gramaje: configTecnica(telarNuevo).gramaje ? $('ms-n-gramaje').value.trim() : '',
       });
+    }
+    if (configTecnica(telarNuevo).esTelar && esTecnico(telarNuevo)) {
+      Object.assign(body, { ancho: $('ms-n-ancho').value.trim(), largo: $('ms-n-largo').value.trim() });
     }
     if (tipo === 'variante') {
       const v = $('ms-n-variante').value.trim();

@@ -191,6 +191,8 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
         tej = [("Pasadas", m.get("pasadas")), ("Altura felpa", m.get("altura_felpa"))]
         if mf.lleva_gramaje(telar):
             tej.append(("Gramaje felpa", m.get("gramaje")))
+        if mf.lleva_medidas(telar):
+            tej.append(("Medidas", mf.medidas_texto(m)))
         tej += [(mf.etiqueta_n_cuerpos(telar), m.get("n_cuerpos")),
                 ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
                 ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado")))]

@@ -203,6 +203,20 @@
           <div id="md-materias"></div>
           <datalist id="md-materiales"></datalist>
           <datalist id="md-coloridos"></datalist>
+          <!-- Tamano de la muestra: solo los telares (hay que montarlos a ese ancho) -->
+          <div id="md-medidas" hidden>
+            <div class="ms-tecnica-sub">Medidas de la muestra <span class="ms-hint">lo que se pide tejer</span></div>
+            <div class="ms-campo-row">
+              <div class="ms-campo">
+                <label for="md-f-ancho">Ancho</label>
+                <input type="text" id="md-f-ancho" data-campo="ancho" maxlength="40" placeholder="Ej. 50 cm" autocomplete="off" />
+              </div>
+              <div class="ms-campo">
+                <label for="md-f-largo">Largo</label>
+                <input type="text" id="md-f-largo" data-campo="largo" maxlength="40" placeholder="Ej. 70 cm" autocomplete="off" />
+              </div>
+            </div>
+          </div>
         </div>
         <div class="ms-campo" id="md-anotacion-wrap" hidden>
           <label>Anotación del registro de números</label>

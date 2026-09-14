@@ -257,7 +257,9 @@ ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "
                                          ("pendiente", "Pendiente"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
-CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "gramaje", "n_cuerpos", "pelo", "acabado")
+CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "gramaje", "n_cuerpos", "pelo", "acabado",
+                   # Tamano que se pide de la muestra (solo los telares)
+                   "ancho", "largo")
 
 
 def _telar_tecnico(telar) -> str:
@@ -308,6 +310,23 @@ def es_telar(telar) -> bool:
 
 def lleva_hilos_pua(telar) -> bool:
     return bool(config_tecnica(telar).get("hilos_pua"))
+
+
+def lleva_medidas(telar) -> bool:
+    """Si se pide el tamano de la muestra: lo llevan los TELARES (hay que
+    montar el telar a ese ancho), no Pompon, Kibby ni Feston."""
+    return es_telar(telar) and bool(config_tecnica(telar))
+
+
+def medidas_texto(m: dict) -> str:
+    """«50 × 70 cm» para el resumen y el PDF ("" si no hay ninguna)."""
+    ancho = (m.get("ancho") or "").strip()
+    largo = (m.get("largo") or "").strip()
+    if ancho and largo:
+        return f"{ancho} × {largo}"
+    if ancho:
+        return f"ancho {ancho}"
+    return f"largo {largo}" if largo else ""
 
 
 def lleva_gramaje(telar) -> bool:
@@ -1398,6 +1417,9 @@ def resumen_tecnico(m: dict) -> str:
         # "2 cuerpos" o, en Tufting, "2 colores"
         palabra = "colores" if "color" in etiqueta_n_cuerpos(telar).lower() else "cuerpos"
         partes.append(cu if palabra[:-2] in cu.lower() else f"{cu} {palabra}")
+    med = medidas_texto(m) if lleva_medidas(telar) else ""
+    if med:
+        partes.append(med)
     pelo = pelo_fijo(m.get("telar")) or m.get("pelo")
     if pelo:
         partes.append(PELOS_LABEL.get(pelo, pelo))

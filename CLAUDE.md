@@ -90,7 +90,11 @@ laboratorio pueda llevar las muestras sin ver costes.
   **Kibby** y **Festón**), en dos bloques en la UI:
   *Datos de tejeduría* (`pasadas`, `altura_felpa`, `gramaje`, `n_cuerpos` —
   textos cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
-  sin_aprestar | resina | latex_resina | pendiente) y
+  sin_aprestar | resina | latex_resina | pendiente),
+  *Medidas de la muestra* (`ancho` y `largo`, el tamaño que se pide tejer:
+  **solo los telares** —`es_telar`—, porque hay que montarlos a ese ancho;
+  `lleva_medidas()` y `medidas_texto()` = «50 × 70 cm» para el resumen y el
+  PDF) y
   *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
   (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
   La ficha y el alta los enseñan solo si el telar es de los técnicos (si
