@@ -412,7 +412,8 @@
         box.innerHTML = `<span class="ms-estado" style="background:#e8f3e1;color:#2f6b29">Correo configurado</span> ` +
           `remitente <b>${esc(e.remitente)}</b> · servidor ${esc(e.host)}${e.origen ? ' — ' + esc(e.origen) : ''} · e-mails conocidos de ${fmtNum(e.directorio_usuarios)} usuarios` +
           (e.ultimo_chequeo_hitos ? ` · último chequeo de hitos ${esc(String(e.ultimo_chequeo_hitos).replace('T', ' ').slice(0, 16))}` : ' · el chequeo de hitos corre solo al usar la app (como mucho cada 15 min)') +
-          (e.ultimo && e.ultimo.cuando ? ` · último envío ${esc(String(e.ultimo.cuando).replace('T', ' ').slice(0, 16))}: ${e.ultimo.ok ? 'OK por ' + esc(e.ultimo.via || '') : 'ERROR ' + esc(e.ultimo.error || '')}` : '');
+          (e.ultimo && e.ultimo.cuando ? ` · último envío ${esc(String(e.ultimo.cuando).replace('T', ' ').slice(0, 16))}: ${e.ultimo.ok ? 'OK por ' + esc(e.ultimo.via || '') : 'ERROR ' + esc(e.ultimo.error || '')}` : '')
+          + avisoEnes(e);
       } else {
         box.innerHTML = `<span class="ms-estado" style="background:#fde2e2;color:#9b1c1c">Correo sin configurar</span> ` +
           `hasta que el servidor tenga <code>ROLS_SMTP_HOST</code>, <code>ROLS_SMTP_USER</code> y <code>ROLS_SMTP_PASS</code> en su <code>.env</code> (o un <code>correo.json</code> en la carpeta de datos) no se envía nada; el resto funciona igual.`;
@@ -423,6 +424,17 @@
       box.textContent = 'No se pudo consultar el estado de los avisos: ' + err.message;
     }
   }
+  // Un buzón con eñe (diseño@…) solo llega si el servidor de correo habla
+  // SMTPUTF8; se pregunta al servidor y se dice aquí.
+  function avisoEnes(e) {
+    const b = (e.buzones_utf8 || []);
+    if (!b.length) return '';
+    const cuales = esc(b.join(', '));
+    if (e.smtputf8 === true) return ` · <span style="color:#2f6b29">${cuales} llega: el servidor habla SMTPUTF8</span>`;
+    if (e.smtputf8 === false) return ` · <span style="color:#9b1c1c">ojo: el servidor NO habla SMTPUTF8, así que los avisos a ${cuales} no salen (hay que activarlo en el servidor o usar una dirección sin eñe)</span>`;
+    return ` · <span style="color:#8a6d3b">no se pudo comprobar si el servidor acepta ${cuales}${e.smtputf8_error ? ' (' + esc(e.smtputf8_error) + ')' : ''}</span>`;
+  }
+
   // ------------------------------------------------------------
   // Quién recibe cada aviso (la tabla se puede cambiar si eres admin)
   // ------------------------------------------------------------

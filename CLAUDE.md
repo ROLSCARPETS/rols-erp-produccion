@@ -208,8 +208,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   **etapas de diseño** suman destinatarios (sale un único correo con todos):
   «Listo para empezar diseño» (`listo_diseno`, la misma etapa en todas las
   técnicas) al buzón de diseño
-  (`ROLS_MUESTRAS_DISENO_EMAIL`, por defecto `diseno@rolscarpets.com`, sin eñe
-  a propósito: una ñ en la parte local exige SMTPUTF8); «Listo para revisión
+  (`ROLS_MUESTRAS_DISENO_EMAIL`, por defecto `diseño@rolscarpets.com`, **con
+  eñe**: es el buzón real. Una ñ en la parte local obliga al servidor a hablar
+  SMTPUTF8, así que `correo.soporta_smtputf8()` se lo pregunta —solo EHLO, sin
+  mandar nada— y el panel de Análisis avisa si no lo habla); «Listo para revisión
   diseño» también a quien **creó** la muestra (`creado_por`); «Diseño listo» al
   buzón del laboratorio. Y al **crear** una muestra,
   resumen a `laboratorio@rolscarpets.com` (`ROLS_MUESTRAS_LAB_EMAIL`), a

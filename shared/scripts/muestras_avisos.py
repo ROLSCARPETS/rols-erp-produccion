@@ -37,11 +37,12 @@ log = logging.getLogger("muestras.avisos")
 
 # Buzon del laboratorio: el resumen de cada muestra nueva y las que llegan a
 # «Diseño listo». Buzon de diseno: las que llegan a «Listo para empezar diseño».
-# Sin acentos en la direccion a proposito: una ñ en la parte local exige
-# SMTPUTF8 y no todos los servidores lo aceptan (se cambia por .env si el
-# buzon real es otro).
+# El de diseno lleva EÑE (es el buzon real de la casa). Una ñ en la parte local
+# obliga al servidor de correo a hablar SMTPUTF8: `correo.soporta_smtputf8()`
+# lo comprueba y el panel de Analisis avisa si el servidor no lo hace. Se
+# cambian por .env (ROLS_MUESTRAS_LAB_EMAIL / ROLS_MUESTRAS_DISENO_EMAIL).
 LAB_EMAIL_DEFECTO = "laboratorio@rolscarpets.com"
-DISENO_EMAIL_DEFECTO = "diseno@rolscarpets.com"
+DISENO_EMAIL_DEFECTO = "diseño@rolscarpets.com"
 # Hitos clave: al llegar a ellos se avisa SIEMPRE a quien encargo la muestra,
 # aunque el cambio lo haga esa misma persona. Es el valor de fabrica de esas
 # dos etapas; se puede cambiar desde Analisis (ver config_avisos).
@@ -127,6 +128,16 @@ def filas_aviso() -> list[dict]:
                 "nota": "una sola vez por fecha",
                 "asunto": "[Muestras] M-… · hito 15/10/2026: llegan los colores"})
     return out
+
+
+def buzones_con_ene() -> list[str]:
+    """Buzones configurados (en cualquier momento) con eñes o acentos en la
+    parte local: son los que necesitan que el servidor hable SMTPUTF8."""
+    import correo
+    todos = []
+    for fila in config_avisos().values():
+        todos.extend(fila.get("buzones") or [])
+    return sorted(set(correo.no_ascii(todos)))
 
 
 def guardar_config_avisos(cambios: dict) -> tuple[dict | None, str]:

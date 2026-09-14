@@ -126,6 +126,44 @@ def estado() -> dict:
             "rutas": [f"{r['origen']}" for r in rutas], "ultimo": dict(ULTIMO)}
 
 
+def no_ascii(direcciones) -> list[str]:
+    """Las direcciones cuya parte local no es ASCII (diseño@…): el servidor
+    tiene que hablar SMTPUTF8 para aceptarlas."""
+    fuera = []
+    for d in direcciones or []:
+        d = str(d or "").strip()
+        if not d:
+            continue
+        try:
+            d.encode("ascii")
+        except UnicodeEncodeError:
+            fuera.append(d)
+    return fuera
+
+
+def soporta_smtputf8() -> tuple[bool | None, str]:
+    """Si la primera ruta de envio acepta direcciones con eñes o acentos en la
+    parte local. Solo saluda al servidor (EHLO): no manda ningun correo.
+    Devuelve (True/False, "") o (None, motivo) si no se pudo preguntar."""
+    rutas = _rutas()
+    if not rutas:
+        return None, "correo no configurado"
+    r = rutas[0]
+    try:
+        if r["port"] == 465:
+            with smtplib.SMTP_SSL(r["host"], r["port"], timeout=10) as s:
+                s.ehlo()
+                return bool(s.has_extn("smtputf8")), ""
+        with smtplib.SMTP(r["host"], r["port"], timeout=10) as s:
+            s.ehlo()
+            if s.has_extn("starttls"):
+                s.starttls()
+                s.ehlo()
+            return bool(s.has_extn("smtputf8")), ""
+    except Exception as e:  # noqa: BLE001 — es un diagnostico, nunca rompe
+        return None, f"{type(e).__name__}: {e}"
+
+
 def _enviar_por(ruta: dict, msg: EmailMessage) -> None:
     if ruta["port"] == 465:
         with smtplib.SMTP_SSL(ruta["host"], ruta["port"], timeout=25) as s:

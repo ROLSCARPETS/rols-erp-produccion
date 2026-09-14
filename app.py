@@ -2057,6 +2057,12 @@ def api_muestras_avisos_estado():
         "es_admin": _user_rol() == "admin",
         "url_publica": _url_publica(),
     })
+    # Buzones con eñe (diseño@…): el servidor tiene que hablar SMTPUTF8 para
+    # aceptarlos. Solo se le pregunta si hay alguno, y sin mandar nada.
+    con_ene = _avisos_module().buzones_con_ene()
+    est["buzones_utf8"] = con_ene
+    if con_ene and est.get("configurado"):
+        est["smtputf8"], est["smtputf8_error"] = _correo_module().soporta_smtputf8()
     return jsonify(est)
 
 
