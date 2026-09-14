@@ -164,13 +164,36 @@ def soporta_smtputf8() -> tuple[bool | None, str]:
         return None, f"{type(e).__name__}: {e}"
 
 
-def _enviar_por(ruta: dict, msg: EmailMessage) -> None:
+def _sin_smtputf8(s: smtplib.SMTP, msg: EmailMessage) -> str:
+    """Si el servidor no habla SMTPUTF8, las direcciones con eñe o acentos en
+    la parte local NO se le pueden dar: intentarlo revienta el envio entero.
+    Se quitan del To para que el correo llegue por lo menos al resto, y se
+    cuenta a quien no se ha podido avisar. Si no queda nadie, se levanta."""
+    destinos = [d.strip() for d in (msg["To"] or "").split(",") if d.strip()]
+    raros = no_ascii(destinos)
+    if not raros or s.has_extn("smtputf8"):
+        return ""
+    quedan = [d for d in destinos if d not in raros]
+    fuera = ", ".join(raros)
+    if not quedan:
+        raise smtplib.SMTPNotSupportedError(
+            f"el servidor no habla SMTPUTF8: no admite {fuera}")
+    del msg["To"]
+    msg["To"] = ", ".join(quedan)
+    return f"el servidor no habla SMTPUTF8: sin avisar a {fuera}"
+
+
+def _enviar_por(ruta: dict, msg: EmailMessage) -> str:
+    """Envia por esa ruta. Devuelve "" o el aviso de a quien no se ha podido
+    mandar (ver _sin_smtputf8)."""
     if ruta["port"] == 465:
         with smtplib.SMTP_SSL(ruta["host"], ruta["port"], timeout=25) as s:
+            s.ehlo()
             if ruta["user"]:
                 s.login(ruta["user"], ruta["password"])
+            aviso = _sin_smtputf8(s, msg)
             s.send_message(msg)
-        return
+            return aviso
     with smtplib.SMTP(ruta["host"], ruta["port"], timeout=25) as s:
         s.ehlo()
         # TLS oportunista (igual que Rols Muestras): si el servidor lo ofrece
@@ -180,7 +203,9 @@ def _enviar_por(ruta: dict, msg: EmailMessage) -> None:
             s.ehlo()
         if ruta["user"]:
             s.login(ruta["user"], ruta["password"])
+        aviso = _sin_smtputf8(s, msg)
         s.send_message(msg)
+        return aviso
 
 
 def enviar(para, asunto: str, texto: str, html: str | None = None,
@@ -208,13 +233,13 @@ def enviar(para, asunto: str, texto: str, html: str | None = None,
             msg.set_content(texto or "")
             if html:
                 msg.add_alternative(html, subtype="html")
-            _enviar_por(ruta, msg)
-            ULTIMO.update({"via": ruta["origen"], "ok": True, "error": "",
+            aviso = _enviar_por(ruta, msg)
+            ULTIMO.update({"via": ruta["origen"], "ok": True, "error": "", "aviso": aviso,
                            "cuando": datetime.now().isoformat(timespec="seconds")})
-            return True, ""
+            return True, aviso
         except Exception as e:  # noqa: BLE001 — se prueba la siguiente ruta
             errores.append(f"{ruta['origen']}: {type(e).__name__}: {e}")
     err = " | ".join(errores)
-    ULTIMO.update({"via": None, "ok": False, "error": err[:300],
+    ULTIMO.update({"via": None, "ok": False, "error": err[:300], "aviso": "",
                    "cuando": datetime.now().isoformat(timespec="seconds")})
     return False, err

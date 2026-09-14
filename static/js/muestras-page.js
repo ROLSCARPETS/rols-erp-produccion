@@ -431,7 +431,7 @@
     if (!b.length) return '';
     const cuales = esc(b.join(', '));
     if (e.smtputf8 === true) return ` · <span style="color:#2f6b29">${cuales} llega: el servidor habla SMTPUTF8</span>`;
-    if (e.smtputf8 === false) return ` · <span style="color:#9b1c1c">ojo: el servidor NO habla SMTPUTF8, así que los avisos a ${cuales} no salen (hay que activarlo en el servidor o usar una dirección sin eñe)</span>`;
+    if (e.smtputf8 === false) return ` · <span style="color:#9b1c1c">ojo: el servidor de correo no habla SMTPUTF8, así que <b>a ${cuales} no le llegan los avisos</b> (el resto de destinatarios sí los reciben). Se arregla activando SMTPUTF8 en el servidor, mandando por el SMTP del proveedor de correo o poniendo una dirección sin eñe que reenvíe a esa.</span>`;
     return ` · <span style="color:#8a6d3b">no se pudo comprobar si el servidor acepta ${cuales}${e.smtputf8_error ? ' (' + esc(e.smtputf8_error) + ')' : ''}</span>`;
   }
 
