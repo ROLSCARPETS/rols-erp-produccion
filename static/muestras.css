@@ -36,19 +36,8 @@
   display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.8rem;
 }
 
-/* ---------- KPIs ---------- */
-.ms-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 1rem; }
-@media (max-width: 1100px) { .ms-kpis { grid-template-columns: repeat(2, 1fr); } }
-.ms-kpi { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1rem; display: flex; gap: 0.8rem; align-items: center; }
-.ms-kpi-ico { width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.ms-kpi-ico svg { width: 20px; height: 20px; }
-.ms-kpi-ico-curso { background: #dbeafe; color: #1e40af; }
-.ms-kpi-ico-alta { background: #fde2e2; color: #9b1c1c; }
-.ms-kpi-ico-anio { background: var(--accent-soft); color: #8a6d3b; }
-.ms-kpi-ico-term { background: #e8f3e1; color: #2f6b29; }
+/* ---------- Rótulos (el reparto de Análisis) ---------- */
 .ms-kpi-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #7a7a7a; font-weight: 600; }
-.ms-kpi-value { font-size: 1.45rem; font-weight: 600; color: #2a2a2a; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.ms-kpi-sub { font-size: 0.72rem; color: #9a9a9a; margin-top: 0.1rem; }
 
 /* ---------- Secciones / tabla ---------- */
 .ms-section { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; }

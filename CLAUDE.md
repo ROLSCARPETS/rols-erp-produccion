@@ -88,8 +88,8 @@ laboratorio pueda llevar las muestras sin ver costes.
 - **Datos técnicos** (telares de `TELARES_TECNICOS`: **Varilla**, **Lancetas**,
   **Rapier**, **Colortec**, **Tufting Bucle**, **Tufting Corte**, **Pompón**,
   **Kibby** y **Festón**), en dos bloques en la UI:
-  *Datos de tejeduría* (`pasadas`, `altura_felpa`, `n_cuerpos` — textos
-  cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
+  *Datos de tejeduría* (`pasadas`, `altura_felpa`, `gramaje`, `n_cuerpos` —
+  textos cortos —, `pelo` con etiqueta "Construcción" y `acabado`: latex |
   sin_aprestar | resina | latex_resina | pendiente) y
   *Datos de materias*: la tabla `materias[]`, una fila por cuerpo
   (`{id, cuerpo, materia, hilos_pua, colorido}`, máx. `MAX_MATERIAS` = 12).
@@ -108,9 +108,11 @@ laboratorio pueda llevar las muestras sin ver costes.
   "telar X"), `tejeduria` (esos tres la llevan a False: solo materias, ver
   `_TEC_SOLO_MATERIAS`), `etiqueta_n` (en los Tufting, `n_cuerpos` se llama
   "Nº de colores"), `etiqueta_cuerpo` (en los tres, la columna de la tabla de
-  materias es "Color") y `hilos_pua` (no llevan esa columna). Helpers:
+  materias es "Color"), `hilos_pua` (no llevan esa columna) y **`gramaje`**
+  («Gramaje felpa», p.ej. 1.500 gr/m2: lo llevan solo **Colortec** y los dos
+  **Tufting**, que se piden así). Helpers:
   `config_tecnica`, `etiqueta_n_cuerpos`, `etiqueta_cuerpo`, `lleva_tejeduria`,
-  `lleva_hilos_pua`, `es_telar`; el endpoint de catálogos lo sirve en
+  `lleva_hilos_pua`, `lleva_gramaje`, `es_telar`; el endpoint de catálogos lo sirve en
   `tecnicos_por_telar`.
   La tabla de materias se guarda **entera** en cada cambio (`PUT` con
   `materias`, sin endpoint por fila): el servidor tira las filas que no dicen
@@ -190,8 +192,9 @@ laboratorio pueda llevar las muestras sin ver costes.
   primera columna; en En curso se puede reordenar pulsando una cabecera.
 - **Próximo hito** (`proximo_hito_fecha` + `proximo_hito`): fecha del siguiente
   paso previsto, la ponen comercial o laboratorio (columna editable en En curso
-  y campos en la ficha); en rojo si ya pasó, contador en el KPI En curso;
-  terminada/cancelada lo limpian.
+  y campos en la ficha); en rojo si ya pasó; terminada/cancelada lo limpian.
+  La cabecera del listado **no lleva KPIs**: los números (en curso, prioridad
+  alta, solicitadas y terminadas del año) se miran en la pestaña Análisis.
 - **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
   del próximo hito (`hito_avisado` evita repetir). No se avisa a quien hace el

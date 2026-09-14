@@ -62,26 +62,12 @@
   }
 
   // ------------------------------------------------------------
-  // KPIs + chips de estado (cabecera)
+  // Cabecera: contadores de las pestañas y número de la próxima M.
+  // Los KPIs se quitaron de aquí: los números viven en la pestaña Análisis.
   // ------------------------------------------------------------
-  function pintarKpis() {
+  function pintarCabecera() {
     const r = ST.resumen;
     if (!r) return;
-    $('kpi-curso').textContent = fmtNum(r.en_curso);
-    const arch = r.archivadas_sin_terminar || 0;
-    const sub = [];
-    if (r.hitos_vencidos) sub.push(`${fmtNum(r.hitos_vencidos)} hito${r.hitos_vencidos === 1 ? '' : 's'} vencido${r.hitos_vencidos === 1 ? '' : 's'}`);
-    if (r.hitos_semana) sub.push(`${fmtNum(r.hitos_semana)} hito${r.hitos_semana === 1 ? '' : 's'} esta semana`);
-    if (arch) sub.push(`${fmtNum(arch)} archivadas sin terminar`);
-    $('kpi-curso-sub').textContent = sub.length ? sub.join(' · ') : 'muestras en fabricación';
-    $('kpi-curso-sub').style.color = r.hitos_vencidos ? '#9b1c1c' : '';
-    $('kpi-alta').textContent = fmtNum(r.prioridad_alta);
-    $('kpi-anio-lbl').textContent = r.anio;
-    $('kpi-anio-lbl2').textContent = r.anio;
-    $('kpi-solic').textContent = fmtNum(r.solicitadas_anio);
-    $('kpi-solic-sub').textContent = `≈ ${String(r.media_mes_anio).replace('.', ',')} al mes`;
-    $('kpi-term').textContent = fmtNum(r.terminadas_anio);
-    $('kpi-term-sub').textContent = 'entregadas este año';
     $('tc-en-curso').textContent = fmtNum(r.en_curso);
     $('tc-historico').textContent = fmtNum(Math.max(0, (r.total || 0) - (r.en_curso || 0)));
     $('ms-n-siguiente').textContent = `M-${r.siguiente_numero}`;
@@ -143,7 +129,7 @@
     ST.resumen = data.resumen;
     if (data.catalogos) { ST.catalogos = data.catalogos; pintarCatalogos(); }
     pintarAnios();
-    pintarKpis();
+    pintarCabecera();
     pintarChipsEstado();
     pintarEnCurso();
   }
@@ -334,7 +320,7 @@
     ST.hi.total = data.total || 0;
     ST.hi.limite = data.limite || 0;
     ST.hi.cargado = true;
-    if (data.resumen) { ST.resumen = data.resumen; pintarAnios(); pintarKpis(); }
+    if (data.resumen) { ST.resumen = data.resumen; pintarAnios(); pintarCabecera(); }
     pintarHistorico();
   }
 
@@ -675,6 +661,8 @@
     $('ms-n-tecnica-telar').textContent = (cfg.esTelar ? 'telar ' : '') + telar;
     // Pompón no teje: solo lleva materias
     $('ms-n-tecnica').querySelectorAll('.tejeduria').forEach(el => { el.hidden = !cfg.tejeduria; });
+    // el gramaje solo lo llevan Colortec y los dos Tufting
+    $('ms-n-gramaje-wrap').hidden = !(cfg.tejeduria && cfg.gramaje);
     $('ms-n-materias-sub').firstChild.textContent = 'Datos de materias ';
     $('ms-n-materias-sub').querySelector('.ms-hint').textContent = `una fila por ${cfg.etiquetaCuerpo.toLowerCase()}`;
     $('ms-n-cuerpos-lbl').textContent = cfg.etiquetaN;
@@ -693,11 +681,14 @@
   function faltanTecnicos(telar) {
     const cfg = configTecnica(telar);
     const tejeduria = [['ms-n-pasadas', 'Pasadas'], ['ms-n-altura', 'Altura felpa'],
-      ['ms-n-cuerpos', cfg.etiquetaN], ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
+      ['ms-n-gramaje', 'Gramaje felpa'], ['ms-n-cuerpos', cfg.etiquetaN],
+      ['ms-n-pelo', 'Construcción'], ['ms-n-acabado', 'Acabado']];
     const faltan = [];
     tejeduria.forEach(([id, etiqueta]) => {
       const el = $(id);
-      const vacio = cfg.tejeduria && !el.value.trim();
+      // el gramaje solo se pide donde se enseña
+      const toca = cfg.tejeduria && (id !== 'ms-n-gramaje' || cfg.gramaje);
+      const vacio = toca && !el.value.trim();
       el.classList.toggle('ms-falta', vacio);
       if (vacio) faltan.push(etiqueta);
     });
@@ -757,6 +748,7 @@
         pasadas: $('ms-n-pasadas').value.trim(), altura_felpa: $('ms-n-altura').value.trim(),
         n_cuerpos: $('ms-n-cuerpos').value.trim(),
         pelo: $('ms-n-pelo').value, acabado: $('ms-n-acabado').value,
+        gramaje: configTecnica(telarNuevo).gramaje ? $('ms-n-gramaje').value.trim() : '',
       });
     }
     if (tipo === 'variante') {

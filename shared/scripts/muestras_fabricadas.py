@@ -216,6 +216,7 @@ def telares_para_alta(catalogo) -> list[str]:
 #   etiqueta_n     → como se llama `n_cuerpos` en ese telar
 #   etiqueta_cuerpo→ como se llama la columna `cuerpo` de la tabla de materias
 #   hilos_pua      → si la tabla de materias lleva esa columna
+#   gramaje        → si la tejeduria lleva el gramaje de la felpa (Colortec y Tufting)
 PELOS_VARILLA: tuple[tuple[str, str], ...] = (("corte", "Corte"), ("bucle", "Bucle"),
                                               ("corte_bucle", "Corte y bucle"), ("estructurado", "Estructurado"),
                                               ("pendiente", "Pendiente"))
@@ -223,20 +224,23 @@ PELOS_LANCETAS: tuple[tuple[str, str], ...] = (("bucle_sencillo", "Bucle sencill
                                                ("tejido_plano", "Tejido plano"), ("bucle_saltillo", "Bucle con saltillo"),
                                                ("pendiente", "Pendiente"))
 _TEC_BASE = {"es_telar": True, "tejeduria": True, "etiqueta_n": "Nº de cuerpos",
-             "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True}
+             "etiqueta_cuerpo": "Cuerpo", "hilos_pua": True, "gramaje": False}
 # Pompon, Kibby y Feston no son telares: solo llevan materias, por color y sin
 # hilos por pua.
 _TEC_SOLO_MATERIAS = {"es_telar": False, "tejeduria": False, "pelos": (), "etiqueta_n": "Nº de colores",
-                      "etiqueta_cuerpo": "Color", "hilos_pua": False}
+                      "etiqueta_cuerpo": "Color", "hilos_pua": False, "gramaje": False}
 TECNICOS_POR_TELAR: dict[str, dict] = {
     "Varilla":       {**_TEC_BASE, "pelos": PELOS_VARILLA},
     "Lancetas":      {**_TEC_BASE, "pelos": PELOS_LANCETAS},
     "Rapier":        {**_TEC_BASE, "pelos": (("tejido_plano", "Tejido plano"),)},
-    "Colortec":      {**_TEC_BASE, "pelos": (("corte", "Corte"),)},
+    # Colortec y los dos Tufting se piden por gramaje de felpa (1.500 gr/m2)
+    "Colortec":      {**_TEC_BASE, "pelos": (("corte", "Corte"),), "gramaje": True},
     # Tufting: dos telares distintos, cada uno con su construccion fija, y los
     # cuerpos se cuentan como colores.
-    "Tufting Bucle": {**_TEC_BASE, "pelos": (("bucle", "Bucle"),), "etiqueta_n": "Nº de colores"},
-    "Tufting Corte": {**_TEC_BASE, "pelos": (("corte", "Corte"),), "etiqueta_n": "Nº de colores"},
+    "Tufting Bucle": {**_TEC_BASE, "pelos": (("bucle", "Bucle"),), "etiqueta_n": "Nº de colores",
+                      "gramaje": True},
+    "Tufting Corte": {**_TEC_BASE, "pelos": (("corte", "Corte"),), "etiqueta_n": "Nº de colores",
+                      "gramaje": True},
     # No son telares: solo materias (ver _TEC_SOLO_MATERIAS)
     "Pompón":        dict(_TEC_SOLO_MATERIAS),
     "Kibby":         dict(_TEC_SOLO_MATERIAS),
@@ -253,7 +257,7 @@ ACABADOS: tuple[tuple[str, str], ...] = (("latex", "Látex"), ("sin_aprestar", "
                                          ("pendiente", "Pendiente"))
 PELOS_LABEL = dict(PELOS)
 ACABADOS_LABEL = dict(ACABADOS)
-CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "n_cuerpos", "pelo", "acabado")
+CAMPOS_TECNICOS = ("pasadas", "altura_felpa", "gramaje", "n_cuerpos", "pelo", "acabado")
 
 
 def _telar_tecnico(telar) -> str:
@@ -304,6 +308,11 @@ def es_telar(telar) -> bool:
 
 def lleva_hilos_pua(telar) -> bool:
     return bool(config_tecnica(telar).get("hilos_pua"))
+
+
+def lleva_gramaje(telar) -> bool:
+    """Si la tejeduria de ese telar lleva gramaje de felpa (Colortec, Tufting)."""
+    return bool(config_tecnica(telar).get("gramaje"))
 
 # MATERIAS: una fila por cuerpo (que se teje con que). Sustituyen a los campos
 # planos `material` / `hilos_pua` (v6 los paso a una fila). Cada fila:
@@ -1087,6 +1096,7 @@ def catalogos(usuarios_one=None, usuario_actual=None) -> dict:
                             for t, ops in PELOS_POR_TELAR.items()},
         "tecnicos_por_telar": {t: {"es_telar": cfg["es_telar"], "tejeduria": cfg["tejeduria"], "etiqueta_n": cfg["etiqueta_n"],
                                    "etiqueta_cuerpo": cfg["etiqueta_cuerpo"], "hilos_pua": cfg["hilos_pua"],
+                                   "gramaje": cfg["gramaje"],
                                    "pelos": [{"valor": s, "label": l} for s, l in cfg["pelos"]]}
                                for t, cfg in TECNICOS_POR_TELAR.items()},
         "acabados": [{"valor": s, "label": l} for s, l in ACABADOS],
@@ -1379,6 +1389,10 @@ def resumen_tecnico(m: dict) -> str:
     alt = (m.get("altura_felpa") or "").strip()
     if alt:
         partes.append(alt if "felpa" in alt.lower() else f"felpa {alt}")
+    gr = (m.get("gramaje") or "").strip()
+    if gr and lleva_gramaje(telar):
+        # si ya trae las unidades escritas se deja como esta
+        partes.append(gr if ("gr" in gr.lower() or "g/m" in gr.lower()) else f"{gr} g/m²")
     cu = (m.get("n_cuerpos") or "").strip()
     if cu:
         # "2 cuerpos" o, en Tufting, "2 colores"

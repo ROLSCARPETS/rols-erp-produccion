@@ -83,26 +83,6 @@
       </button>
     </div>
 
-    <!-- KPIs -->
-    <div class="ms-kpis">
-      <div class="ms-kpi">
-        <div class="ms-kpi-ico ms-kpi-ico-curso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-        <div><div class="ms-kpi-label">En curso</div><div class="ms-kpi-value" id="kpi-curso">—</div><div class="ms-kpi-sub" id="kpi-curso-sub"></div></div>
-      </div>
-      <div class="ms-kpi">
-        <div class="ms-kpi-ico ms-kpi-ico-alta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17.5v.5"/></svg></div>
-        <div><div class="ms-kpi-label">Prioridad alta</div><div class="ms-kpi-value" id="kpi-alta">—</div><div class="ms-kpi-sub">en curso</div></div>
-      </div>
-      <div class="ms-kpi">
-        <div class="ms-kpi-ico ms-kpi-ico-anio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
-        <div><div class="ms-kpi-label">Solicitadas <span id="kpi-anio-lbl"></span></div><div class="ms-kpi-value" id="kpi-solic">—</div><div class="ms-kpi-sub" id="kpi-solic-sub"></div></div>
-      </div>
-      <div class="ms-kpi">
-        <div class="ms-kpi-ico ms-kpi-ico-term"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-        <div><div class="ms-kpi-label">Terminadas <span id="kpi-anio-lbl2"></span></div><div class="ms-kpi-value" id="kpi-term">—</div><div class="ms-kpi-sub" id="kpi-term-sub"></div></div>
-      </div>
-    </div>
-
     <!-- Tabs -->
     <div class="tabs-bar mb-5">
       <button class="tab-btn active" data-tab="en-curso">En curso <span class="tab-count" id="tc-en-curso">0</span></button>
@@ -319,6 +299,8 @@
           <div class="c2 tejeduria"><label>Pasadas</label><input type="text" id="ms-n-pasadas" maxlength="40" placeholder="Ej. 30" inputmode="decimal" autocomplete="off" /></div>
           <div class="c2 tejeduria"><label>Altura felpa</label><input type="text" id="ms-n-altura" maxlength="40" placeholder="Ej. 12 mm" autocomplete="off" /></div>
           <div class="c2 tejeduria"><label id="ms-n-cuerpos-lbl">Nº de cuerpos</label><input type="text" id="ms-n-cuerpos" maxlength="40" placeholder="Ej. 2" inputmode="decimal" autocomplete="off" /></div>
+          <!-- Gramaje de la felpa: solo Colortec y los dos Tufting -->
+          <div class="c2 tejeduria" id="ms-n-gramaje-wrap" hidden><label>Gramaje felpa</label><input type="text" id="ms-n-gramaje" maxlength="40" placeholder="Ej. 1.500 gr/m2" autocomplete="off" /></div>
           <div class="c3 tejeduria"><label>Construcción</label><select id="ms-n-pelo"></select><div class="ms-readonly" id="ms-n-pelo-fijo" hidden></div></div>
           <div class="c3 tejeduria"><label>Acabado</label><select id="ms-n-acabado"><option value="">—</option><option value="latex">Látex</option><option value="sin_aprestar">Sin aprestar</option><option value="resina">Resina</option><option value="latex_resina">Látex + resina</option><option value="pendiente">Pendiente</option></select></div>
           <div class="full ms-tecnica-sub" id="ms-n-materias-sub">Datos de materias <span class="ms-hint">una fila por cuerpo</span></div>

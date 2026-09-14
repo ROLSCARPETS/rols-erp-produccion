@@ -188,10 +188,12 @@ def generar_pdf_muestra(m: dict, base_url: str = "") -> bytes:
         flow.append(KeepTogether([cab, Spacer(1, 1.5 * mm)] + contenido + [Spacer(1, 4 * mm)]))
 
     if mf.lleva_tejeduria(telar):
-        tej = [("Pasadas", m.get("pasadas")), ("Altura felpa", m.get("altura_felpa")),
-               (mf.etiqueta_n_cuerpos(telar), m.get("n_cuerpos")),
-               ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
-               ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado")))]
+        tej = [("Pasadas", m.get("pasadas")), ("Altura felpa", m.get("altura_felpa"))]
+        if mf.lleva_gramaje(telar):
+            tej.append(("Gramaje felpa", m.get("gramaje")))
+        tej += [(mf.etiqueta_n_cuerpos(telar), m.get("n_cuerpos")),
+                ("Construcción", mf.PELOS_LABEL.get(m.get("pelo"), m.get("pelo"))),
+                ("Acabado", mf.ACABADOS_LABEL.get(m.get("acabado"), m.get("acabado")))]
         celdas = [[Paragraph(_esc(k), st_label) for k, _ in tej],
                   [Paragraph(_esc(v) or "—", st_valor) for _, v in tej]]
         t = Table(celdas, colWidths=[ancho / len(tej)] * len(tej))

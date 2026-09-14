@@ -78,22 +78,24 @@
   //   etiquetaN      → cómo se llama `n_cuerpos` en ese telar
   //   etiquetaCuerpo → cómo se llama la columna `cuerpo` de las materias
   //   hilosPua       → si la tabla de materias lleva esa columna
+  //   gramaje        → si la tejeduría lleva el gramaje de la felpa (Colortec y Tufting)
   const PELOS_VARILLA = [['corte', 'Corte'], ['bucle', 'Bucle'], ['corte_bucle', 'Corte y bucle'],
     ['estructurado', 'Estructurado'], ['pendiente', 'Pendiente']];
   const PELOS_LANCETAS = [['bucle_sencillo', 'Bucle sencillo'], ['tejido_plano', 'Tejido plano'],
     ['bucle_saltillo', 'Bucle con saltillo'], ['pendiente', 'Pendiente']];
-  const TEC_BASE = { esTelar: true, tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true };
+  const TEC_BASE = { esTelar: true, tejeduria: true, etiquetaN: 'Nº de cuerpos', etiquetaCuerpo: 'Cuerpo', hilosPua: true, gramaje: false };
   // Pompón, Kibby y Festón no son telares: solo materias, por color y sin hilos púa
   const TEC_SOLO_MATERIAS = { esTelar: false, tejeduria: false, pelos: [], etiquetaN: 'Nº de colores',
-    etiquetaCuerpo: 'Color', hilosPua: false };
+    etiquetaCuerpo: 'Color', hilosPua: false, gramaje: false };
   const TECNICOS_POR_TELAR = {
     'Varilla': Object.assign({}, TEC_BASE, { pelos: PELOS_VARILLA }),
     'Lancetas': Object.assign({}, TEC_BASE, { pelos: PELOS_LANCETAS }),
     'Rapier': Object.assign({}, TEC_BASE, { pelos: [['tejido_plano', 'Tejido plano']] }),
-    'Colortec': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']] }),
+    // Colortec y los dos Tufting se piden por gramaje de felpa (1.500 gr/m2)
+    'Colortec': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']], gramaje: true }),
     // Tufting son dos telares distintos; los cuerpos se cuentan como colores
-    'Tufting Bucle': Object.assign({}, TEC_BASE, { pelos: [['bucle', 'Bucle']], etiquetaN: 'Nº de colores' }),
-    'Tufting Corte': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']], etiquetaN: 'Nº de colores' }),
+    'Tufting Bucle': Object.assign({}, TEC_BASE, { pelos: [['bucle', 'Bucle']], etiquetaN: 'Nº de colores', gramaje: true }),
+    'Tufting Corte': Object.assign({}, TEC_BASE, { pelos: [['corte', 'Corte']], etiquetaN: 'Nº de colores', gramaje: true }),
     // No son telares: solo materias (ver TEC_SOLO_MATERIAS)
     'Pompón': Object.assign({}, TEC_SOLO_MATERIAS),
     'Kibby': Object.assign({}, TEC_SOLO_MATERIAS),
