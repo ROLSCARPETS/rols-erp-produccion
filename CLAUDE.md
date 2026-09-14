@@ -202,9 +202,10 @@ laboratorio pueda llevar las muestras sin ver costes.
   alta, solicitadas y terminadas del año) se miran en la pestaña Análisis.
 - **Avisos por correo** (`shared/scripts/correo.py` + `muestras_avisos.py`): a
   quien encargó la muestra al cambiar de etapa, al terminar/cancelar y el día
-  del próximo hito (`hito_avisado` evita repetir). No se avisa a quien hace el
-  cambio, salvo en los `HITOS_CLAVE` («Listo para revisión diseño», que pide
-  marcar la Verificación de diseño, y «Terminada»), que avisan siempre. Las
+  del próximo hito (`hito_avisado` evita repetir). Se le avisa **también
+  cuando el cambio lo hace ella misma**: el modo «salvo si lo hace ella»
+  (`salvo_actor`) se retiró para dejarlo en avisar o no avisar, y lo que
+  hubiera guardado con ese valor se lee como «siempre» (`MODO_LEGACY`). Las
   **etapas de diseño** suman destinatarios (sale un único correo con todos):
   «Listo para empezar diseño» (`listo_diseno`, la misma etapa en todas las
   técnicas) al buzón de diseño
@@ -229,8 +230,8 @@ laboratorio pueda llevar las muestras sin ver costes.
   por momento (la estructura del modal de fases de Heroturfs One: etapa +
   asunto · selector · buzones con el check debajo)
   (`GET|PUT /api/muestras/avisos/config`, el PUT solo admin): por cada momento
-  —el alta, cada etapa y el hito— se elige si va a **quien la encargó** (`no` |
-  `salvo_actor` | `siempre`), si va a **quien la creó** y qué **buzones** fijos
+  —el alta, cada etapa y el hito— se elige si va a **quien la encargó**
+  (`no` | `siempre`), si va a **quien la creó** y qué **buzones** fijos
   la reciben. `muestras_avisos.avisos_por_defecto()` son los valores de fábrica
   (los de arriba) y `config_avisos()` les pega encima lo guardado en la muestra
   doc (`avisos_destinatarios`, solo las filas tocadas).

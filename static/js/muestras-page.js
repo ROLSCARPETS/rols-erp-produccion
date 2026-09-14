@@ -439,7 +439,7 @@
   // Quién recibe cada aviso (la tabla se puede cambiar si eres admin)
   // ------------------------------------------------------------
   let AVISOS = null;
-  const MODOS = [['no', 'No se le avisa'], ['salvo_actor', 'Sí, salvo si lo hace ella'], ['siempre', 'Sí, siempre']];
+  const MODOS = [['no', 'No se le avisa'], ['siempre', 'Sí, se le avisa']];
 
   async function cargarAvisosConfig() {
     const tb = $('an-avisos-filas');

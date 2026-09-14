@@ -9,7 +9,8 @@ Reglas:
   - Destinatario: `encargada_por_usuario` → su e-mail segun el directorio de
     cuentas (snapshot guardado en el documento) o, si el usuario ya es un
     e-mail (fernando@rolscarpets.com), ese mismo.
-  - No se avisa a quien hace el cambio (ya lo sabe), salvo en los HITOS_CLAVE.
+  - A quien encargo la muestra se le avisa o no segun diga su fila: no se
+    mira quien hace el cambio (antes habia un "salvo si lo hace ella").
   - Etapas de diseno: «Listo para empezar diseno» avisa al buzon de diseno,
     «Listo para revision diseno» a quien la encargo Y a quien la creo, y
     «Diseno listo» al buzon del laboratorio.
@@ -46,17 +47,19 @@ DISENO_EMAIL_DEFECTO = "diseño@rolscarpets.com"
 # Hitos clave: al llegar a ellos se avisa SIEMPRE a quien encargo la muestra,
 # aunque el cambio lo haga esa misma persona. Es el valor de fabrica de esas
 # dos etapas; se puede cambiar desde Analisis (ver config_avisos).
-HITOS_CLAVE = ("revision_diseno", "terminada")
 
 # ---------------------------------------------------------------------------
 # Quien recibe cada aviso (configurable desde la pestana Analisis)
 # ---------------------------------------------------------------------------
 # Una fila por momento: el alta ("nueva"), cada etapa y el proximo hito
 # ("hito"). De cada fila:
-#   encargada → "no" | "salvo_actor" (no si el cambio lo hace ella) | "siempre"
+#   encargada → "no" | "siempre" (se le avisa, lo haya hecho ella o no)
 #   creador   → si tambien se avisa a quien creo la muestra
 #   buzones   → e-mails fijos que reciben esa fila pase lo que pase
-MODOS_ENCARGADA = ("no", "salvo_actor", "siempre")
+MODOS_ENCARGADA = ("no", "siempre")
+# El modo viejo "salvo_actor" (no avisar si el cambio lo hacia ella misma) se
+# retiro: lo que haya guardado con ese valor pasa a "siempre".
+MODO_LEGACY = {"salvo_actor": "siempre"}
 MAX_BUZONES = 5
 _RE_EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]{2,}$")
 
@@ -65,7 +68,7 @@ def claves_aviso() -> list[str]:
     return ["nueva", *mf.ESTADOS_SELECCIONABLES, "hito"]
 
 
-def _fila(encargada: str = "salvo_actor", creador: bool = False, buzones=()) -> dict:
+def _fila(encargada: str = "siempre", creador: bool = False, buzones=()) -> dict:
     return {"encargada": encargada, "creador": bool(creador), "buzones": [b for b in buzones if b]}
 
 
@@ -74,9 +77,9 @@ def avisos_por_defecto() -> dict:
     lab, dis = email_laboratorio(), email_diseno()
     cfg = {c: _fila() for c in claves_aviso()}
     cfg["nueva"] = _fila("no", True, [lab])
-    cfg["listo_diseno"] = _fila("salvo_actor", False, [dis])
+    cfg["listo_diseno"] = _fila("siempre", False, [dis])
     cfg["revision_diseno"] = _fila("siempre", True)
-    cfg["diseno_listo"] = _fila("salvo_actor", False, [lab])
+    cfg["diseno_listo"] = _fila("siempre", False, [lab])
     cfg["terminada"] = _fila("siempre")
     cfg["hito"] = _fila("siempre")
     return cfg
@@ -91,6 +94,7 @@ def config_avisos() -> dict:
             for campo in ("encargada", "creador", "buzones"):
                 if campo in v:
                     fila[campo] = v[campo]
+            fila["encargada"] = MODO_LEGACY.get(fila["encargada"], fila["encargada"])
             cfg[k] = fila
     return cfg
 
@@ -153,6 +157,8 @@ def guardar_config_avisos(cambios: dict) -> tuple[dict | None, str]:
             return None, f"{clave}: la fila debe ser un objeto"
         out = {}
         if "encargada" in fila:
+            fila = dict(fila)
+            fila["encargada"] = MODO_LEGACY.get(fila["encargada"], fila["encargada"])
             if fila["encargada"] not in MODOS_ENCARGADA:
                 return None, f"{clave}: «quien la encargó» no válido ({fila['encargada']!r})"
             out["encargada"] = fila["encargada"]
@@ -341,8 +347,8 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
                         directorio, base_url: str) -> dict:
     """Avisa del cambio de etapa. Quien lo recibe:
 
-      - quien encargo la muestra, en cualquier etapa, salvo que el cambio lo
-        haga esa misma persona (en los HITOS_CLAVE se le avisa igualmente);
+      - quien encargo la muestra, en las etapas que su fila diga que si
+        (tambien cuando el cambio lo hace ella misma);
       - en «Listo para revision diseno», tambien quien la creo;
       - el buzon de la etapa: diseno en «Listo para empezar diseno» (Print o
         Varilla) y laboratorio en «Diseno listo».
@@ -376,8 +382,8 @@ def aviso_cambio_estado(mid: str, anterior: str, nuevo: str, actor, nota: str,
     # 1) quien la encargo, segun lo configurado para esta etapa
     dest_u = (m.get("encargada_por_usuario") or "").strip().lower()
     sin_email_de = ""
-    modo = cfg.get("encargada", "salvo_actor")
-    if dest_u and (modo == "siempre" or (modo == "salvo_actor" and dest_u != actor_u)):
+    modo = MODO_LEGACY.get(cfg.get("encargada"), cfg.get("encargada", "siempre"))
+    if dest_u and modo != "no":
         email, nombre = email_de_usuario(dest_u, directorio)
         if not anadir(email, nombre or m.get("encargada_por") or dest_u):
             sin_email_de = dest_u
