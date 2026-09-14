@@ -427,6 +427,8 @@ details.ms-hist > summary { cursor: pointer; font-size: 0.78rem; color: #7a7a7a;
 .ms-n-tecnica .ms-form-grid-inner { margin-bottom: 0; grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .ms-form-grid-inner > .c2 { grid-column: span 2; }
 .ms-form-grid-inner > .c3 { grid-column: span 3; }
+/* El gramaje va en su propia línea, pero el campo no necesita todo el ancho */
+.ms-form-grid-inner > .ms-n-gramaje input { max-width: 220px; }
 /* Subdivisión del bloque técnico: tejeduría / materias */
 .ms-tecnica-sub { font-size: 0.66rem; font-weight: 700; color: #a0865a; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.45rem; padding-top: 0.55rem; border-top: 1px dashed #e8dcc6; }
 .ms-tecnica-title + .ms-tecnica-sub, .ms-form-grid-inner > .ms-tecnica-sub:first-child { border-top: 0; padding-top: 0; }
