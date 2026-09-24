@@ -45,7 +45,7 @@ Seguimiento de prototipos y muestras tejidas en fábrica (sustituye al
 `LIBRO DE MUESTRAS.xlsx` de `X:. MUESTRAS`). Módulo
 `shared/scripts/muestras_fabricadas.py` (doc jsonstore `muestras_fabricadas`,
 seed `shared/data/muestras_fabricadas.json` importado del Excel: 2.337
-muestras desde 2015, esquema v9). Permiso propio **`muestras_fabricadas`** (sección
+muestras desde 2015, esquema v11). Permiso propio **`muestras_fabricadas`** (sección
 "Rols Producción" en cuentas), separado de `compras` para que el
 laboratorio pueda llevar las muestras sin ver costes.
 
@@ -315,6 +315,16 @@ un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
 - Flask **no** tiene hot-reload de Python: tras cambios hay que reiniciar.
 - Producción: `passenger_wsgi.py` (Plesk/Passenger). Siembra `ROLS_DATA_DIR`
   desde `shared/data` (idempotente) y bootstrapea reportlab.
+
+## Pruebas
+
+- `python tests/test_muestras.py`: regresión de Muestras fabricadas (módulo,
+  API, páginas, correo y PDF) con el test client de Flask, el SSO y el correo
+  de mentira, sobre una **copia del seed en una carpeta temporal** (no toca
+  datos). Sale con 0 si todo pasa. **Pasarla antes de cada push** que toque
+  muestras, y añadir las comprobaciones del cambio en el mismo commit.
+- Las pruebas viven en el repo: la batería anterior estaba en la carpeta
+  temporal de la sesión y se perdió con una limpieza de Windows.
 
 ## Git
 
