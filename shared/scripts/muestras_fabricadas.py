@@ -1670,6 +1670,10 @@ def crear(datos: dict, usuario: str | None = None, usuarios_one=None,
             persona_raw, _personas_conocidas(data, usuarios_one, usuario_actual))
         if err:
             return None, err
+        # Toda muestra nueva tiene a alguien detras: es a quien se avisa y
+        # quien responde de ella (las antiguas del libro se quedan como estan).
+        if not persona:
+            return None, "indica quién encarga la muestra: «Encargada por» es obligatorio"
         variante_de = datos.get("variante_de")
         numero_manual = datos.get("numero_manual")
         if variante_de not in (None, ""):
@@ -1829,6 +1833,8 @@ def actualizar(mid: str, datos: dict, usuario: str | None = None, usuarios_one=N
                     v, _personas_conocidas(data, usuarios_one, usuario_actual))
                 if err:
                     return None, err
+                if not v:
+                    return None, "«Encargada por» es obligatorio: no se puede dejar vacío"
                 m["encargada_por_usuario"] = v_usuario
             if m.get(k) != v:
                 cambios.append((k, m.get(k), v))

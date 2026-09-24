@@ -201,7 +201,13 @@ laboratorio pueda llevar las muestras sin ver costes.
 - Migraciones de esquema en `cargar()` (version-gated, idempotentes). v2:
   tipo deducido, telares unificados (Escala→Rapier, Solo diseño→Print), dos
   erratas de fecha del libro corregidas y fuera las 6 M de dic-2014.
-- **Quien encarga** (`encargada_por` + `encargada_por_usuario`) debe ser un
+- **Quien encarga** (`encargada_por` + `encargada_por_usuario`) es
+  **obligatorio** en las muestras nuevas: el alta y el backend (`crear`) no
+  dejan crearla sin nadie, y en la ficha no se puede vaciar (`actualizar` lo
+  rechaza; el selector solo enseña el marcador «elige…» si la muestra no tiene
+  a nadie, como las antiguas del libro, que se quedan como estaban). La
+  «Nueva variante» copia a quien la encarga, así que si la original no tiene
+  un usuario actual pide elegirlo antes. Debe ser un
   usuario de Rols One: `app.py` pide a cuentas `/api/usuarios/con-permiso?permiso=muestras_fabricadas`
   (cache 5 min; si cuentas no responde, se usan los usuarios ya vistos en
   datos). v3 pasó los nombres cortos del libro a su cuenta (Fernando →

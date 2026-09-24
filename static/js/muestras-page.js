@@ -642,7 +642,8 @@
     const c = ST.catalogos || { personas_activas: [], telares: [] };
     const u = window.__rolsUser || {};
     // Por defecto, quien está logueado (si tiene acceso a muestras)
-    llenarSelectPersonas($('ms-n-persona'), c.personas_activas, { vacio: '— quién la encarga —', usuario: u.username || '' });
+    llenarSelectPersonas($('ms-n-persona'), c.personas_activas,
+      { vacio: '— elige quién la encarga —', obligatorio: true, usuario: u.username || '' });
     llenarSelect($('ms-n-telar'), c.telares_alta || c.telares, { vacio: '— telar / técnica —', valor: '' });
     $('ms-n-telar').dataset.vacio = '— telar / técnica —';
     // Datos técnicos: solo con telar de varilla
@@ -745,6 +746,13 @@
     err.classList.remove('show');
     const cliente = $('ms-n-cliente').value.trim();
     if (tipoNuevo === 'cliente' && !cliente) return fallo('Indica el cliente, o marca la muestra como interna.');
+    // Toda muestra tiene a alguien que la encarga (es a quien se avisa)
+    const persona = $('ms-n-persona');
+    persona.classList.toggle('ms-falta', !persona.value);
+    if (!persona.value) {
+      persona.focus();
+      return fallo('Indica quién encarga la muestra: «Encargada por» es obligatorio.');
+    }
     const telarNuevo = $('ms-n-telar').value;
     if (esTecnico(telarNuevo)) {
       const faltan = faltanTecnicos(telarNuevo);

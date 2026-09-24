@@ -103,6 +103,15 @@
       textoConfirmar: 'Crear variante',
     });
     if (!r.ok) return;
+    if (!M.encargada_por_usuario) {
+      await window.mostrarAlerta({
+        titulo: 'Falta quién la encarga',
+        mensaje: `La variante copia «Encargada por» de esta muestra, y aquí no hay ningún usuario actual${M.encargada_por ? ` (${M.encargada_por} es del libro antiguo)` : ''}. Elige quién la encarga en la ficha y vuelve a crear la variante.`,
+        tipo: 'warning',
+      });
+      $('md-f-persona').focus();
+      return;
+    }
     try {
       const d = await api('/api/muestras', { method: 'POST', body: {
         variante_de: M.numero, cliente: M.cliente, tipo: M.tipo || 'cliente',
@@ -319,8 +328,12 @@
   });
 
   function rellenarPersona() {
+    // Obligatorio: una vez puesta no se puede vaciar. Solo si la muestra no
+    // tiene a nadie (del libro antiguo) sale el marcador para elegir.
+    const nadie = !M.encargada_por_usuario && !M.encargada_por;
     llenarSelectPersonas($('md-f-persona'), CAT.personas_activas,
-      { vacio: '—', usuario: M.encargada_por_usuario || '', nombre: M.encargada_por || '' });
+      { vacio: nadie ? '— elige quién la encarga —' : undefined, obligatorio: true,
+        usuario: M.encargada_por_usuario || '', nombre: M.encargada_por || '' });
   }
 
   function marcar(el, cls) {

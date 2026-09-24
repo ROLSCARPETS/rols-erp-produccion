@@ -283,7 +283,11 @@
     const lista = activas || [];
     const usuarioSel = (o.usuario || '').toLowerCase();
     sel.innerHTML = '';
-    if (o.vacio !== undefined) sel.insertAdjacentHTML('beforeend', `<option value="">${esc(o.vacio)}</option>`);
+    // o.obligatorio: el hueco vacío es solo un marcador («elige…»), no una opción
+    if (o.vacio !== undefined) {
+      sel.insertAdjacentHTML('beforeend',
+        `<option value=""${o.obligatorio ? ' disabled' : ''}>${esc(o.vacio)}</option>`);
+    }
     lista.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${esc(p.usuario)}">${esc(p.nombre)}</option>`));
     let valor = '';
     const hit = usuarioSel ? lista.find(p => (p.usuario || '').toLowerCase() === usuarioSel) : null;
