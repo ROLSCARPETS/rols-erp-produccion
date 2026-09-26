@@ -2048,6 +2048,160 @@ def _avisos_module():
     return _av
 
 
+def _sistema_module():
+    rols_shared.ensure_shared_on_path()
+    import sistema as _s
+    return _s
+
+
+# ---- Copia de seguridad diaria de la BD (sistema.py) ----
+# La dispara la primera peticion de cada hora (como el chequeo de hitos:
+# Passenger no garantiza un proceso vivo a una hora fija) y solo hace algo si
+# la copia de hoy aun no existe. En segundo plano: nadie la espera.
+_COPIA_ULTIMA: dict = {"t": 0.0}
+_COPIA_CADA_S = 3600.0
+
+
+@app.before_request
+def _copia_tick():
+    p = request.path or ""
+    if p.startswith("/static/") or p.startswith("/shared/") or p == "/health":
+        return
+    now = time.time()
+    if now - _COPIA_ULTIMA["t"] < _COPIA_CADA_S:
+        return
+    _COPIA_ULTIMA["t"] = now
+    _en_segundo_plano(_copia_diaria_bg)
+
+
+def _copia_diaria_bg():
+    try:
+        hecha = _sistema_module().copia_diaria_si_toca()
+        if hecha:
+            log.info("copia de seguridad diaria: %s (%d bytes)", hecha["nombre"], hecha["tamano"])
+    except Exception:
+        log.exception("la copia de seguridad diaria ha fallado")
+
+
+# ---- Errores no controlados: se apuntan y se avisa por correo ----
+# Una alerta por ruta y tipo de error cada _ALERTAS_CADA_S, para no inundar el
+# buzon si algo entra en bucle. A quien se avisa lo decide un admin desde el
+# panel de mantenimiento (Analisis). Best-effort: nunca empeora el error.
+_ALERTAS_ULTIMA: dict = {}
+_ALERTAS_CADA_S = 1800.0
+
+
+def _al_error(sender, exception, **extra):
+    try:
+        import traceback
+        tipo = type(exception).__name__
+        traza = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+        try:
+            usuario = _user_name() or "(sin sesión)"
+        except Exception:
+            usuario = "?"
+        metodo, ruta = request.method, request.path
+        log.error("error no controlado en %s %s (%s): %s", metodo, ruta, usuario, exception)
+        sis = _sistema_module()
+        destinos = sis.alertas_email()
+        clave = f"{ruta}|{tipo}"
+        avisar = bool(destinos) and time.time() - _ALERTAS_ULTIMA.get(clave, 0.0) >= _ALERTAS_CADA_S
+        if avisar:
+            _ALERTAS_ULTIMA[clave] = time.time()
+        sis.registrar_error(metodo, ruta, usuario, tipo, str(exception), traza, avisado=avisar)
+        if avisar:
+            texto = (f"Ha fallado una petición del ERP de Producción.\n\n"
+                     f"Cuándo: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+                     f"Dónde:  {metodo} {ruta}\n"
+                     f"Quién:  {usuario}\n"
+                     f"Error:  {tipo}: {exception}\n\n"
+                     f"(No se repite el aviso de este mismo error en esta ruta hasta dentro de "
+                     f"{int(_ALERTAS_CADA_S // 60)} minutos. Los últimos errores están en "
+                     f"Muestras fabricadas → Análisis → Mantenimiento.)\n\n{traza[-3000:]}")
+            _en_segundo_plano(_correo_module().enviar, destinos,
+                              f"[ERP Producción] Error en {ruta}", texto)
+    except Exception:
+        pass
+
+
+from flask import got_request_exception  # noqa: E402
+got_request_exception.connect(_al_error, app, weak=False)
+
+from werkzeug.exceptions import InternalServerError  # noqa: E402
+
+
+@app.errorhandler(InternalServerError)
+def _error_500(e):
+    """En la API, un JSON que el front sabe enseñar (en vez de una página HTML)."""
+    if (request.path or "").startswith("/api/"):
+        return jsonify({"error": "error interno del servidor: ha quedado registrado para revisarlo"}), 500
+    return e
+
+
+# ---- Panel de mantenimiento (solo administradores) ----
+def _solo_admin():
+    if not _sso_user():
+        return jsonify({"error": "no autorizado"}), 403
+    if _user_rol() != "admin":
+        return jsonify({"error": "solo un administrador puede ver el mantenimiento"}), 403
+    return None
+
+
+@app.route("/api/sistema")
+def api_sistema():
+    """Copias de seguridad, a quien se avisa de los errores y los ultimos errores."""
+    bl = _solo_admin()
+    if bl:
+        return bl
+    sis = _sistema_module()
+    return jsonify({"copias": sis.listar_copias(), "diarias": sis.DIARIAS, "semanales": sis.SEMANALES,
+                    "alertas_email": sis.alertas_email(), "errores": sis.errores_recientes(10),
+                    "correo_configurado": _correo_module().configurado()})
+
+
+@app.route("/api/sistema/copias", methods=["POST"])
+def api_sistema_hacer_copia():
+    """Copia de seguridad ahora mismo (la de hoy se sustituye) y su comprobacion."""
+    bl = _solo_admin()
+    if bl:
+        return bl
+    sis = _sistema_module()
+    try:
+        copia = sis.hacer_copia()
+        comprobacion = sis.verificar_copia(copia["nombre"])
+    except Exception as e:  # noqa: BLE001
+        log.exception("copia de seguridad a mano")
+        return jsonify({"error": f"no se pudo hacer la copia: {e}"}), 500
+    return jsonify({"copia": copia, "comprobacion": comprobacion, "copias": sis.listar_copias()}), 201
+
+
+@app.route("/api/sistema/copias/<nombre>")
+def api_sistema_descargar_copia(nombre):
+    """Descarga una copia (para guardarla FUERA del servidor)."""
+    bl = _solo_admin()
+    if bl:
+        return bl
+    ruta = _sistema_module().ruta_copia(nombre)
+    if not ruta:
+        return jsonify({"error": "esa copia no existe"}), 404
+    from flask import send_file
+    return send_file(ruta, mimetype="application/gzip", as_attachment=True,
+                     download_name=nombre, max_age=0)
+
+
+@app.route("/api/sistema/alertas", methods=["PUT"])
+def api_sistema_alertas():
+    """A quien se avisa por correo de los errores de la aplicacion."""
+    bl = _solo_admin()
+    if bl:
+        return bl
+    data = request.get_json(force=True, silent=True) or {}
+    emails, err = _sistema_module().guardar_alertas_email(data.get("emails", []))
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"alertas_email": emails})
+
+
 def _en_segundo_plano(fn, *args, **kwargs):
     """Ejecuta fn en un hilo (en tests, en linea, para poder comprobarlo)."""
     if app.config.get("TESTING"):

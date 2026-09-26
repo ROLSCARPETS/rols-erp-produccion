@@ -253,6 +253,21 @@ select.ms-sel-estado.saving { opacity: 0.5; }
 .ms-avisos-txt { font-size: 0.84rem; color: #4d4d4d; line-height: 1.5; margin: 0 0 0.7rem; max-width: 70rem; }
 .ms-avisos-estado { font-size: 0.82rem; color: #4d4d4d; line-height: 1.6; }
 /* Chuleta de avisos: quién recibe cada correo y en qué etapa */
+/* Panel de mantenimiento (Análisis, solo admin) */
+.ms-mant-bloque { border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; margin-bottom: 0.7rem; background: var(--bg-page); }
+.ms-mant-cab { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem; font-size: 0.88rem; }
+.ms-mant-cab .ms-btn { margin-left: auto; }
+.ms-mant-sub { font-size: 0.76rem; color: #7a7a7a; }
+.ms-mant-lista { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; }
+.ms-mant-fila { display: flex; align-items: center; gap: 0.7rem; padding: 0.3rem 0.4rem; border-radius: 6px; background: #fff; border: 1px solid #f0ebe4; }
+.ms-mant-fila .n { font-variant-numeric: tabular-nums; color: #2a2a2a; font-weight: 600; min-width: 7.5rem; }
+.ms-mant-fila .m { color: #7a7a7a; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-mant-fila a { color: var(--accent-hover); font-weight: 600; text-decoration: none; }
+.ms-mant-fila a:hover { text-decoration: underline; }
+.ms-mant-fila.err .n { color: #9b1c1c; }
+.ms-mant-alertas { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #4d4d4d; }
+.ms-mant-alertas input { flex: 1 1 auto; max-width: 28rem; }
+
 /* Cada momento, una fila-tarjeta: cuándo · a quién · otros destinatarios */
 .ms-av-lista { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.7rem; }
 .ms-av-cab, .ms-av-fila { display: grid; grid-template-columns: minmax(170px, 1.1fr) 190px minmax(220px, 1.4fr); gap: 0.6rem; align-items: center; }

@@ -419,11 +419,80 @@
           `hasta que el servidor tenga <code>ROLS_SMTP_HOST</code>, <code>ROLS_SMTP_USER</code> y <code>ROLS_SMTP_PASS</code> en su <code>.env</code> (o un <code>correo.json</code> en la carpeta de datos) no se envía nada; el resto funciona igual.`;
       }
       $('an-avisos-prueba').hidden = !e.es_admin;
+      if (e.es_admin) cargarMantenimiento();
       if (!AVISOS) cargarAvisosConfig();
     } catch (err) {
       box.textContent = 'No se pudo consultar el estado de los avisos: ' + err.message;
     }
   }
+  // ------------------------------------------------------------
+  // Mantenimiento (solo admin): copias de seguridad y errores
+  // ------------------------------------------------------------
+  const fmtTam = (b) => b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
+  function pintarCopias(copias, diarias, semanales) {
+    $('an-copias-resumen').textContent = copias.length
+      ? `última: ${fmtFecha(copias[0].dia)} · ${copias.length} guardadas (${diarias} diarias + ${semanales} semanales)`
+      : 'todavía no hay ninguna';
+    $('an-copias').innerHTML = copias.slice(0, 6).map(cp => `<div class="ms-mant-fila">
+        <span class="n">${esc(fmtFecha(cp.dia))}</span>
+        <span class="m">${esc(fmtTam(cp.tamano))} · hecha a las ${esc(String(cp.hecha_en).slice(11, 16))}</span>
+        <a href="/api/sistema/copias/${encodeURIComponent(cp.nombre)}" download>Descargar</a>
+      </div>`).join('') + (copias.length > 6 ? `<div class="ms-mant-sub">y ${copias.length - 6} más antiguas</div>` : '');
+  }
+  function pintarErrores(errores) {
+    $('an-errores-resumen').textContent = errores.length ? `los ${errores.length} más recientes` : 'ninguno registrado';
+    $('an-errores').innerHTML = errores.map(er => `<div class="ms-mant-fila err" title="${esc(er.mensaje)}">
+        <span class="n">${esc(String(er.en).replace('T', ' ').slice(0, 16))}</span>
+        <span class="m">${esc(er.metodo)} ${esc(er.ruta)} · ${esc(er.tipo)}: ${esc(er.mensaje)} · ${esc(er.usuario)}${er.avisado ? ' · avisado' : ''}</span>
+      </div>`).join('');
+  }
+  async function cargarMantenimiento() {
+    let s;
+    try { s = await api('/api/sistema'); } catch (e) { return; }   // no es admin: no se enseña
+    $('an-mant').hidden = false;
+    pintarCopias(s.copias || [], s.diarias, s.semanales);
+    pintarErrores(s.errores || []);
+    $('an-alertas-email').value = (s.alertas_email || []).join(', ');
+    $('an-alertas-email').title = s.correo_configurado ? 'E-mails separados por comas'
+      : 'El correo no está configurado en el servidor: los avisos no saldrán';
+  }
+  $('an-copia-ya').addEventListener('click', async () => {
+    const b = $('an-copia-ya');
+    b.disabled = true;
+    b.textContent = 'Haciendo la copia…';
+    try {
+      const d = await api('/api/sistema/copias', { method: 'POST' });
+      pintarCopias(d.copias || [], 14, 8);
+      const n = Object.keys((d.comprobacion || {}).documentos || {}).length;
+      await window.mostrarAlerta({
+        titulo: 'Copia hecha',
+        mensaje: `${d.copia.nombre} (${fmtTam(d.copia.tamano)}). Comprobada: integridad «${d.comprobacion.integridad}», ${n} documentos dentro. Descárgala para tenerla fuera del servidor.`,
+        tipo: 'success',
+      });
+    } catch (e) {
+      await window.mostrarAlerta({ titulo: 'No se pudo hacer la copia', mensaje: e.message, tipo: 'danger' });
+    } finally {
+      b.disabled = false;
+      b.textContent = 'Hacer una copia ahora';
+    }
+  });
+  $('an-alertas-email').addEventListener('change', async () => {
+    const el = $('an-alertas-email');
+    el.classList.remove('saved-ok', 'saved-err');
+    el.classList.add('saving');
+    try {
+      const d = await api('/api/sistema/alertas', { method: 'PUT', body: { emails: el.value } });
+      el.value = (d.alertas_email || []).join(', ');
+      el.classList.remove('saving');
+      el.classList.add('saved-ok');
+      setTimeout(() => el.classList.remove('saved-ok'), 1400);
+    } catch (e) {
+      el.classList.remove('saving');
+      el.classList.add('saved-err');
+      await window.mostrarAlerta({ titulo: 'No se pudo guardar', mensaje: e.message, tipo: 'danger' });
+    }
+  });
+
   // Un buzón con eñe (diseño@…) solo llega si el servidor de correo habla
   // SMTPUTF8; se pregunta al servidor y se dice aquí.
   function avisoEnes(e) {

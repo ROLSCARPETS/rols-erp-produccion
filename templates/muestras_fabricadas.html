@@ -253,6 +253,33 @@
           <span id="an-avisos-res"></span>
         </div>
       </div>
+      <!-- Mantenimiento: solo lo ven los administradores (el JS lo enseña si
+           /api/sistema responde) -->
+      <div class="ms-section" id="an-mant" hidden>
+        <div class="ms-section-title">
+          <span>Mantenimiento</span>
+          <span class="ms-hint">copias de seguridad de la base de datos y errores de la aplicación · solo administradores</span>
+        </div>
+        <div class="ms-mant-bloque">
+          <div class="ms-mant-cab">
+            <b>Copias de seguridad</b>
+            <span class="ms-mant-sub" id="an-copias-resumen"></span>
+            <button type="button" class="ms-btn ms-btn-ghost ms-btn-sm" id="an-copia-ya">Hacer una copia ahora</button>
+          </div>
+          <p class="ms-avisos-txt ms-avisos-no">Se hace sola una vez al día y se guarda en el propio servidor: protege de un
+            borrado o un error, no de perder el servidor. <b>Descarga de vez en cuando la última</b> y guárdala fuera.
+            No incluye los ficheros adjuntos de las muestras.</p>
+          <div class="ms-mant-lista" id="an-copias"></div>
+        </div>
+        <div class="ms-mant-bloque">
+          <div class="ms-mant-cab"><b>Errores de la aplicación</b><span class="ms-mant-sub" id="an-errores-resumen"></span></div>
+          <div class="ms-mant-alertas">
+            <label for="an-alertas-email">Avisar por correo a</label>
+            <input type="text" id="an-alertas-email" class="ms-av-campo ms-av-buzones" placeholder="nadie (escribe uno o varios e-mails)" autocomplete="off" />
+          </div>
+          <div class="ms-mant-lista" id="an-errores"></div>
+        </div>
+      </div>
     </section>
 
   </main>

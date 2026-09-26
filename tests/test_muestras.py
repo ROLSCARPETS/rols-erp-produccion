@@ -667,6 +667,87 @@ dirc = mf.directorio_guardado()
 dirc.append({"username": "intruso"})
 check(all(u.get("username") != "intruso" for u in mf.directorio_guardado()), "el directorio también se entrega copiado")
 
+seccion("mantenimiento: copias de seguridad")
+import gzip as _gz
+import sqlite3 as _sq
+from datetime import timedelta as _td
+import sistema as sis
+hoy_d = date.today()
+check(any(cp["dia"] == HOY for cp in sis.listar_copias()),
+      "la primera petición del día deja hecha la copia diaria (en segundo plano)")
+check(sis.copia_diaria_si_toca() is None, "y no se repite si ya está la de hoy")
+cp = sis.hacer_copia()
+comp = sis.verificar_copia(cp["nombre"])
+check(cp["nombre"] == f"erp-{HOY}.db.gz" and comp["integridad"] == "ok" and "muestras_fabricadas" in comp["documentos"],
+      "una copia comprimida, íntegra y con los documentos dentro")
+with _gz.open(sis.ruta_copia(cp["nombre"]), "rb") as fz:
+    crudo = fz.read()
+tmp_db = TMP / "restaurada.db"
+tmp_db.write_bytes(crudo)
+_con = _sq.connect(str(tmp_db))
+copia_doc = json.loads(_con.execute("SELECT data FROM documents WHERE key='muestras_fabricadas'").fetchone()[0])
+_con.close()
+vivo_doc = json.loads(_js.store()._conn().execute("SELECT data FROM documents WHERE key='muestras_fabricadas'").fetchone()[0])
+check(copia_doc == vivo_doc, "restaurar la copia devuelve exactamente los datos de ese momento")
+# rotación: 40 días de copias falsas → 14 diarias + los lunes de las últimas 8 semanas
+for i in range(1, 41):
+    (sis.carpeta_copias() / f"erp-{(hoy_d - _td(days=i)).isoformat()}.db.gz").write_bytes(b"x")
+sis.rotar(hoy_d)
+dias = {cp_["dia"] for cp_ in sis.listar_copias()}
+recientes = {(hoy_d - _td(days=i)).isoformat() for i in range(0, 14)}
+lunes = {(hoy_d - _td(days=i)).isoformat() for i in range(14, 41)
+         if (hoy_d - _td(days=i)).weekday() == 0 and (hoy_d - _td(days=i)) >= hoy_d - _td(weeks=8)}
+check(dias == recientes | lunes, f"rotación: {len(recientes)} diarias + {len(lunes)} lunes ({len(dias)} en total)")
+r = c.get("/api/sistema")
+check(r.status_code == 200 and j(r)["copias"] and "alertas_email" in j(r), "el panel lista las copias (admin)")
+r = c.post("/api/sistema/copias")
+check(r.status_code == 201 and j(r)["comprobacion"]["integridad"] == "ok", "copia a mano desde el panel, comprobada")
+r = c.get(f"/api/sistema/copias/erp-{HOY}.db.gz")
+check(r.status_code == 200 and r.mimetype == "application/gzip" and _gz.decompress(r.data)[:15] == b"SQLite format 3",
+      "se descarga y es una base de datos SQLite")
+for malo in ("..%2Ferp.db", "erp.db", "erp-2026-13-99.db.gz", "..%5C..%5Cerp.db"):
+    check(c.get(f"/api/sistema/copias/{malo}").status_code == 404, f"nombre no válido ({malo}) → 404")
+check(c.post("/api/sistema/copias", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403,
+      "hacer copias también está protegido de otras webs")
+CURRENT["user"] = LAB
+check(c.get("/api/sistema").status_code == 403 and c.post("/api/sistema/copias").status_code == 403
+      and c.get(f"/api/sistema/copias/erp-{HOY}.db.gz").status_code == 403, "sin ser admin: ni ver, ni hacer, ni descargar")
+CURRENT["user"] = None
+check(c.get("/api/sistema").status_code == 403, "sin sesión tampoco")
+CURRENT["user"] = ADMIN
+
+seccion("mantenimiento: errores de la aplicación")
+check(c.put("/api/sistema/alertas", json={"emails": "no-es-un-email"}).status_code == 400, "e-mail no válido → 400")
+r = c.put("/api/sistema/alertas", json={"emails": "Admin@RolsCarpets.com, laboratorio@rolscarpets.com"})
+check(r.status_code == 200 and j(r)["alertas_email"] == ["admin@rolscarpets.com", "laboratorio@rolscarpets.com"],
+      "se guarda a quién avisar (en minúsculas, sin repetir)")
+CURRENT["user"] = LAB
+check(c.put("/api/sistema/alertas", json={"emails": "x@y.com"}).status_code == 403, "solo un admin lo cambia")
+CURRENT["user"] = ADMIN
+_vista_real = app.view_functions["api_muestras_analisis"]
+app.view_functions["api_muestras_analisis"] = lambda: 1 / 0
+app.config["PROPAGATE_EXCEPTIONS"] = False
+appmod._ALERTAS_ULTIMA.clear()
+try:
+    n = len(ENVIADOS)
+    r = c.get("/api/muestras/analisis")
+    check(r.status_code == 500 and "registrado" in (r.get_json() or {}).get("error", ""),
+          "un fallo en la API devuelve un JSON legible (500)")
+    err = sis.errores_recientes(1)[0]
+    check(err["ruta"] == "/api/muestras/analisis" and err["tipo"] == "ZeroDivisionError" and "ZeroDivisionError" in err["traza"]
+          and err["usuario"] == ADMIN["username"] and err["avisado"], "queda registrado: dónde, qué, quién y la traza")
+    check(len(ENVIADOS) == n + 1 and sorted(ENVIADOS[-1][0]) == ["admin@rolscarpets.com", "laboratorio@rolscarpets.com"]
+          and "Error en /api/muestras/analisis" in ENVIADOS[-1][1] and "ZeroDivisionError" in ENVIADOS[-1][2],
+          "y se avisa por correo a quien diga el panel")
+    c.get("/api/muestras/analisis")
+    check(len(ENVIADOS) == n + 1 and not sis.errores_recientes(1)[0]["avisado"],
+          "el mismo error otra vez: se apunta, pero no se repite el correo (30 min)")
+finally:
+    app.view_functions["api_muestras_analisis"] = _vista_real
+    app.config["PROPAGATE_EXCEPTIONS"] = None
+check(c.get("/api/muestras/analisis").status_code == 200, "todo vuelve a funcionar")
+check(len(j(c.get("/api/sistema"))["errores"]) >= 2, "el panel enseña los últimos errores")
+
 seccion("permisos")
 CURRENT["user"] = SIN
 check(c.get("/api/muestras").status_code == 403, "sin permiso → 403")

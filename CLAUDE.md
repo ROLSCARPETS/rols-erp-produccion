@@ -360,6 +360,30 @@ un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
   rápidas. Pendiente: mantener la app arrancada en Plesk (el arranque en frío
   cuesta ~2 s).
 
+## Mantenimiento: copias de seguridad y errores (`shared/scripts/sistema.py`)
+
+- **Copia diaria de la BD**: la primera petición de cada hora mira si ya está la
+  de hoy y, si no, la hace en segundo plano (`_copia_tick` →
+  `sistema.copia_diaria_si_toca`). Usa la API de backup de SQLite (foto
+  coherente aunque haya escrituras), la comprime y la deja en
+  `ROLS_DATA_DIR/copias/erp-AAAA-MM-DD.db.gz`. Se quedan las 14 últimas y los
+  lunes de las 8 últimas semanas (`rotar`). **No incluye los adjuntos**
+  (`muestras_adjuntos/`). Están en el mismo servidor: para tener una fuera, se
+  descargan desde el panel.
+- **Restaurar** (a mano, con la app parada o justo antes de reiniciarla):
+  `gunzip -c copias/erp-AAAA-MM-DD.db.gz > erp.db`, borrar `erp.db-wal` y
+  `erp.db-shm`, y `touch tmp/restart.txt`. Antes, guardar aparte el `erp.db`
+  que se sustituye.
+- **Errores no controlados** (500): `got_request_exception` → `_al_error` los
+  apunta (los últimos 30, documento `erp_sistema`) y, si hay destinatarios,
+  manda un correo con dónde, quién y la traza; como mucho uno por ruta y tipo
+  de error cada 30 min. En `/api/` el 500 sale como JSON legible.
+- **Panel «Mantenimiento»** en Muestras → Análisis, solo admin
+  (`/api/sistema`, `POST /api/sistema/copias`, `GET /api/sistema/copias/<nombre>`,
+  `PUT /api/sistema/alertas`): las copias con su descarga, «Hacer una copia
+  ahora» (la comprueba al hacerla: integridad y documentos) y a quién se avisa
+  de los errores, con los últimos.
+
 ## Pruebas
 
 - `python tests/test_muestras.py`: regresión de Muestras fabricadas (módulo,
