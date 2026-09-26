@@ -124,6 +124,10 @@ class _Store:
                 finally:
                     self._local.tx_docs = None
 
+    def en_transaccion(self) -> bool:
+        """True si este hilo tiene una transaccion abierta (load→mutate→save)."""
+        return getattr(self._local, "depth", 0) > 0
+
     def load(self, key: str, default_factory, legacy_json=None) -> dict:
         """Devuelve el documento `key` (dict). Dentro de una transacción,
         devuelve SIEMPRE el mismo objeto (para load→mutate→save). Fuera de una

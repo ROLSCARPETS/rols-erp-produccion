@@ -813,7 +813,7 @@
 
   function textoHistorial(h) {
     const t = h.tipo;
-    if (t === 'creacion') return h.texto || 'Alta de la muestra';
+    if (t === 'creacion') return esc(h.texto || 'Alta de la muestra');
     // Etiquetas GENÉRICAS a propósito: el historial es pasado y el telar de
     // hoy no debe reescribir cómo se llamaba una etapa entonces.
     if (t === 'estado') return `Estado: ${esc(ESTADOS_LABEL[h.de] || h.de || '—')} → <b>${esc(ESTADOS_LABEL[h.a] || h.a)}</b>${h.nota ? ' · «' + esc(h.nota) + '»' : ''}`;

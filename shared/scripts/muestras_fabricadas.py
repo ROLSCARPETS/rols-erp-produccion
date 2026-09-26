@@ -441,9 +441,37 @@ def _version(data: dict) -> int:
         return 1
 
 
+# Lectura unica por peticion. El documento pesa varios MB y descifrarlo es
+# casi todo el coste de cada peticion; el listado lo leia dos veces (listar +
+# resumen) y el cambio de etapa tres. Dentro de una misma peticion Flask se
+# guarda el documento ya leido en `g` y se reutiliza. Reglas:
+#   - dentro de una transaccion NUNCA se usa (ahi se lee de la BD con el
+#     cerrojo tomado, que es lo que evita pisar escrituras de otro proceso);
+#   - al guardar, lo guardado pasa a ser el documento de la peticion (asi lo
+#     que se lee despues del cambio ya lo trae);
+#   - fuera de Flask (scripts, pruebas directas) no hay memoria: como antes.
+def _memo_peticion(data: dict | None = None, *, guardar: bool = False) -> dict | None:
+    try:
+        from flask import g, has_app_context
+    except ImportError:          # pragma: no cover — sin Flask no hay peticion
+        return None
+    if not has_app_context():
+        return None
+    if guardar:
+        g._muestras_doc = data
+        return data
+    return getattr(g, "_muestras_doc", None)
+
+
 def cargar() -> dict:
     """Carga el documento aplicando (una sola vez, dentro de una transaccion)
-    las migraciones de esquema pendientes."""
+    las migraciones de esquema pendientes. Fuera de una transaccion, lo que ya
+    se haya leido en esta misma peticion se reutiliza (ver _memo_peticion)."""
+    fuera_de_tx = not jsonstore.store().en_transaccion()
+    if fuera_de_tx:
+        ya = _memo_peticion()
+        if ya is not None:
+            return ya
     data = _cargar_sin_migrar()
     if _version(data) < _VERSION_SCHEMA:
         with jsonstore.store().tx():
@@ -472,6 +500,8 @@ def cargar() -> dict:
                     _migrar_v11(data)
                 data["_meta"]["version_schema"] = _VERSION_SCHEMA
                 _guardar(data)
+    if fuera_de_tx:
+        _memo_peticion(data, guardar=True)
     return data
 
 
@@ -698,6 +728,8 @@ def _guardar(data: dict) -> None:
     data.setdefault("_meta", {})
     data["_meta"]["actualizado_en"] = _ahora()
     jsonstore.store().save(_KEY, data)
+    # lo recien guardado es lo que debe ver el resto de esta peticion
+    _memo_peticion(data, guardar=True)
 
 
 def _ahora() -> str:

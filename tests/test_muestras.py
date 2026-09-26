@@ -41,6 +41,7 @@ LAB = {"username": "isa@rolscarpets.com", "nombre": "Isa Laboratorio", "rol": "c
 SIN = {"username": "rep@rolscarpets.com", "nombre": "Rep", "rol": "representante",
        "permisos": {"compras": False, "muestras_fabricadas": False}}
 CURRENT = {"user": ADMIN}
+SSO_REAL = appmod._sso_user          # la de verdad, para probar el filtro de cookies
 appmod._sso_user = lambda: CURRENT["user"]
 # Sin cuentas: el módulo tira de los usuarios ya vistos en los datos
 appmod._usuarios_one_con_permiso = lambda permiso: None
@@ -470,6 +471,99 @@ check("md-f-pasadas" not in ficha and 'id="md-f-pelo"' in ficha and 'id="md-f-ac
       "arriba solo construcción y acabado")
 check('id="md-cliente-info"' in ficha and ficha.index('id="md-cliente-info"') > ficha.index('id="md-adjuntos-wrap"'),
       "«Información de cliente» debajo de Diseño")
+
+seccion("seguridad: escrituras que no vienen de la propia aplicación")
+ap = lambda **h: c.post(f"/api/muestras/{MID_V}/apuntes", json={"texto": "prueba de origen"}, headers=h)
+check(ap(**{"Sec-Fetch-Site": "cross-site"}).status_code == 403, "desde otra web → 403")
+check(ap(**{"Sec-Fetch-Site": "same-site"}).status_code == 403,
+      "desde otro subdominio de rolscarpets.com (mismo «sitio» para la cookie) → 403")
+check(ap(**{"Sec-Fetch-Site": "same-origin"}).status_code == 201, "desde la propia aplicación → pasa")
+check(ap(Origin="https://evil.example.com").status_code == 403, "navegador sin Sec-Fetch-Site pero con Origin ajeno → 403")
+check(ap(Origin="http://localhost").status_code == 201, "Origin propio → pasa")
+r = c.post(f"/api/muestras/{MID_V}/estado", data='{"estado":"cancelada","nota":"x="}', content_type="text/plain",
+           headers={"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example.com"})
+check(r.status_code == 403 and j(c.get(f"/api/muestras/{MID_V}"))["muestra"]["estado"] != "cancelada",
+      "el ataque real (formulario text/plain de otra web) ya no cancela la muestra")
+check(c.get("/api/muestras?vista=en-curso", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 200,
+      "las lecturas no se tocan")
+r = c.post("/api/muestras/avisos/hitos", headers={"X-Rols-Api-Token": "no-vale", "Sec-Fetch-Site": "cross-site"})
+check(r.status_code != 403 or "no viene de esta aplicación" not in r.get_data(as_text=True),
+      "servidor a servidor con token: lo decide el endpoint, no esta barrera")
+
+seccion("seguridad: cabeceras y límites")
+for nombre, r in (("página", c.get("/muestras-fabricadas")), ("API", c.get("/api/muestras?vista=en-curso")),
+                  ("PDF", c.get(f"/api/muestras/{MID_V}/pdf"))):
+    h = r.headers
+    check(h.get("X-Content-Type-Options") == "nosniff" and h.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+          and "frame-ancestors 'self' https://*.rolscarpets.com" in (h.get("Content-Security-Policy") or ""),
+          f"{nombre}: nosniff, Referrer-Policy y solo enmarcable desde la suite")
+check("Strict-Transport-Security" not in c.get("/api/muestras").headers, "sin HSTS en local (http)")
+check(c.get("/api/muestras", base_url="https://produccion.rolscarpets.com").headers.get("Strict-Transport-Security")
+      == "max-age=31536000", "HSTS en producción")
+r = c.post(f"/api/muestras/{MID_V}/apuntes", data=b"x" * (31 * 1024 * 1024), content_type="application/json")
+check(r.status_code == 413, f"una petición de más de 30 MB → 413 ({r.status_code})")
+
+seccion("seguridad: páginas de Compras y filtro de cookies")
+check(c.get("/materias-primas").status_code == 200 and c.get("/").status_code == 200, "con permiso se ven")
+CURRENT["user"] = SIN
+r = c.get("/materias-primas")
+check(r.status_code == 302 and r.headers["Location"].endswith("/inicio"), "Compras sin permiso → al inicio de One")
+check(c.get("/materia-prima/65-2c__pais-normal").status_code == 302, "ficha de materia prima sin permiso → fuera")
+CURRENT["user"] = None
+check(c.get("/").status_code == 302 and "/login" in c.get("/").headers["Location"], "el inicio del ERP pide sesión")
+CURRENT["user"] = LAB
+check(c.get("/").status_code == 200, "el inicio vale para cualquiera con sesión (el laboratorio no tiene Compras)")
+CURRENT["user"] = ADMIN
+import urllib.request as _ur
+_llamadas = []
+_urlopen_real = _ur.urlopen
+
+
+def _urlopen_espia(req, *a, **k):
+    _llamadas.append(getattr(req, "full_url", req))
+    raise OSError("sin red en las pruebas")
+
+
+_ur.urlopen = _urlopen_espia
+try:
+    for valor, debe_preguntar in (("cualquiera", False), ("<script>", False), ("a.b", False),
+                                  ("eyJ1c2VyX2lkIjo0Mn0.aP3xZg.Qk1v0WQ8vX5t9pYl2mH7rJ3c", True)):
+        _llamadas.clear()
+        appmod._SSO_CACHE.clear()
+        with app.test_request_context("/api/muestras", headers={"Cookie": f"rols_one_session={valor}"}):
+            usuario = SSO_REAL()
+        check(usuario is None and bool(_llamadas) == debe_preguntar,
+              f"cookie {valor[:14]!r}: {'se pregunta a cuentas' if debe_preguntar else 'se descarta sin preguntar'}")
+finally:
+    _ur.urlopen = _urlopen_real
+
+seccion("rendimiento: el documento se lee una vez por petición")
+import jsonstore as _js
+_lecturas = {"n": 0}
+_load_real = _js._Store.load
+
+
+def _load_contado(self, key, *a, **k):
+    if key == "muestras_fabricadas" and getattr(self._local, "tx_docs", None) is None:
+        _lecturas["n"] += 1
+    return _load_real(self, key, *a, **k)
+
+
+_js._Store.load = _load_contado
+try:
+    _lecturas["n"] = 0
+    c.get("/api/muestras?vista=en-curso&catalogos=1")
+    check(_lecturas["n"] == 1, f"el listado lee el documento una vez ({_lecturas['n']})")
+    _lecturas["n"] = 0
+    r = estado(MID_V, "en_hilatura")
+    check(r.status_code == 200 and _lecturas["n"] == 1,
+          f"un cambio de etapa: una lectura fuera de la transacción ({_lecturas['n']})")
+    # otra petición no hereda nada: lo cambiado por fuera se ve en la siguiente
+    mf.actualizar(MID_V, {"referencia": "cambiada por fuera"}, usuario=None)
+    check(j(c.get(f"/api/muestras/{MID_V}"))["muestra"]["referencia"] == "cambiada por fuera",
+          "cada petición parte de cero: no hay datos rancios entre peticiones")
+finally:
+    _js._Store.load = _load_real
 
 seccion("permisos")
 CURRENT["user"] = SIN

@@ -316,6 +316,36 @@ un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
 - Producción: `passenger_wsgi.py` (Plesk/Passenger). Siembra `ROLS_DATA_DIR`
   desde `shared/data` (idempotente) y bootstrapea reportlab.
 
+## Seguridad y rendimiento (revisión del 26/09/2026)
+
+- **Escrituras solo desde la propia app** (`_solo_escrituras_propias`, en
+  `before_request`): los POST/PUT/PATCH/DELETE de `/api/` se rechazan (403) si
+  el navegador dice que vienen de otro origen (`Sec-Fetch-Site` distinto de
+  `same-origin`/`none`, o un `Origin` ajeno). Es la defensa CSRF: la cookie es
+  `SameSite=Lax`, pero para el navegador todos los subdominios de
+  rolscarpets.com son el mismo sitio, y Flask acepta como JSON un cuerpo
+  `text/plain` (lo que manda un `<form>`). Sin esas cabeceras (servidor a
+  servidor, cron) o con `X-Rols-Api-Token` pasa y decide el endpoint.
+- **Cabeceras** en todo lo que sirve Flask (`_cabeceras_seguridad`): `nosniff`,
+  `Referrer-Policy`, `frame-ancestors 'self' https://*.rolscarpets.com` (la
+  suite puede enmarcarla, nadie más) y HSTS fuera de localhost. Los estáticos
+  los sirve nginx y no pasan por aquí.
+- `MAX_CONTENT_LENGTH` = 30 MB (lo más grande legítimo es un adjunto de 25).
+- La cookie de sesión debe tener la **forma** de una sesión de Flask
+  (`_FORMATO_COOKIE_SESION`) antes de preguntar a cuentas: la basura se
+  descarta sin gastar una llamada de hasta 4 s a whoami.
+- Las páginas de Compras piden permiso en el servidor (`_pagina_protegida`) y
+  el inicio del ERP pide sesión (`_pagina_con_sesion`), como las de muestras.
+- **Rendimiento**: casi todo el coste de una petición es descifrar el
+  documento de muestras (varios MB). `cargar()` lo lee **una vez por
+  petición** y lo reutiliza (en `flask.g`, `_memo_peticion`); dentro de una
+  transacción nunca (ahí se lee de la BD con el cerrojo) y al guardar, lo
+  guardado pasa a ser el documento de la petición. Las funciones de lectura
+  **no deben modificar el documento** que devuelve `cargar()` (trabajan sobre
+  copias: `dict(m)`, listas nuevas). Pendiente: caché entre peticiones con
+  control de versión, y mantener la app arrancada en Plesk (el arranque en
+  frío cuesta ~2 s).
+
 ## Pruebas
 
 - `python tests/test_muestras.py`: regresión de Muestras fabricadas (módulo,

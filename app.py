@@ -77,6 +77,11 @@ rols_shared.register_shared(app)
 LOAD_TIME = time.time()
 
 
+# Ninguna peticion legitima pasa de un adjunto de 25 MB: por encima, 413 sin
+# llegar a leer el cuerpo (protege a todos los endpoints, no solo al de subir).
+app.config["MAX_CONTENT_LENGTH"] = 30 * 1024 * 1024
+
+
 @app.route("/health")
 def health():
     """Healthcheck del despliegue (Passenger/Plesk). No requiere login.
@@ -100,9 +105,71 @@ def _track_request_end(response):
     return response
 
 
+# ---- Seguridad: peticiones que escriben y cabeceras de las respuestas ----
+# Las escrituras de la API solo valen si vienen de las propias paginas del ERP.
+# La cookie de sesion es SameSite=Lax, pero para el navegador TODOS los
+# subdominios de rolscarpets.com son el mismo sitio: un formulario servido en
+# cualquiera de ellos llegaria aqui con la sesion puesta (y Flask acepta como
+# JSON un cuerpo text/plain, que es lo que manda un <form>). Se mira lo que el
+# navegador dice del origen (Sec-Fetch-Site / Origin), que no se puede falsear
+# desde una pagina. Sin esas cabeceras (servidor a servidor, un cron) se deja
+# pasar: ahi manda el token o la sesion de cada endpoint.
+_METODOS_QUE_ESCRIBEN = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+@app.before_request
+def _solo_escrituras_propias():
+    if request.method not in _METODOS_QUE_ESCRIBEN or not request.path.startswith("/api/"):
+        return None
+    if request.headers.get("X-Rols-Api-Token"):
+        return None   # servidor a servidor: el endpoint valida el token
+    sitio = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if sitio:
+        if sitio in ("same-origin", "none"):
+            return None
+        return jsonify({"error": "petición rechazada: no viene de esta aplicación"}), 403
+    origen = (request.headers.get("Origin") or "").strip()
+    if origen:
+        from urllib.parse import urlparse
+        if urlparse(origen).netloc.lower() != (request.host or "").lower():
+            return jsonify({"error": "petición rechazada: no viene de esta aplicación"}), 403
+    return None
+
+
+def _es_local() -> bool:
+    return (request.host or "").split(":")[0].lower() in ("localhost", "127.0.0.1")
+
+
+@app.after_request
+def _cabeceras_seguridad(resp):
+    """Cabeceras que el navegador aplica en todo lo que sirve Flask (paginas,
+    API, adjuntos, PDF). Los estaticos los sirve nginx directamente."""
+    h = resp.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    # Solo se puede meter en un iframe desde el propio ERP o la suite Rols One
+    h.setdefault("Content-Security-Policy", "frame-ancestors 'self' https://*.rolscarpets.com")
+    if not _es_local():
+        h.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return resp
+
+
+def _pagina_con_sesion():
+    """Guard de PAGINA que solo pide estar dentro (cualquier usuario de Rols
+    One): sin sesion, al login con vuelta aqui."""
+    if not _sso_user():
+        from flask import redirect
+        from urllib.parse import quote
+        return redirect(_cuentas_base() + "/login?next=" + quote(request.url, safe=""))
+    return None
+
+
 @app.route("/")
 def index():
     """Raiz → inicio del ERP (grid de tarjetas, como el de Rols One)."""
+    bl = _pagina_con_sesion()
+    if bl:
+        return bl
     return render_template("inicio.html")
 
 
@@ -135,6 +202,12 @@ def _cuentas_base() -> str:
 # valida, no se pasa. Cacheado 60s por cookie para no llamar en cada request.
 _SSO_CACHE: dict = {}
 _SSO_TTL = 60.0
+# Forma de la cookie de sesion de Flask (firmada, con o sin comprimir):
+# payload.fecha.firma, en base64 url-safe. Lo que no tenga esa forma no puede
+# ser una sesion valida: se descarta sin preguntar a cuentas, asi una lluvia
+# de cookies basura no se convierte en una lluvia de llamadas de 4 s a whoami.
+import re as _re  # noqa: E402
+_FORMATO_COOKIE_SESION = _re.compile(r"\.?[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+){2}")
 _SSO_COOKIE = os.environ.get("ROLS_SESSION_COOKIE", "rols_one_session")
 
 
@@ -143,7 +216,7 @@ def _sso_user():
     if hasattr(g, "_sso_user"):
         return g._sso_user
     val = request.cookies.get(_SSO_COOKIE)
-    if not val:
+    if not val or len(val) > 4096 or not _FORMATO_COOKIE_SESION.fullmatch(val):
         g._sso_user = None
         return None
     now = time.time()
@@ -604,6 +677,9 @@ def materia_prima_detalle_view(calidad_id):
     existe en lanas_inventario.json (es una proyeccion). Redirigimos al
     tab "Lana en crudo" del listado, que es donde se gestiona.
     """
+    bl = _pagina_protegida("compras")
+    if bl:
+        return bl
     if calidad_id == "lana-en-crudo__generica":
         from flask import redirect
         return redirect("/materias-primas#lana-cruda")
@@ -1134,6 +1210,9 @@ def _mp_module():
 @app.route("/materias-primas")
 def materias_primas_view():
     """Pagina de gestion de materias primas (de momento solo lanas)."""
+    bl = _pagina_protegida("compras")
+    if bl:
+        return bl
     return render_template("materias_primas.html")
 
 
