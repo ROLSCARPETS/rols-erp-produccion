@@ -342,9 +342,23 @@ un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
   transacción nunca (ahí se lee de la BD con el cerrojo) y al guardar, lo
   guardado pasa a ser el documento de la petición. Las funciones de lectura
   **no deben modificar el documento** que devuelve `cargar()` (trabajan sobre
-  copias: `dict(m)`, listas nuevas). Pendiente: caché entre peticiones con
-  control de versión, y mantener la app arrancada en Plesk (el arranque en
-  frío cuesta ~2 s).
+  copias: `dict(m)`, listas nuevas).
+- **Caché entre peticiones** (`jsonstore`, `load(..., compartida=True)`, hoy
+  solo el documento de muestras): cada documento lleva una columna `version`
+  que sube en cada guardado; antes de reutilizar lo ya interpretado se mira
+  `(version, updated_at)` en la BD —microsegundos—, así que un guardado de
+  **otro proceso** de Passenger se ve en la siguiente lectura (y uno de código
+  viejo que no suba la versión, por la fecha). Caduca sola a los `CACHE_TTL`
+  (120 s) como red de seguridad; dentro de una transacción **nunca** se usa
+  (las escrituras leen de la BD con el cerrojo y trabajan sobre su copia) y
+  al guardar se invalida. El objeto cacheado se **comparte** entre
+  peticiones: las lecturas no lo modifican y lo que sale hacia fuera va
+  copiado (`obtener` con `copy.deepcopy`, `avisos_guardados`,
+  `directorio_guardado`, `hitos_pendientes`, `ruta_adjunto`). La batería lleva
+  un **centinela** que, tras cada petición, compara lo cacheado con la BD: si
+  alguna lectura lo tocara, falla y dice cuál. Lecturas entre 2,5× y 5,6× más
+  rápidas. Pendiente: mantener la app arrancada en Plesk (el arranque en frío
+  cuesta ~2 s).
 
 ## Pruebas
 

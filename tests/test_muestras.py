@@ -63,6 +63,28 @@ correo._enviar_por = _enviar_de_mentira
 
 app = appmod.app
 app.config["TESTING"] = True
+
+# Centinela de la caché compartida: el documento de muestras se reutiliza entre
+# peticiones y NADIE debe modificarlo al leer. Tras cada petición se compara lo
+# cacheado (si dice estar al día) con lo que hay de verdad en la BD.
+import jsonstore as _js  # noqa: E402
+from flask import request as _req  # noqa: E402
+CENTINELA = {"on": True, "fallos": []}
+
+
+@app.after_request
+def _centinela_cache(resp):
+    if CENTINELA["on"]:
+        st = _js.store()
+        ent = st._cache.get("muestras_fabricadas")
+        if ent is not None:
+            fila = st._conn().execute("SELECT data, version, updated_at FROM documents "
+                                      "WHERE key='muestras_fabricadas'").fetchone()
+            if fila and (fila[1], fila[2]) == ent[0] and ent[1] != json.loads(fila[0]):
+                CENTINELA["fallos"].append(f"{_req.method} {_req.path}")
+    return resp
+
+
 c = app.test_client()
 HOY = date.today().isoformat()
 
@@ -565,6 +587,86 @@ try:
 finally:
     _js._Store.load = _load_real
 
+seccion("rendimiento: caché del documento entre peticiones")
+st = _js.store()
+KEY = "muestras_fabricadas"
+PARSEOS = {"n": 0}
+_loads_real = json.loads
+
+
+def _loads_contado(txt, *a, **k):
+    if isinstance(txt, str) and len(txt) > 500_000:      # el documento de muestras
+        PARSEOS["n"] += 1
+    return _loads_real(txt, *a, **k)
+
+
+def parseos_en(fn):
+    CENTINELA["on"] = False
+    PARSEOS["n"] = 0
+    _js.json.loads = _loads_contado
+    try:
+        fn()
+    finally:
+        _js.json.loads = _loads_real
+        CENTINELA["on"] = True
+    return PARSEOS["n"]
+
+
+cols = {r[1] for r in st._conn().execute("PRAGMA table_info(documents)")}
+check("version" in cols, "la tabla de documentos lleva su versión")
+st.invalidar()
+check(parseos_en(lambda: c.get("/api/muestras?vista=en-curso")) == 1, "la primera lectura interpreta el documento")
+check(parseos_en(lambda: (c.get("/api/muestras?vista=en-curso"), c.get(f"/api/muestras/{MID_V}"),
+                          c.get("/api/muestras/catalogos"))) == 0,
+      "las siguientes lo reutilizan: cero interpretaciones")
+ver = lambda: st._conn().execute("SELECT version FROM documents WHERE key=?", (KEY,)).fetchone()[0]
+v0 = ver()
+c.put(f"/api/muestras/{MID_V}", json={"referencia": "cambio en este proceso"})
+check(ver() == v0 + 1, "cada guardado sube la versión")
+check(j(c.get(f"/api/muestras/{MID_V}"))["muestra"]["referencia"] == "cambio en este proceso",
+      "lo guardado en este proceso se ve en la siguiente lectura")
+# otro proceso de Passenger (otra conexión, otra caché) guarda por su lado
+otro = _js._Store(_js._db_path())
+with otro.tx():
+    d = otro.load(KEY, dict)
+    next(x for x in d["muestras"] if x["id"] == MID_V)["referencia"] = "cambio de otro proceso"
+    otro.save(KEY, d)
+check(j(c.get(f"/api/muestras/{MID_V}"))["muestra"]["referencia"] == "cambio de otro proceso",
+      "lo que guarda OTRO proceso se ve en la siguiente lectura")
+# código viejo (desplegando) que guarda sin subir la versión: se nota por la fecha
+fila = st._conn().execute("SELECT data FROM documents WHERE key=?", (KEY,)).fetchone()
+d = json.loads(fila[0])
+next(x for x in d["muestras"] if x["id"] == MID_V)["referencia"] = "cambio sin versión"
+with st.tx():
+    st._conn().execute("UPDATE documents SET data=?, updated_at=? WHERE key=?",
+                       (json.dumps(d, ensure_ascii=False), "2099-01-01T00:00:00", KEY))
+check(j(c.get(f"/api/muestras/{MID_V}"))["muestra"]["referencia"] == "cambio sin versión",
+      "un guardado que no sube la versión se detecta por la fecha")
+_ttl = _js.CACHE_TTL
+_js.CACHE_TTL = 0
+check(parseos_en(lambda: c.get("/api/muestras?vista=en-curso")) == 1, "y además caduca sola (red de seguridad)")
+_js.CACHE_TTL = _ttl
+# dentro de una transacción nunca se usa el objeto compartido
+compartido = mf.cargar()
+try:
+    with st.tx():
+        dtx = mf.cargar()
+        check(dtx is not compartido, "dentro de una transacción se trabaja sobre una copia propia")
+        dtx["muestras"][0]["cliente"] = "CONTAMINADO"
+        raise RuntimeError("se deshace")
+except RuntimeError:
+    pass
+check(mf.cargar()["muestras"][0]["cliente"] != "CONTAMINADO",
+      "una escritura que se deshace no deja rastro en la copia compartida")
+ficha_m = mf.obtener(MID_V)
+ficha_m["historial"].append({"tipo": "intruso"})
+ficha_m["piezas"].clear()
+check(all(h.get("tipo") != "intruso" for h in next(x for x in mf.cargar()["muestras"] if x["id"] == MID_V)["historial"]),
+      "la ficha que se entrega es una copia: tocarla no toca el documento")
+dirc = mf.directorio_guardado()
+dirc.append({"username": "intruso"})
+check(all(u.get("username") != "intruso" for u in mf.directorio_guardado()), "el directorio también se entrega copiado")
+
 seccion("permisos")
 CURRENT["user"] = SIN
 check(c.get("/api/muestras").status_code == 403, "sin permiso → 403")
@@ -581,6 +683,8 @@ check(c.delete(f"/api/muestras/{MID}").status_code == 200 and c.get(f"/api/muest
       "un admin la borra")
 
 seccion("integridad al final")
+check(not CENTINELA["fallos"], "ninguna lectura de toda la batería modificó el documento compartido"
+      + (f" (sí: {CENTINELA['fallos'][:5]})" if CENTINELA["fallos"] else ""))
 data = mf.cargar()
 check(len({m["id"] for m in data["muestras"]}) == len(data["muestras"]), "ids únicos")
 check(data["_meta"]["version_schema"] == 11, "esquema v11")

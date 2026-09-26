@@ -50,6 +50,7 @@ Reglas:
 """
 from __future__ import annotations
 
+import copy
 import os
 import re
 import secrets
@@ -425,7 +426,11 @@ def _default() -> dict:
 
 
 def _cargar_sin_migrar() -> dict:
-    data = jsonstore.store().load(_KEY, _default, DATA_PATH)
+    # compartida=True: fuera de transaccion, el documento ya interpretado se
+    # reutiliza entre peticiones (jsonstore.CACHE_TTL). Es un objeto COMPARTIDO:
+    # las funciones de lectura trabajan sobre el sin modificarlo y lo que
+    # entregan hacia fuera son copias (obtener, avisos_guardados...).
+    data = jsonstore.store().load(_KEY, _default, DATA_PATH, compartida=True)
     data.setdefault("_meta", {}).setdefault("ultimo_numero", 0)
     cat = data.setdefault("catalogos", {})
     cat.setdefault("telares", list(TELARES_DEFAULT))
@@ -1125,7 +1130,9 @@ def obtener(mid: str) -> dict | None:
     m = _buscar(data, mid)
     if not m:
         return None
-    out = dict(m)
+    # copia PROFUNDA: el documento se comparte entre peticiones y quien reciba
+    # la ficha podria tocar su historial o su diario
+    out = copy.deepcopy(m)
     out["tipo"] = out.get("tipo") or "cliente"
     out["referencia"] = out.get("referencia") or ""
     out["diseno_verificado"] = bool(out.get("diseno_verificado"))
@@ -2075,7 +2082,7 @@ def ruta_adjunto(mid: str, aid: str) -> tuple[Path | None, dict | None, str]:
     ruta = _carpeta_adjuntos(mid) / f"{a['id']}.{a.get('ext') or ''}"
     if not ruta.is_file():
         return None, a, "el fichero del adjunto no esta en el servidor"
-    return ruta, a, ""
+    return ruta, dict(a), ""
 
 
 def etiquetar_adjunto(mid: str, aid: str, clase, usuario: str | None = None) -> tuple[dict | None, str]:
@@ -2228,7 +2235,7 @@ def borrar(mid: str) -> tuple[bool, str]:
 def avisos_guardados() -> dict:
     """Destinatarios de los avisos que se han cambiado a mano. Lo que no esta
     aqui usa el valor por defecto (ver `muestras_avisos.avisos_por_defecto`)."""
-    return dict(cargar().get("avisos_destinatarios") or {})
+    return copy.deepcopy(cargar().get("avisos_destinatarios") or {})
 
 
 def guardar_avisos(config: dict) -> None:
@@ -2278,7 +2285,7 @@ def hitos_pendientes(hoy: str | None = None) -> list[dict]:
     """Muestras en curso cuyo proximo hito ha llegado (fecha <= hoy) y aun no
     se ha avisado de ESA fecha."""
     hoy = hoy or _hoy()
-    return [dict(m) for m in cargar()["muestras"]
+    return [copy.deepcopy(m) for m in cargar()["muestras"]
             if en_curso(m) and m.get("proximo_hito_fecha")
             and m["proximo_hito_fecha"] <= hoy
             and m.get("hito_avisado") != m["proximo_hito_fecha"]]
@@ -2316,7 +2323,7 @@ def guardar_directorio(usuarios) -> None:
 
 
 def directorio_guardado() -> list[dict]:
-    return list((cargar()["_meta"].get("directorio_one") or {}).get("usuarios") or [])
+    return copy.deepcopy(list((cargar()["_meta"].get("directorio_one") or {}).get("usuarios") or []))
 
 
 # ---------------------------------------------------------------------------

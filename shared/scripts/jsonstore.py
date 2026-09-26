@@ -36,9 +36,21 @@ import json
 import os
 import sqlite3
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+
+
+# Cache COMPARTIDA entre peticiones (solo para las keys que la piden: hoy,
+# el documento de muestras, que pesa varios MB). Cada documento lleva una
+# `version` que sube en cada guardado; antes de reutilizar lo ya interpretado
+# se mira (version, updated_at) en la BD, que cuesta microsegundos, asi que un
+# guardado de OTRO proceso se nota en la siguiente lectura. Ademas caduca sola
+# a los CACHE_TTL segundos, por si algo escribiera sin pasar por aqui.
+# El objeto se COMPARTE entre peticiones del proceso: quien lo lee NO debe
+# modificarlo (las funciones publicas de lectura devuelven copias).
+CACHE_TTL = 120.0
 
 
 def _db_path() -> Path:
@@ -56,6 +68,8 @@ class _Store:
         # Conexión y profundidad de transacción POR HILO (cada worker-thread
         # tiene la suya; SQLite serializa entre hilos y procesos por fichero).
         self._local = threading.local()
+        self._cache: dict = {}          # key -> ((version, updated_at), dict, momento)
+        self._cache_lock = threading.Lock()
         self._init_schema()
 
     def _conn(self) -> sqlite3.Connection:
@@ -71,9 +85,53 @@ class _Store:
         return c
 
     def _init_schema(self) -> None:
-        self._conn().execute(
+        c = self._conn()
+        c.execute(
             "CREATE TABLE IF NOT EXISTS documents ("
-            " key TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT)")
+            " key TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT,"
+            " version INTEGER NOT NULL DEFAULT 0)")
+        # BDs de antes de la cache: se les anade la columna (idempotente; si
+        # otro proceso la anade a la vez, el segundo ALTER falla y da igual).
+        cols = {r[1] for r in c.execute("PRAGMA table_info(documents)")}
+        if "version" not in cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN version INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+
+    def invalidar(self, key: str | None = None) -> None:
+        """Olvida lo cacheado de `key` (o de todo)."""
+        with self._cache_lock:
+            if key is None:
+                self._cache.clear()
+            else:
+                self._cache.pop(key, None)
+
+    def _load_compartida(self, key: str):
+        """Fuera de transaccion: el documento cacheado si sigue al dia, o
+        recien leido (y cacheado). None si la key no existe (lo resuelve el
+        camino normal, con su importacion legacy)."""
+        c = self._conn()
+        fila = c.execute("SELECT version, updated_at FROM documents WHERE key=?", (key,)).fetchone()
+        if fila is None:
+            return None
+        ahora = time.monotonic()
+        with self._cache_lock:
+            ent = self._cache.get(key)
+        if ent and ent[0] == (fila[0], fila[1]) and ahora - ent[2] < CACHE_TTL:
+            return ent[1]
+        # Datos y huella en la MISMA consulta: si otro proceso escribe entre
+        # medias, lo que se cachea es coherente con su huella.
+        fila = c.execute("SELECT data, version, updated_at FROM documents WHERE key=?", (key,)).fetchone()
+        if fila is None:
+            return None
+        try:
+            data = json.loads(fila[0])
+        except (ValueError, TypeError):
+            return None                 # que el camino normal lo registre
+        with self._cache_lock:
+            self._cache[key] = ((fila[1], fila[2]), data, ahora)
+        return data
 
     @contextmanager
     def tx(self):
@@ -128,14 +186,21 @@ class _Store:
         """True si este hilo tiene una transaccion abierta (load→mutate→save)."""
         return getattr(self._local, "depth", 0) > 0
 
-    def load(self, key: str, default_factory, legacy_json=None) -> dict:
+    def load(self, key: str, default_factory, legacy_json=None, compartida: bool = False) -> dict:
         """Devuelve el documento `key` (dict). Dentro de una transacción,
-        devuelve SIEMPRE el mismo objeto (para load→mutate→save). Fuera de una
-        transacción, lee fresco de la BD cada vez (sin caché entre procesos). Si
-        no hay fila y hay un JSON legacy, lo importa una vez."""
+        devuelve SIEMPRE el mismo objeto (para load→mutate→save), leido de la
+        BD con el cerrojo tomado. Fuera de una transacción lee fresco de la BD,
+        salvo con `compartida=True`: entonces reutiliza lo ya interpretado
+        mientras su version siga siendo la de la BD (ver CACHE_TTL) y el
+        objeto devuelto es COMPARTIDO: no se debe modificar. Si no hay fila y
+        hay un JSON legacy, lo importa una vez."""
         docs = getattr(self._local, "tx_docs", None)
         if docs is not None and key in docs:
             return docs[key]
+        if compartida and docs is None:
+            ya = self._load_compartida(key)
+            if ya is not None:
+                return ya
         c = self._conn()
         row = c.execute("SELECT data FROM documents WHERE key=?", (key,)).fetchone()
         data = None
@@ -186,7 +251,7 @@ class _Store:
         c = self._conn()
         with self.tx():
             cur = c.execute(
-                "INSERT INTO documents(key, data, updated_at) VALUES(?,?,?) "
+                "INSERT INTO documents(key, data, updated_at, version) VALUES(?,?,?,1) "
                 "ON CONFLICT(key) DO NOTHING",
                 (key, blob, now))
             return cur.rowcount > 0
@@ -205,10 +270,12 @@ class _Store:
         c = self._conn()
         with self.tx():
             c.execute(
-                "INSERT INTO documents(key, data, updated_at) VALUES(?,?,?) "
+                "INSERT INTO documents(key, data, updated_at, version) VALUES(?,?,?,1) "
                 "ON CONFLICT(key) DO UPDATE SET data=excluded.data, "
-                "updated_at=excluded.updated_at",
+                "updated_at=excluded.updated_at, version=documents.version+1",
                 (key, blob, now))
+        # lo cacheado de esta key ya no vale (la version acaba de subir)
+        self.invalidar(key)
         # Mantener la identidad en la transacción (si save se llama dentro de una).
         docs2 = getattr(self._local, "tx_docs", None)
         if docs2 is not None:
