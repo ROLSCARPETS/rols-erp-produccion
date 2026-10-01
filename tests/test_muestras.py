@@ -536,6 +536,24 @@ check(c.get("/").status_code == 302 and "/login" in c.get("/").headers["Location
 CURRENT["user"] = LAB
 check(c.get("/").status_code == 200, "el inicio vale para cualquiera con sesión (el laboratorio no tiene Compras)")
 CURRENT["user"] = ADMIN
+
+seccion("portada: la chincheta de Rols One en cada tarjeta")
+# Fernando, 01/10/2026: «los pins también deben aplicar dentro de las apps».
+# Pone esa página en el menú de la izquierda de One; la trae de One
+# shared/menu/chinchetas.js y la pone en cada celda según su id en el catálogo
+# de One (shared/static/destinos.js de rols-one).
+import re as _re
+_html = c.get("/").get_data(as_text=True)
+_celdas = _re.findall(r'<div class="app-card-celda" data-destino="([a-z-]+)" data-permiso="([a-z_]+)">\s*'
+                      r'<a href="([^"]+)" class="app-card">', _html)
+check(_celdas == [("produccion-materias", "compras", "/materias-primas"),
+                  ("produccion-proveedores", "compras", "/materias-primas#proveedores"),
+                  ("produccion-muestras", "muestras_fabricadas", "/muestras-fabricadas")],
+      f"cada tarjeta en su celda, con su id en One y su permiso (el que la oculta): {_celdas}")
+check(_html.count('class="app-card"') == len(_celdas), "ninguna tarjeta fuera de su celda")
+check('<script async src="http://localhost:5051/shared/menu/chinchetas.js"></script>' in _html,
+      "la chincheta se trae de One, sin esperar")
+
 import urllib.request as _ur
 _llamadas = []
 _urlopen_real = _ur.urlopen

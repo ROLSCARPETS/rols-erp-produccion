@@ -595,6 +595,22 @@ body {
   color: var(--accent-hover); text-decoration: none;
 }
 .app-card:hover .app-card-cta { color: var(--accent); }
+/* Cada tarjeta va en su celda, con la chincheta de Rols One arriba a la
+   derecha (la pone en el menú de la izquierda de One; la trae
+   shared/menu/chinchetas.js). Al lado del enlace, no dentro. */
+.app-card-celda { position: relative; display: flex; }
+.app-card-celda > .app-card { flex: 1 1 auto; min-width: 0; }
+.app-card-celda .app-card-title { padding-right: 1.25rem; }
+.app-card-celda > .rols-fijar { position: absolute; top: 0.75rem; right: 0.75rem; }
+/* Con el ratón en la chincheta la tarjeta sigue encendida, y suben juntas. */
+.app-card-celda:hover > .app-card {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -16px rgba(77,77,77,0.25);
+}
+.app-card-celda:hover > .app-card .app-card-cta { color: var(--accent); }
+.app-card-celda:hover > .rols-fijar { transform: translateY(-2px); }
+.app-card-celda:hover > .rols-fijar:not(.en-menu):not(:hover) { color: #8a8178; }
 
 /* ---------- Card ---------- */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px; }
