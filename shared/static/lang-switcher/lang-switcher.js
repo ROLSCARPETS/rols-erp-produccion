@@ -34,11 +34,14 @@
         { code: "pl", label: "Polski",     flag: "fi-pl" },
     ];
 
-    // CUENTAS (IdP) persiste la preferencia de idioma del usuario. Local :5054,
-    // prod /cuentas (same-origin). Antes apuntaba al asistente (:5052).
+    // CUENTAS (IdP) persiste la preferencia de idioma del usuario. Local :5054.
+    // En producción está en Rols One, en otro subdominio: la misma base que
+    // usa sso-guard.js (antes era "/cuentas", que aquí es el propio ERP, y el
+    // idioma no se guardaba).
     var _ssHost = window.location.hostname;
     var _ssLocal = (_ssHost === "localhost" || _ssHost === "127.0.0.1");
-    var CUENTAS_BASE = _ssLocal ? "http://localhost:5054" : "/cuentas";
+    var CUENTAS_BASE = window.ROLS_CUENTAS_BASE ||
+        (_ssLocal ? "http://localhost:5054" : "https://one.rolscarpets.com/cuentas");
 
     function lang() {
         return localStorage.getItem("app-lang") || "es";
@@ -50,18 +53,21 @@
         // gana. Persistimos al backend para que en su proximo login
         // desde otro equipo ya arranque en este idioma.
         try { sessionStorage.setItem("__rolsLangSynced", "1"); } catch (e) {}
-        // Fire-and-forget: si falla (asistente caído, sesion expirada)
-        // no bloqueamos la recarga local.
+        // Se recarga cuando Cuentas ha contestado (o a los 1,5 s): al ser otro
+        // origen, la petición lleva su pregunta previa (CORS) y recargar a la
+        // vez la cortaría. Si falla (Cuentas caído, sesión expirada), se
+        // recarga igual: el idioma ya está puesto en este navegador.
+        var guardado;
         try {
-            fetch(CUENTAS_BASE + "/api/usuario/idioma", {
+            guardado = fetch(CUENTAS_BASE + "/api/usuario/idioma", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ idioma: code }),
-                keepalive: true,
             }).catch(function () { /* ignorar */ });
-        } catch (e) { /* ignorar */ }
-        location.reload();
+        } catch (e) { guardado = null; }
+        var espera = new Promise(function (listo) { setTimeout(listo, 1500); });
+        Promise.race([guardado || espera, espera]).then(function () { location.reload(); });
     }
     function findIdioma(code) {
         return IDIOMAS.find(function (i) { return i.code === code; }) || IDIOMAS[0];
