@@ -331,9 +331,17 @@ un dato y no una ayuda no lleva esa clase (el telar del bloque técnico usa
   suite puede enmarcarla, nadie más) y HSTS fuera de localhost. Los estáticos
   los sirve nginx y no pasan por aquí.
 - `MAX_CONTENT_LENGTH` = 30 MB (lo más grande legítimo es un adjunto de 25).
-- La cookie de sesión debe tener la **forma** de una sesión de Flask
-  (`_FORMATO_COOKIE_SESION`) antes de preguntar a cuentas: la basura se
-  descarta sin gastar una llamada de hasta 4 s a whoami.
+- **Login común de la suite** (desde el 03/10/2026): `shared/scripts/sso.py`
+  carga `shared/scripts/rols_sso.py`, COPIA del de `rols-one/shared/kit` (no se
+  edita aquí: se reparte desde allí con `repartir.py`, y
+  `tests/test_rols_sso_al_dia.py` avisa si se queda atrás). `_sso_user()` es
+  lo que Cuentas dice del usuario (whoami, caché de 60 s). La cookie de sesión
+  debe tener la **forma** de una sesión de Flask antes de preguntar a Cuentas:
+  la basura se descarta sin llamar a whoami. Un 401/403 de Cuentas es un «no»;
+  si no contesta, vale lo último que confirmó de esa sesión en este proceso.
+  En local, sirviendo en localhost entra un admin de pruebas sin login
+  (`ROLS_NO_AUTH=0` para probar el login de verdad); en el servidor nunca
+  (`passenger_wsgi.py` pone `PASSENGER_APP_ENV`).
 - Las páginas de Compras piden permiso en el servidor (`_pagina_protegida`) y
   el inicio del ERP pide sesión (`_pagina_con_sesion`), como las de muestras.
 - **Rendimiento**: casi todo el coste de una petición es descifrar el

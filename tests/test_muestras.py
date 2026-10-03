@@ -569,8 +569,10 @@ try:
     for valor, debe_preguntar in (("cualquiera", False), ("<script>", False), ("a.b", False),
                                   ("eyJ1c2VyX2lkIjo0Mn0.aP3xZg.Qk1v0WQ8vX5t9pYl2mH7rJ3c", True)):
         _llamadas.clear()
-        appmod._SSO_CACHE.clear()
-        with app.test_request_context("/api/muestras", headers={"Cookie": f"rols_one_session={valor}"}):
+        appmod.sso._cache_whoami.clear()
+        # En el host de verdad: en localhost entraria el admin de pruebas.
+        with app.test_request_context("/api/muestras", base_url="https://produccion.rolscarpets.com",
+                                      headers={"Cookie": f"rols_one_session={valor}"}):
             usuario = SSO_REAL()
         check(usuario is None and bool(_llamadas) == debe_preguntar,
               f"cookie {valor[:14]!r}: {'se pregunta a cuentas' if debe_preguntar else 'se descarta sin preguntar'}")

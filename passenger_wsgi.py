@@ -26,6 +26,12 @@ from rols_shared import decode_path_info  # noqa: E402
 # afecta a prod: en local este entrypoint no se usa y los modulos caen a shared/data.
 os.environ.setdefault("ROLS_DATA_DIR", str(ROOT.parent / "rols-erp-produccion-data"))
 
+# «Esto es el servidor» para el login comun (shared/scripts/sso.py): con esto
+# nunca hay usuario de pruebas sin login, ni con un ROLS_NO_AUTH olvidado en el
+# .env. Las demas apps ponen ROLS_COMPOSED, pero aqui cambiaria los enlaces de
+# rols_shared.nav_bases. Passenger ya suele ponerla; por si no, aqui.
+os.environ.setdefault("PASSENGER_APP_ENV", "production")
+
 
 def _seed_data_dir():
     """Siembra idempotente: copia el seed del repo (shared/data) a ROLS_DATA_DIR

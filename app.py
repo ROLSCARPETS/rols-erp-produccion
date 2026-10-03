@@ -56,7 +56,7 @@ _cargar_dotenv(APP_DIR / ".env")
 # shared/data (parent.parent/data) o en ROLS_DATA_DIR si esta definido.
 sys.path.insert(0, str(APP_DIR / "shared" / "scripts"))
 
-from flask import Flask, render_template, request, jsonify, Response, g  # noqa: E402
+from flask import Flask, render_template, request, jsonify, Response  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -173,78 +173,35 @@ def index():
     return render_template("inicio.html")
 
 
-# ---- Ecosistema Rols One: URLs del IdP (rols-cuentas) y home ----
+# ---- Ecosistema Rols One: el login comun de la suite (shared/scripts/sso.py) ----
 # Este ERP es autonomo; el login y el home viven en Rols One, en OTRO
-# subdominio. En local apuntan a los puertos de la suite; en prod a
-# one.rolscarpets.com. Sobrescribibles con ROLS_ONE_BASE / ROLS_CUENTAS_BASE.
+# subdominio. Quien es la persona lo dice Cuentas (/api/whoami, reenviando la
+# cookie de sesion de la suite, que llega aqui por Domain=.rolscarpets.com): es
+# la fuente de verdad. El header X-Rols-User-Rol que ponia sso-guard.js NO se
+# usa como auth (era del cliente, spoofeable). Lo comun a toda la suite —la
+# cache de 60 s, descartar sin preguntar las cookies que no tienen forma de
+# sesion, que un 401 de Cuentas es un no y una caida no, y lo ultimo que
+# confirmo si no contesta— vive en el login comun (sso.py + rols_sso.py).
+import sso  # noqa: E402
+
+_SSO_COOKIE = sso.cookie_name()
+
+
 def _rols_one_base() -> str:
-    if os.environ.get("ROLS_ONE_BASE"):
-        return os.environ["ROLS_ONE_BASE"].rstrip("/")
-    host = (request.host or "").split(":")[0].lower()
-    return ("http://localhost:5051" if host in ("localhost", "127.0.0.1")
-            else "https://one.rolscarpets.com")
+    return sso.rols_one_base()
 
 
 def _cuentas_base() -> str:
-    if os.environ.get("ROLS_CUENTAS_BASE"):
-        return os.environ["ROLS_CUENTAS_BASE"].rstrip("/")
-    host = (request.host or "").split(":")[0].lower()
-    if host in ("localhost", "127.0.0.1"):
-        return "http://localhost:5054"
-    return _rols_one_base() + "/cuentas"
-
-
-# ---- Autenticacion REAL del ERP: sesion de Rols One validada en el SERVIDOR ----
-# La cookie de sesion de rols-cuentas (Domain=.rolscarpets.com) llega tambien a
-# este subdominio. La validamos server-side contra /api/whoami reenviando esa
-# cookie: es la fuente de verdad. El header X-Rols-User-Rol que ponia sso-guard.js
-# NO se usa como auth (era del cliente, spoofeable). FAIL-CLOSED: sin sesion
-# valida, no se pasa. Cacheado 60s por cookie para no llamar en cada request.
-_SSO_CACHE: dict = {}
-_SSO_TTL = 60.0
-# Forma de la cookie de sesion de Flask (firmada, con o sin comprimir):
-# payload.fecha.firma, en base64 url-safe. Lo que no tenga esa forma no puede
-# ser una sesion valida: se descarta sin preguntar a cuentas, asi una lluvia
-# de cookies basura no se convierte en una lluvia de llamadas de 4 s a whoami.
-import re as _re  # noqa: E402
-_FORMATO_COOKIE_SESION = _re.compile(r"\.?[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+){2}")
-_SSO_COOKIE = os.environ.get("ROLS_SESSION_COOKIE", "rols_one_session")
+    return sso.cuentas_base()
 
 
 def _sso_user():
-    """Usuario autenticado (dict del whoami) o None. Cachea en g por request."""
-    if hasattr(g, "_sso_user"):
-        return g._sso_user
-    val = request.cookies.get(_SSO_COOKIE)
-    if not val or len(val) > 4096 or not _FORMATO_COOKIE_SESION.fullmatch(val):
-        g._sso_user = None
-        return None
-    now = time.time()
-    hit = _SSO_CACHE.get(val)
-    if hit and (now - hit[1]) < _SSO_TTL:
-        g._sso_user = hit[0]
-        return hit[0]
-    user = None
-    try:
-        import urllib.request
-        req = urllib.request.Request(
-            _cuentas_base() + "/api/whoami",
-            headers={"Cookie": f"{_SSO_COOKIE}={val}"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            if resp.status == 200:
-                user = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        user = None  # 401 / cuentas caido / red -> sin sesion valida
-    # Purga: sin esto el dict crece sin limite (una entrada por valor de
-    # cookie que pase por aqui, incluidos valores invalidos aleatorios).
-    if len(_SSO_CACHE) > 512:
-        for k in [k for k, v in _SSO_CACHE.items() if (now - v[1]) >= _SSO_TTL]:
-            _SSO_CACHE.pop(k, None)
-        if len(_SSO_CACHE) > 512:
-            _SSO_CACHE.clear()   # todas vivas y aun asi enorme: reset
-    _SSO_CACHE[val] = (user, now)
-    g._sso_user = user
-    return user
+    """Lo que Cuentas dice del usuario de esta peticion (su whoami: nombre,
+    rol, permisos) o None: sin sesion, si Cuentas dice que no, o si no contesta
+    y nunca lo confirmo. En local sin login, el admin de pruebas."""
+    if sso._no_auth():
+        return sso.current_user()
+    return sso.usuario_cuentas()
 
 
 def _user_rol() -> str | None:
