@@ -52,6 +52,8 @@ Lo que hace:
   403 con la página sin_acceso.html de la app. `requiere_vista` por secciones.
 - Sin login (usuario admin de pruebas) solo en local: pedido con ROLS_NO_AUTH o
   sirviendo en localhost. Nunca en producción.
+- `proteger_escrituras(app)`: las escrituras que el navegador dice que vienen
+  de otra web, fuera (CSRF).
 - `servicio_de_one(request)`: lo que One pide de servidor a servidor, firmado.
 """
 from __future__ import annotations
@@ -450,11 +452,17 @@ def es_admin() -> bool:
 # ---------------------------------------------------------------------------
 # Las puertas
 # ---------------------------------------------------------------------------
+def es_api() -> bool:
+    """¿Contesta esta petición en JSON (la API) y no con una pantalla? Una app
+    con API fuera de /api/ lo redefine (Copilot: /admin/sync)."""
+    return (request.path or "").startswith("/api/")
+
+
 def sin_acceso(codigo: str = "sin_acceso", detalle_api: str = "",
                titulo: str | None = None, detalle: str | None = None):
     """La respuesta 403: JSON en la API, la página sin_acceso.html de la app en
     las pantallas (con las URLs de Cuentas y de One, para sus botones)."""
-    if (request.path or "").startswith("/api/"):
+    if es_api():
         cuerpo = {"error": codigo}
         if detalle_api:
             cuerpo["detalle"] = detalle_api
@@ -469,7 +477,7 @@ def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if current_user() is None:
-            if (request.path or "").startswith("/api/"):
+            if es_api():
                 return jsonify({"error": "auth_required"}), 401
             return redirect(f"{cuentas_base()}/login?next={quote(request.url, safe='')}")
         if not tiene_acceso():
@@ -500,6 +508,44 @@ def requiere_alguna_vista(*vistas: str):
 
 def requiere_vista(vista: str):
     return requiere_alguna_vista(vista)
+
+
+# ---------------------------------------------------------------------------
+# Escrituras solo desde la propia app (CSRF)
+# ---------------------------------------------------------------------------
+# La cookie de la suite es SameSite=Lax, pero para el navegador TODOS los
+# subdominios de rolscarpets.com son el mismo «sitio»: un formulario servido en
+# cualquiera de ellos llegaría aquí con la sesión puesta (y Flask acepta como
+# JSON un cuerpo text/plain, que es lo que manda un <form>). Se mira lo que el
+# navegador dice del origen (Sec-Fetch-Site; si no, Origin), que una página no
+# puede falsear, y el front no tiene que añadir nada. Sin esas cabeceras
+# (servidor a servidor: un cron, un webhook, One) pasa: ahí decide el endpoint
+# con su token o su firma. Como Producción desde el 26-09-2026.
+_METODOS_QUE_ESCRIBEN = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def escritura_de_otra_web(req) -> bool:
+    """¿Es una escritura que el navegador dice que viene de otra web?"""
+    if req.method not in _METODOS_QUE_ESCRIBEN:
+        return False
+    sitio = (req.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if sitio:
+        return sitio not in ("same-origin", "none")
+    origen = (req.headers.get("Origin") or "").strip()
+    if origen:
+        from urllib.parse import urlparse
+        return urlparse(origen).netloc.lower() != (req.host or "").lower()
+    return False
+
+
+def proteger_escrituras(app) -> None:
+    """403 a toda escritura (POST/PUT/PATCH/DELETE) que el navegador dice que
+    viene de otra web. Se llama una vez, al montar la app."""
+    @app.before_request
+    def _solo_escrituras_propias():  # noqa: ANN202
+        if escritura_de_otra_web(request):
+            return jsonify({"error": "petición rechazada: no viene de esta aplicación"}), 403
+        return None
 
 
 # ---------------------------------------------------------------------------
